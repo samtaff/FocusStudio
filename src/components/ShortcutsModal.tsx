@@ -1,0 +1,65 @@
+import React from 'react';
+import { X, Keyboard } from 'lucide-react';
+
+interface ShortcutsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  const shortcuts = [
+    { key: '+ ou A', desc: 'Ajouter un nouveau focus (240 × 50 px)' },
+    { key: 'Suppr / Retour arrière', desc: 'Supprimer le focus sélectionné' },
+    { key: 'Ctrl + D / ⌘D', desc: 'Dupliquer le focus sélectionné' },
+    { key: 'Flèches directionnelles', desc: 'Déplacer le focus de 1 px' },
+    { key: 'Shift + Flèches', desc: 'Déplacer le focus de 10 px' },
+    { key: 'Ctrl + Z / ⌘Z', desc: 'Annuler la dernière action' },
+    { key: 'Ctrl + Shift + Z / ⌘Y', desc: 'Rétablir la dernière action' },
+    { key: 'Ctrl + V / ⌘V', desc: "Coller une capture d'écran directement" },
+    { key: 'Espace + Glisser', desc: 'Déplacer la vue (Pan)' },
+    { key: 'Échap', desc: 'Désélectionner le focus en cours' },
+    { key: "Double-clic sur l'image", desc: 'Créer un focus instantané à cet endroit' },
+    { key: 'Ctrl + E / ⌘E', desc: 'Exporter le visuel en PNG transparent' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/25 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+      <div className="bg-white/85 backdrop-blur-2xl border border-white/60 rounded-3xl shadow-2xl max-w-md w-full p-6 text-[#000000]">
+        <div className="flex items-center justify-between pb-3 border-b border-[#eeeeee]">
+          <div className="flex items-center gap-2">
+            <Keyboard className="w-5 h-5 text-[#0088cc]" />
+            <h3 className="font-semibold text-sm tracking-tight text-[#000000]">Raccourcis clavier</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-full text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee] transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+          {shortcuts.map((s, i) => (
+            <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-[#eeeeee]/60 last:border-0">
+              <span className="text-[#666666]">{s.desc}</span>
+              <kbd className="px-2.5 py-0.5 rounded-full bg-[#eeeeee] border border-white text-[11px] font-mono font-medium text-[#000000] shadow-2xs whitespace-nowrap">
+                {s.key}
+              </kbd>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 pt-3 border-t border-[#eeeeee] flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-full bg-[#000000] hover:bg-[#222222] text-white text-xs font-semibold shadow-2xs transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

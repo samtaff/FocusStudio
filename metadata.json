@@ -1,0 +1,6 @@
+{
+  "name": "Focus",
+  "description": "Générateur de visuels de procédures techniques avec captures d'écran et zones de focus agrandies",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

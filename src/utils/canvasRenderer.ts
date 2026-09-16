@@ -1,0 +1,1164 @@
+/**
+ * High-fidelity Canvas 2D rendering engine for procedure visuals.
+ *
+ * Rules:
+ * - Screenshot corners: always straight square corners (no rounded corners, no drop shadow).
+ * - Screenshot border: MUST ALWAYS have a 1px border of color #25465F.
+ * - Step Badge (Pastille): MUST be a 20x20px square with 5px rounded corners,
+ *   must NOT be cut by the rectangle, strictly without contour/border,
+ *   and drawn at the absolute FOREGROUND (premier plan).
+ * - Blue Mask shape: MUST be color #25465F.
+ * - High-efficiency Blur: powerful frosted / downsampled blur guaranteeing complete anonymization.
+ * - Visual Hover feedback: intuitive, ergonomic highlighting so users clearly see which zone is targeted.
+ * - Preview Mode: displays exactly what the final exported PNG will look like.
+ */
+
+import { 
+  FocusZone, 
+  LoadedImage, 
+  ResizeHandle, 
+  SmartGuide, 
+  GlobalStyleSettings,
+  AnnotationArrow,
+  UserGuide,
+  BlurZone,
+  MaskShape,
+  TriangleShape
+} from '../types';
+
+export const BASE_COLOR = '#25465F'; // Corporate navy cyan #25465F
+export const DEFAULT_WORKSPACE_WIDTH = 440; // Default workspace width in px
+export const MIN_WORKSPACE_WIDTH = 240;
+export const MAX_WORKSPACE_WIDTH = 500; // Cap at 500px max per requirement
+
+export interface RenderOptions {
+  interactive?: boolean;
+  selectedFocusId?: string | null;
+  hoveredFocusId?: string | null;
+  hoveredHandle?: ResizeHandle | null;
+  smartGuides?: SmartGuide[];
+  userGuides?: UserGuide[];
+  arrows?: AnnotationArrow[];
+  globalStyles?: Partial<GlobalStyleSettings>;
+  showGuides?: boolean;
+  showRulers?: boolean;
+  skipClear?: boolean;
+  blurZones?: BlurZone[];
+  selectedBlurId?: string | null;
+  hoveredBlurId?: string | null;
+  maskShapes?: MaskShape[];
+  selectedMaskId?: string | null;
+  hoveredMaskId?: string | null;
+  triangles?: TriangleShape[];
+  selectedTriangleId?: string | null;
+  hoveredTriangleId?: string | null;
+  previewMode?: boolean;
+}
+
+/**
+ * Calculates the stable composition dimensions for the workspace.
+ * - Screenshot size: resized homothetically to max 180px width and max 390px height.
+ * - Workspace width: configurable up to 500px max (default: 440px).
+ * - Screenshot stays centered horizontally and vertically inside the workspace.
+ */
+export function calculateCompositionBounds(
+  image: LoadedImage | null,
+  _focuses?: FocusZone[],
+  workspaceWidth = DEFAULT_WORKSPACE_WIDTH
+): {
+  canvasWidth: number;
+  canvasHeight: number;
+  bgX: number;
+  bgY: number;
+  bgWidth: number;
+  bgHeight: number;
+  scale: number;
+} {
+  const canvasWidth = Math.min(MAX_WORKSPACE_WIDTH, Math.max(MIN_WORKSPACE_WIDTH, Math.round(workspaceWidth || DEFAULT_WORKSPACE_WIDTH)));
+
+  if (!image) {
+    const bgWidth = 180;
+    const bgHeight = 390;
+    const canvasHeight = 440;
+    return {
+      canvasWidth,
+      canvasHeight,
+      bgX: Math.round((canvasWidth - bgWidth) / 2),
+      bgY: Math.round((canvasHeight - bgHeight) / 2),
+      bgWidth,
+      bgHeight,
+      scale: 1,
+    };
+  }
+
+  const origW = image.originalWidth;
+  const origH = image.originalHeight;
+
+  // Screenshot resizes to 180px max width and 390px max height, homothetically
+  const maxW = 180;
+  const maxH = 390;
+  const bgScale = Math.min(maxW / origW, maxH / origH);
+  const bgWidth = Math.round(origW * bgScale);
+  const bgHeight = Math.round(origH * bgScale);
+
+  const canvasHeight = Math.min(500, Math.max(420, bgHeight + 40));
+  const bgX = Math.round((canvasWidth - bgWidth) / 2);
+  const bgY = Math.round((canvasHeight - bgHeight) / 2);
+
+  return {
+    canvasWidth,
+    canvasHeight,
+    bgX,
+    bgY,
+    bgWidth,
+    bgHeight,
+    scale: bgScale,
+  };
+}
+
+/**
+ * Calculates tight bounding box around the active visual elements for clean PNG export
+ */
+export function calculateExportBounds(
+  image: LoadedImage | null,
+  focuses: FocusZone[],
+  arrows: AnnotationArrow[] = [],
+  padding = 16,
+  workspaceWidth = DEFAULT_WORKSPACE_WIDTH,
+  blurZones: BlurZone[] = [],
+  maskShapes: MaskShape[] = [],
+  triangles: TriangleShape[] = []
+): {
+  exportWidth: number;
+  exportHeight: number;
+  offsetX: number;
+  offsetY: number;
+} {
+  const { bgX, bgY, bgWidth, bgHeight } = calculateCompositionBounds(image, focuses, workspaceWidth);
+
+  let minX = bgX;
+  let maxX = bgX + bgWidth;
+  let minY = bgY;
+  let maxY = bgY + bgHeight;
+
+  focuses.forEach((f) => {
+    minX = Math.min(minX, f.x);
+    maxX = Math.max(maxX, f.x + f.width);
+    minY = Math.min(minY, f.y);
+    maxY = Math.max(maxY, f.y + f.height);
+
+    // Also account for 20x20 step badge: badgeY = f.y - 14
+    if (f.showStepBadge !== false && f.stepNumber !== undefined) {
+      const num = f.stepNumber || 1;
+      const alignLeft = f.badgePosition === 'left' ? true : f.badgePosition === 'right' ? false : (num % 2 !== 0);
+      const badgeX = alignLeft ? bgX - 10 : bgX + bgWidth - 10;
+      const badgeY = f.y - 14;
+      minX = Math.min(minX, badgeX);
+      maxX = Math.max(maxX, badgeX + 20);
+      minY = Math.min(minY, badgeY);
+      maxY = Math.max(maxY, badgeY + 20);
+    }
+  });
+
+  arrows.forEach((a) => {
+    if (!a.visible) return;
+    minX = Math.min(minX, a.startX, a.endX);
+    maxX = Math.max(maxX, a.startX, a.endX);
+    minY = Math.min(minY, a.startY, a.endY);
+    maxY = Math.max(maxY, a.startY, a.endY);
+  });
+
+  blurZones.forEach((b) => {
+    minX = Math.min(minX, b.x);
+    maxX = Math.max(maxX, b.x + b.width);
+    minY = Math.min(minY, b.y);
+    maxY = Math.max(maxY, b.y + b.height);
+  });
+
+  maskShapes.forEach((m) => {
+    minX = Math.min(minX, m.x);
+    maxX = Math.max(maxX, m.x + m.width);
+    minY = Math.min(minY, m.y);
+    maxY = Math.max(maxY, m.y + m.height);
+  });
+
+  triangles.forEach((t) => {
+    minX = Math.min(minX, t.x);
+    maxX = Math.max(maxX, t.x + t.width);
+    minY = Math.min(minY, t.y);
+    maxY = Math.max(maxY, t.y + t.height);
+  });
+
+  const exportWidth = Math.max(60, Math.round(maxX - minX + padding * 2));
+  const exportHeight = Math.max(60, Math.round(maxY - minY + padding * 2));
+  const offsetX = Math.round(-minX + padding);
+  const offsetY = Math.round(-minY + padding);
+
+  return {
+    exportWidth,
+    exportHeight,
+    offsetX,
+    offsetY,
+  };
+}
+
+/**
+ * Draws the visual composition onto any CanvasRenderingContext2D.
+ */
+export function drawComposition(
+  ctx: CanvasRenderingContext2D,
+  image: LoadedImage | null,
+  focuses: FocusZone[],
+  options: RenderOptions = {}
+) {
+  const { 
+    interactive = false, 
+    selectedFocusId = null, 
+    hoveredFocusId = null,
+    smartGuides = [],
+    userGuides = [],
+    globalStyles = {},
+    showGuides = true,
+    showRulers = true,
+    skipClear = false,
+    blurZones = [],
+    selectedBlurId = null,
+    hoveredBlurId = null,
+    maskShapes = [],
+    selectedMaskId = null,
+    hoveredMaskId = null,
+    triangles = [],
+    selectedTriangleId = null,
+    hoveredTriangleId = null,
+  } = options;
+
+  if (!skipClear) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  }
+
+  if (!image) return;
+
+  const workspaceWidth = globalStyles.workspaceWidth || DEFAULT_WORKSPACE_WIDTH;
+  const { bgX, bgY, bgWidth, bgHeight, scale } = calculateCompositionBounds(image, focuses, workspaceWidth);
+
+  // 1. Draw base screenshot non-destructively with STRAIGHT SQUARE CORNERS (no rounded corners, no shadow)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(bgX, bgY, bgWidth, bgHeight);
+  ctx.clip();
+  ctx.drawImage(image.element, bgX, bgY, bgWidth, bgHeight);
+
+  // 2. Apply blue tint (#25465F at 50% opacity by default)
+  const tintColor = globalStyles.bgTintColor || BASE_COLOR;
+  const tintOpacity = globalStyles.bgTintOpacity ?? 0.50;
+  ctx.fillStyle = hexToRgba(tintColor, tintOpacity);
+  ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+  ctx.restore();
+
+  // 3. Screenshot border: MUST ALWAYS HAVE A 1px BORDER IN #25465F (straight square corners)
+  ctx.save();
+  ctx.strokeStyle = BASE_COLOR; // Strictly #25465F
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bgX + 0.5, bgY + 0.5, bgWidth - 1, bgHeight - 1);
+  ctx.restore();
+
+  // 4. Draw Focus zones content & borders (WITHOUT the badge, so the badge stays strictly on top)
+  focuses.forEach((focus) => {
+    drawSingleFocusContentAndBorder(ctx, image, focus, { bgX, bgY, bgWidth, bgHeight, scale });
+  });
+
+  // 5. Draw High-Efficiency Blur zones: calculated on the chosen zone (screenshot or focus)
+  if (blurZones.length > 0) {
+    blurZones.forEach((blur) => {
+      drawSingleBlurZone(ctx, blur, interactive && !options.previewMode && blur.id === selectedBlurId);
+    });
+  }
+
+  // 6. Draw Mask shapes
+  if (maskShapes.length > 0) {
+    maskShapes.forEach((mask) => {
+      drawSingleMaskShape(ctx, mask);
+    });
+  }
+
+  // 7. Draw Triangles (15x13px en #25465F ou blanc)
+  if (triangles.length > 0) {
+    triangles.forEach((triangle) => {
+      drawSingleTriangle(ctx, triangle);
+    });
+  }
+
+  // 8. STEP BADGE: MUST BE A 20x20px SQUARE WITH 5px ROUNDED CORNERS,
+  // NOT CUT BY THE RECTANGLE, STRICTLY NO BORDER, DRAWN AT THE VERY FOREGROUND (premier plan)
+  // Positionné comme sur l'image : badgeY = focus.y - 14 (dépasse au-dessus du rectangle, à cheval sur le bord supérieur)
+  focuses.forEach((focus) => {
+    if (focus.showStepBadge !== false && focus.stepNumber !== undefined) {
+      drawStepBadge(ctx, focus, { bgX, bgY, bgWidth, bgHeight });
+    }
+  });
+
+  // If in Preview Mode, do NOT draw any guides, handles, rulers, or hover highlights
+  if (options.previewMode) {
+    return;
+  }
+
+  // 9. If interactive, draw Rulers (discreet and small)
+  if (interactive && showRulers) {
+    drawRulers(ctx, bgX, bgY, bgWidth, bgHeight);
+  }
+
+  // 10. If interactive, draw smart alignment guides & user guides (ultra-discreet & small)
+  if (interactive && showGuides) {
+    const phoneCenterX = bgX + bgWidth / 2;
+    drawSymmetryAxis(ctx, phoneCenterX, bgY, bgHeight);
+
+    if (smartGuides.length > 0) {
+      drawSmartGuides(ctx, smartGuides);
+    }
+
+    if (userGuides.length > 0) {
+      drawUserGuides(ctx, userGuides);
+    }
+  }
+
+  // 11. If interactive, draw hover highlight & selection handles
+  if (interactive && globalStyles.showHandles !== false) {
+    // Focus hover & selection
+    focuses.forEach((focus) => {
+      const isSelected = focus.id === selectedFocusId;
+      const isHovered = focus.id === hoveredFocusId && !isSelected;
+
+      if (isHovered) {
+        drawFocusHoverHighlight(ctx, focus);
+      } else if (isSelected) {
+        drawFocusSelectionHandles(ctx, focus);
+      }
+    });
+
+    // Blur hover & selection
+    blurZones.forEach((blur) => {
+      const isSelected = blur.id === selectedBlurId;
+      const isHovered = blur.id === hoveredBlurId && !isSelected;
+
+      if (isHovered) {
+        drawBlurHoverHighlight(ctx, blur);
+      } else if (isSelected) {
+        drawGenericSelectionHandles(ctx, blur.x, blur.y, blur.width, blur.height, '#0284c7', blur.name || 'Zone de flou');
+      }
+    });
+
+    // Mask hover & selection
+    maskShapes.forEach((mask) => {
+      const isSelected = mask.id === selectedMaskId;
+      const isHovered = mask.id === hoveredMaskId && !isSelected;
+
+      if (isHovered) {
+        drawMaskHoverHighlight(ctx, mask);
+      } else if (isSelected) {
+        drawGenericSelectionHandles(ctx, mask.x, mask.y, mask.width, mask.height, '#38bdf8', mask.name || 'Forme');
+      }
+    });
+
+    // Triangle hover & selection
+    triangles.forEach((triangle) => {
+      const isSelected = triangle.id === selectedTriangleId;
+      const isHovered = triangle.id === hoveredTriangleId && !isSelected;
+
+      if (isHovered) {
+        drawTriangleHoverHighlight(ctx, triangle);
+      } else if (isSelected) {
+        drawGenericSelectionHandles(ctx, triangle.x, triangle.y, triangle.width, triangle.height, '#f59e0b', 'Triangle');
+      }
+    });
+  }
+}
+
+/**
+ * Renders a single Focus card:
+ * - Drop shadow
+ * - Rounded corners (10px default)
+ * - Magnified un-tinted screenshot area
+ * - Border in #25465F (2 pt)
+ */
+function drawSingleFocusContentAndBorder(
+  ctx: CanvasRenderingContext2D,
+  image: LoadedImage,
+  focus: FocusZone,
+  bounds: { bgX: number; bgY: number; bgWidth: number; bgHeight: number; scale: number }
+) {
+  const { bgX, bgY, scale } = bounds;
+  const zoom = Math.max(1.0, focus.zoom || 1.4);
+  const radius = Math.max(0, focus.borderRadius ?? 10);
+
+  const destX = Math.round(focus.x);
+  const destY = Math.round(focus.y);
+  const destW = Math.round(focus.width);
+  const destH = Math.round(focus.height);
+
+  const compCenterX = focus.x + focus.width / 2 + (focus.sourceOffsetX || 0);
+  const compCenterY = focus.y + focus.height / 2 + (focus.sourceOffsetY || 0);
+
+  const origCenterX = (compCenterX - bgX) / scale;
+  const origCenterY = (compCenterY - bgY) / scale;
+
+  const origCropW = (destW / zoom) / scale;
+  const origCropH = (destH / zoom) / scale;
+
+  const origSrcX = origCenterX - origCropW / 2;
+  const origSrcY = origCenterY - origCropH / 2;
+
+  // A. Drop Shadow under the focus card
+  if (focus.hasShadow !== false) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(15, 23, 42, 0.28)';
+    ctx.shadowBlur = focus.shadowBlur ?? 14;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = focus.shadowOffsetY ?? 5;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.roundRect(destX, destY, destW, destH, radius);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // B. Draw clipped and magnified content with rounded corners
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(destX, destY, destW, destH, radius);
+  ctx.clip();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(destX, destY, destW, destH);
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+
+  ctx.drawImage(
+    image.element,
+    origSrcX,
+    origSrcY,
+    origCropW,
+    origCropH,
+    destX,
+    destY,
+    destW,
+    destH
+  );
+
+  ctx.restore();
+
+  // C. Border stroke (2 pt in #25465F, rounded corners 10px)
+  ctx.save();
+  const bWidth = focus.borderWidth || 2;
+  ctx.strokeStyle = focus.borderColor || BASE_COLOR;
+  ctx.lineWidth = bWidth;
+  ctx.beginPath();
+  ctx.roundRect(destX, destY, destW, destH, radius);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Draws the numbered step badge:
+ * - MUST be a 20x20px square with 5px rounded corners.
+ * - Odd numbers on left vertical edge of screenshot (bgX)
+ * - Even numbers on right vertical edge of screenshot (bgX + bgWidth)
+ * - MUST NOT be cut off by the rectangle: drawn on the top layer, strictly unclipped.
+ * - Exactly matching reference image: positioned at the top edge of the focus zone,
+ *   sitting 14px above focus.y (the white card top line passes below the number),
+ *   and overlapping the first 6px of the card.
+ * - STRICTLY NO BORDER / CONTOUR.
+ */
+function drawStepBadge(
+  ctx: CanvasRenderingContext2D, 
+  focus: FocusZone,
+  bounds: { bgX: number; bgY: number; bgWidth: number; bgHeight: number }
+) {
+  const { bgX, bgWidth } = bounds;
+  const badgeW = 20;
+  const badgeH = 20;
+  const badgeRadius = 5;
+  const num = focus.stepNumber || 1;
+
+  let alignLeft = true;
+  if (focus.badgePosition === 'left') {
+    alignLeft = true;
+  } else if (focus.badgePosition === 'right') {
+    alignLeft = false;
+  } else {
+    // 'auto': Odd on left edge, Even on right edge
+    alignLeft = num % 2 !== 0;
+  }
+
+  // Centered on the vertical edge of the imported screenshot
+  const badgeX = alignLeft
+    ? Math.round(bgX - badgeW / 2)
+    : Math.round(bgX + bgWidth - badgeW / 2);
+
+  // Position exactly as shown in the reference image:
+  // Badge top is 14px above focus top, number is centered, bottom overlaps top of focus by 6px
+  const badgeY = Math.round(focus.y - 14);
+
+  ctx.save();
+  // Fill badge (strictly no contour / stroke)
+  ctx.fillStyle = focus.badgeColor || focus.borderColor || BASE_COLOR;
+  ctx.beginPath();
+  ctx.roundRect(badgeX, badgeY, badgeW, badgeH, badgeRadius);
+  ctx.fill();
+
+  // Text: White, Bold, Centered
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(num), badgeX + badgeW / 2, badgeY + badgeH / 2);
+  ctx.restore();
+}
+
+/**
+ * Draws high-efficiency blur:
+ * Uses a multi-stage blur (downsampling + bicubic upscale + Gaussian filter + frosted veil)
+ * to guarantee complete anonymization of text, numbers, and UI elements.
+ */
+function drawSingleBlurZone(
+  ctx: CanvasRenderingContext2D,
+  blur: BlurZone,
+  showIndicator = false
+) {
+  const { x, y, width: w, height: h } = blur;
+  if (w <= 0 || h <= 0) return;
+
+  const radius = blur.borderRadius ?? 4;
+  const userRadius = Math.max(4, blur.blurRadius || 12);
+
+  // Pad slightly to sample surrounding pixels without edge clamping
+  const pad = Math.ceil(userRadius * 0.75);
+  const srcX = Math.max(0, Math.floor(x - pad));
+  const srcY = Math.max(0, Math.floor(y - pad));
+  const srcW = Math.min(ctx.canvas.width - srcX, Math.ceil(w + pad * 2));
+  const srcH = Math.min(ctx.canvas.height - srcY, Math.ceil(h + pad * 2));
+
+  if (srcW <= 0 || srcH <= 0) return;
+
+  try {
+    // 1. Snapshot the existing pixels on the canvas (screenshot + focus zones)
+    const offscreen = document.createElement('canvas');
+    offscreen.width = srcW;
+    offscreen.height = srcH;
+    const offCtx = offscreen.getContext('2d');
+    if (!offCtx) return;
+    offCtx.drawImage(ctx.canvas, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+
+    // 2. High-Efficiency Downsampling:
+    // Shrinking the zone completely pulverizes high-frequency glyphs and text
+    const scaleDivisor = Math.max(4, Math.min(10, Math.round(userRadius / 2)));
+    const downW = Math.max(4, Math.floor(srcW / scaleDivisor));
+    const downH = Math.max(4, Math.floor(srcH / scaleDivisor));
+
+    const downCanvas = document.createElement('canvas');
+    downCanvas.width = downW;
+    downCanvas.height = downH;
+    const downCtx = downCanvas.getContext('2d');
+    if (!downCtx) return;
+
+    downCtx.imageSmoothingEnabled = true;
+    downCtx.imageSmoothingQuality = 'medium';
+    downCtx.drawImage(offscreen, 0, 0, srcW, srcH, 0, 0, downW, downH);
+
+    // 3. Render back onto target zone with clip and smooth Gaussian blur
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, radius);
+    ctx.clip();
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.filter = `blur(${Math.max(6, Math.round(userRadius / 2))}px)`;
+    ctx.drawImage(downCanvas, 0, 0, downW, downH, srcX, srcY, srcW, srcH);
+
+    // 4. Subtle frosted glass veil for premium finish and 100% confidentiality
+    ctx.filter = 'none';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.fillRect(x, y, w, h);
+
+    ctx.restore();
+  } catch (e) {
+    console.error('Error applying blur:', e);
+  }
+
+  // Subtle border only for interactive positioning when selected
+  if (showIndicator) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+    ctx.lineWidth = 0.75;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, radius);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/**
+ * Draws a mask shape to hide portions:
+ * Supports custom color (#25465F by default), border contour, and clipping mask with secondary screenshot!
+ */
+function drawSingleMaskShape(
+  ctx: CanvasRenderingContext2D,
+  mask: MaskShape
+) {
+  const radius = mask.borderRadius ?? 4;
+  const color = mask.color || BASE_COLOR;
+  const opacity = mask.opacity ?? 1.0;
+
+  ctx.save();
+  ctx.globalAlpha = opacity;
+
+  // 1. Clipping mask with an imported screenshot if present
+  if (mask.clipImage && (mask.clipImage.element || mask.clipImage.dataUrl)) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(mask.x, mask.y, mask.width, mask.height, radius);
+    ctx.clip();
+
+    // Background base
+    ctx.fillStyle = color;
+    ctx.fillRect(mask.x, mask.y, mask.width, mask.height);
+
+    const imgEl = mask.clipImage.element;
+    if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
+      const scale = mask.clipImage.scale ?? 1;
+      const offX = mask.clipImage.offsetX ?? 0;
+      const offY = mask.clipImage.offsetY ?? 0;
+
+      const destW = mask.width * scale;
+      const destH = mask.height * scale;
+      const destX = mask.x + (mask.width - destW) / 2 + offX;
+      const destY = mask.y + (mask.height - destH) / 2 + offY;
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(imgEl, destX, destY, destW, destH);
+    }
+    ctx.restore();
+  } else {
+    // Standard solid color fill
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(mask.x, mask.y, mask.width, mask.height, radius);
+    ctx.fill();
+  }
+
+  // 2. Contour / Border
+  if (mask.borderWidth && mask.borderWidth > 0) {
+    ctx.save();
+    ctx.strokeStyle = mask.borderColor || '#ffffff';
+    ctx.lineWidth = mask.borderWidth;
+    if (mask.borderStyle === 'dashed') {
+      ctx.setLineDash([4, 3]);
+    } else if (mask.borderStyle === 'dotted') {
+      ctx.setLineDash([2, 2]);
+    } else {
+      ctx.setLineDash([]);
+    }
+    ctx.beginPath();
+    ctx.roundRect(mask.x, mask.y, mask.width, mask.height, radius);
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    // Subtle boundary stroke if no explicit border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws a 15x13px Triangle:
+ * - Default size: 15px width × 13px height
+ * - Color: #25465F or white (#ffffff)
+ * - Orientation: down (default), up, left, right
+ */
+function drawSingleTriangle(
+  ctx: CanvasRenderingContext2D,
+  triangle: TriangleShape
+) {
+  const { x, y, width: w, height: h, color, direction = 'down', opacity = 1 } = triangle;
+
+  ctx.save();
+  ctx.globalAlpha = opacity;
+
+  ctx.beginPath();
+  if (direction === 'down') {
+    // Pointing downward: flat top, point at bottom center
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + w, y);
+    ctx.lineTo(x + w / 2, y + h);
+  } else if (direction === 'up') {
+    // Pointing upward: point at top center, flat bottom
+    ctx.moveTo(x + w / 2, y);
+    ctx.lineTo(x + w, y + h);
+    ctx.lineTo(x, y + h);
+  } else if (direction === 'left') {
+    // Pointing left
+    ctx.moveTo(x, y + h / 2);
+    ctx.lineTo(x + w, y);
+    ctx.lineTo(x + w, y + h);
+  } else {
+    // Pointing right
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + w, y + h / 2);
+    ctx.lineTo(x, y + h);
+  }
+  ctx.closePath();
+
+  ctx.fillStyle = color || BASE_COLOR;
+  ctx.fill();
+
+  if (triangle.borderWidth && triangle.borderWidth > 0) {
+    ctx.strokeStyle = triangle.borderColor || '#ffffff';
+    ctx.lineWidth = triangle.borderWidth;
+    ctx.stroke();
+  } else if (color === '#ffffff' || color?.toLowerCase() === '#fff') {
+    // Subtle hairline stroke for white triangle on light backgrounds
+    ctx.strokeStyle = 'rgba(37, 70, 95, 0.3)';
+    ctx.lineWidth = 0.75;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * High-visibility ergonomic hover highlight for Focus zone
+ */
+function drawFocusHoverHighlight(ctx: CanvasRenderingContext2D, focus: FocusZone) {
+  const { x, y, width: w, height: h, borderRadius = 10 } = focus;
+
+  ctx.save();
+  // 1. Soft glowing outer halo
+  ctx.shadowColor = 'rgba(56, 189, 248, 0.4)';
+  ctx.shadowBlur = 8;
+  ctx.strokeStyle = '#0284c7';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
+  ctx.stroke();
+  ctx.restore();
+
+  // 2. Clear floating tooltip badge above the hovered zone
+  ctx.save();
+  const label = `${focus.name || `Zone ${focus.stepNumber || 1}`} • Cliquer pour sélectionner`;
+  ctx.font = 'bold 9.5px system-ui, sans-serif';
+  const textW = ctx.measureText(label).width;
+  const pillW = textW + 14;
+  const pillH = 18;
+  const pillX = Math.round(x + w / 2 - pillW / 2);
+  const pillY = Math.round(y - pillH - 6);
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 2;
+  ctx.beginPath();
+  ctx.roundRect(pillX, pillY, pillW, pillH, 4);
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, pillX + pillW / 2, pillY + pillH / 2);
+  ctx.restore();
+}
+
+/**
+ * High-visibility ergonomic hover highlight for Blur zone:
+ * Luminous cyan halo + pill tooltip indicating size and action
+ */
+function drawBlurHoverHighlight(ctx: CanvasRenderingContext2D, blur: BlurZone) {
+  const { x, y, width: w, height: h, borderRadius = 4 } = blur;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(56, 189, 248, 0.6)';
+  ctx.shadowBlur = 8;
+  ctx.strokeStyle = '#0284c7';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  const label = `${blur.name || 'Flou'} (${Math.round(w)}×${Math.round(h)}) • Cliquer pour sélectionner`;
+  ctx.font = 'bold 9.5px system-ui, sans-serif';
+  const textW = ctx.measureText(label).width;
+  const pillW = textW + 14;
+  const pillH = 18;
+  const pillX = Math.round(x + w / 2 - pillW / 2);
+  const pillY = Math.round(y - pillH - 6);
+
+  ctx.fillStyle = 'rgba(12, 74, 110, 0.94)';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 2;
+  ctx.beginPath();
+  ctx.roundRect(pillX, pillY, pillW, pillH, 4);
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, pillX + pillW / 2, pillY + pillH / 2);
+  ctx.restore();
+}
+
+/**
+ * High-visibility ergonomic hover highlight for Mask shape
+ */
+function drawMaskHoverHighlight(ctx: CanvasRenderingContext2D, mask: MaskShape) {
+  const { x, y, width: w, height: h, borderRadius = 4 } = mask;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(56, 189, 248, 0.5)';
+  ctx.shadowBlur = 8;
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  const label = `${mask.name || 'Forme'} • Cliquer pour sélectionner`;
+  ctx.font = 'bold 9.5px system-ui, sans-serif';
+  const textW = ctx.measureText(label).width;
+  const pillW = textW + 14;
+  const pillH = 18;
+  const pillX = Math.round(x + w / 2 - pillW / 2);
+  const pillY = Math.round(y - pillH - 6);
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 2;
+  ctx.beginPath();
+  ctx.roundRect(pillX, pillY, pillW, pillH, 4);
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, pillX + pillW / 2, pillY + pillH / 2);
+  ctx.restore();
+}
+
+/**
+ * High-visibility hover highlight for Triangle
+ */
+function drawTriangleHoverHighlight(ctx: CanvasRenderingContext2D, triangle: TriangleShape) {
+  const { x, y, width: w, height: h } = triangle;
+
+  ctx.save();
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+
+  const label = `Triangle (15×13) • Cliquer pour sélectionner`;
+  ctx.font = 'bold 9.5px system-ui, sans-serif';
+  const textW = ctx.measureText(label).width;
+  const pillW = textW + 14;
+  const pillH = 18;
+  const pillX = Math.round(x + w / 2 - pillW / 2);
+  const pillY = Math.round(y - pillH - 6);
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+  ctx.beginPath();
+  ctx.roundRect(pillX, pillY, pillW, pillH, 4);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, pillX + pillW / 2, pillY + pillH / 2);
+  ctx.restore();
+}
+
+/**
+ * Generic selection handles for blur, mask or triangle shapes (discreet, 8 handles)
+ */
+function drawGenericSelectionHandles(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  color = '#38bdf8',
+  label?: string
+) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.25;
+  ctx.setLineDash([3, 2]);
+  ctx.strokeRect(x, y, w, h);
+  ctx.setLineDash([]);
+
+  // Tag badge with dimensions
+  if (label) {
+    ctx.font = 'bold 9px system-ui, sans-serif';
+    const tagText = `${label} (${Math.round(w)}×${Math.round(h)})`;
+    const tagW = ctx.measureText(tagText).width + 8;
+    const tagH = 14;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(x, y - tagH - 3, tagW, tagH, 3);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(tagText, x + 4, y - tagH / 2 - 3);
+  }
+
+  const handleSize = 5;
+  const half = handleSize / 2;
+  const corners = [
+    { cx: x, cy: y },
+    { cx: x + w / 2, cy: y },
+    { cx: x + w, cy: y },
+    { cx: x, cy: y + h / 2 },
+    { cx: x + w, cy: y + h / 2 },
+    { cx: x, cy: y + h },
+    { cx: x + w / 2, cy: y + h },
+    { cx: x + w, cy: y + h },
+  ];
+
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  corners.forEach(({ cx, cy }) => {
+    ctx.fillRect(cx - half, cy - half, handleSize, handleSize);
+    ctx.strokeRect(cx - half, cy - half, handleSize, handleSize);
+  });
+  ctx.restore();
+}
+
+/**
+ * Draws pixel metric rulers along the top and left
+ */
+function drawRulers(ctx: CanvasRenderingContext2D, bgX: number, bgY: number, bgW: number, bgH: number) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+  ctx.strokeStyle = 'rgba(148, 163, 184, 0.25)';
+  ctx.font = '7.5px "JetBrains Mono", Menlo, monospace';
+  ctx.lineWidth = 0.5;
+
+  const rulerY = Math.max(8, bgY - 6);
+  ctx.beginPath();
+  ctx.moveTo(bgX, rulerY);
+  ctx.lineTo(bgX + bgW, rulerY);
+  ctx.stroke();
+
+  for (let x = 0; x <= bgW; x += 50) {
+    const rx = bgX + x;
+    const isMajor = x % 100 === 0;
+    ctx.beginPath();
+    ctx.moveTo(rx, rulerY - (isMajor ? 2.5 : 1.5));
+    ctx.lineTo(rx, rulerY + (isMajor ? 2.5 : 1.5));
+    ctx.stroke();
+
+    if (isMajor) {
+      ctx.textAlign = 'center';
+      ctx.fillText(`${x}`, rx, rulerY - 3.5);
+    }
+  }
+
+  const rulerX = Math.max(8, bgX - 6);
+  ctx.beginPath();
+  ctx.moveTo(rulerX, bgY);
+  ctx.lineTo(rulerX, bgY + bgH);
+  ctx.stroke();
+
+  for (let y = 0; y <= bgH; y += 50) {
+    const ry = bgY + y;
+    const isMajor = y % 100 === 0;
+    ctx.beginPath();
+    ctx.moveTo(rulerX - (isMajor ? 2.5 : 1.5), ry);
+    ctx.lineTo(rulerX + (isMajor ? 2.5 : 1.5), ry);
+    ctx.stroke();
+
+    if (isMajor) {
+      ctx.textAlign = 'right';
+      ctx.fillText(`${y}`, rulerX - 3.5, ry + 2.5);
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws the central vertical symmetry axis (discreet)
+ */
+function drawSymmetryAxis(ctx: CanvasRenderingContext2D, centerX: number, bgY: number, bgH: number) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([2, 3]);
+
+  ctx.beginPath();
+  ctx.moveTo(centerX, bgY - 4);
+  ctx.lineTo(centerX, bgY + bgH + 4);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
+ * Draws smart alignment guides
+ */
+function drawSmartGuides(ctx: CanvasRenderingContext2D, guides: SmartGuide[]) {
+  ctx.save();
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([2, 2]);
+
+  guides.forEach((g) => {
+    ctx.strokeStyle = g.type === 'vertical' ? 'rgba(56, 189, 248, 0.35)' : 'rgba(236, 72, 153, 0.35)';
+    ctx.beginPath();
+    if (g.type === 'vertical') {
+      ctx.moveTo(g.position, 0);
+      ctx.lineTo(g.position, ctx.canvas.height);
+    } else {
+      ctx.moveTo(0, g.position);
+      ctx.lineTo(ctx.canvas.width, g.position);
+    }
+    ctx.stroke();
+
+    if (g.label) {
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(100, 116, 139, 0.7)';
+      ctx.font = '7.5px "JetBrains Mono", system-ui, sans-serif';
+      if (g.type === 'vertical') {
+        ctx.fillText(g.label, g.position + 2, 12);
+      } else {
+        ctx.fillText(g.label, 4, g.position - 2);
+      }
+      ctx.restore();
+    }
+  });
+
+  ctx.restore();
+}
+
+/**
+ * Draws manual user-placed guides
+ */
+function drawUserGuides(ctx: CanvasRenderingContext2D, guides: UserGuide[]) {
+  ctx.save();
+  ctx.lineWidth = 0.5;
+  ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = 'rgba(2, 132, 199, 0.30)';
+
+  guides.forEach((g) => {
+    ctx.beginPath();
+    if (g.type === 'vertical') {
+      ctx.moveTo(g.position, 0);
+      ctx.lineTo(g.position, ctx.canvas.height);
+    } else {
+      ctx.moveTo(0, g.position);
+      ctx.lineTo(ctx.canvas.width, g.position);
+    }
+    ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+/**
+ * Interactive handles for dragging & resizing
+ */
+export const HANDLE_SIZE = 6;
+
+export function getFocusHandles(focus: FocusZone): Record<ResizeHandle, { x: number; y: number }> {
+  const { x, y, width: w, height: h } = focus;
+  return {
+    nw: { x, y },
+    n: { x: x + w / 2, y },
+    ne: { x: x + w, y },
+    w: { x, y: y + h / 2 },
+    e: { x: x + w, y: y + h / 2 },
+    sw: { x, y: y + h },
+    s: { x: x + w / 2, y: y + h },
+    se: { x: x + w, y: y + h },
+  };
+}
+
+function drawFocusSelectionHandles(ctx: CanvasRenderingContext2D, focus: FocusZone) {
+  const { x, y, width: w, height: h, borderRadius = 10 } = focus;
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.55)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.roundRect(x - 1.5, y - 1.5, w + 3, h + 3, borderRadius + 1.5);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const handles = getFocusHandles(focus);
+  const hs = HANDLE_SIZE;
+  const half = hs / 2;
+
+  (Object.keys(handles) as ResizeHandle[]).forEach((handleKey) => {
+    const pt = handles[handleKey];
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(pt.x - half, pt.y - half, hs, hs);
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(pt.x - half, pt.y - half, hs, hs);
+  });
+
+  // Name pill tag above focus
+  const label = focus.name || `Zone ${focus.stepNumber || 1}`;
+  ctx.font = 'bold 9px system-ui, sans-serif';
+  const textWidth = ctx.measureText(label).width;
+  const tagW = textWidth + 10;
+  const tagH = 14;
+  const tagX = x;
+  const tagY = y - tagH - 4;
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+  ctx.beginPath();
+  ctx.roundRect(tagX, tagY, tagW, tagH, 3);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(label, tagX + 5, tagY + 10);
+
+  // Zoom indicator pill
+  const zoomText = `${focus.zoom.toFixed(1)}×`;
+  const zWidth = ctx.measureText(zoomText).width + 8;
+  ctx.fillStyle = 'rgba(37, 70, 95, 0.85)';
+  ctx.beginPath();
+  ctx.roundRect(x + w - zWidth, tagY, zWidth, tagH, 3);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(zoomText, x + w - zWidth + 4, tagY + 10);
+
+  ctx.restore();
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  let c = hex.replace('#', '');
+  if (c.length === 3) {
+    c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+  }
+  const r = parseInt(c.substring(0, 2), 16) || 37;
+  const g = parseInt(c.substring(2, 4), 16) || 70;
+  const b = parseInt(c.substring(4, 6), 16) || 95;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
