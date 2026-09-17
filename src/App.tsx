@@ -17,6 +17,7 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { ToolType } from './components/VerticalToolPalette';
 import { SAMPLE_PRESETS } from './utils/sampleImages';
 import { detectInterfaceElements } from './utils/detection';
+import { processImportedImageFile } from './utils/imageProcessor';
 import { 
   drawComposition, 
   calculateCompositionBounds, 
@@ -50,7 +51,7 @@ export default function App() {
     bgTintColor: BASE_COLOR,
     bgTintOpacity: 0.50,
     exportScale: 1,
-    workspaceWidth: 440,
+    workspaceWidth: 260,
     container: {
       borderRadius: 0, // Strictement droit, sans arrondis
       showShadow: false, // Pas d'ombre portée sur le screenshot
@@ -63,6 +64,9 @@ export default function App() {
     showGuides: true,
     previewHD: false,
   });
+
+  // Panel width management (responsive)
+  const [panelWidth, setPanelWidth] = useState<number>(340);
 
   // User manual guides (+ Repère H / V)
   const [userGuides, setUserGuides] = useState<UserGuide[]>([]);
@@ -142,18 +146,18 @@ export default function App() {
 
     const initialFocus: FocusZone = {
       id: `focus-${Date.now()}`,
-      name: 'Zone 2',
+      name: 'Zone 1',
       x: defaultX,
       y: defaultY,
       width: defaultFocusW,
       height: defaultFocusH,
-      zoom: 1.6,
+      zoom: 1.0,
       sourceOffsetX: 0,
       sourceOffsetY: 0,
       borderWidth: 2,
       borderColor: BASE_COLOR,
       borderRadius: 10,
-      stepNumber: 2,
+      stepNumber: 1,
       showStepBadge: true,
       badgePosition: 'auto',
       badgeColor: BASE_COLOR,
@@ -180,16 +184,22 @@ export default function App() {
     }
   }, [loadImageFromDataUrl]);
 
-  // Import local file
-  const handleImportFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      if (dataUrl) {
-        loadImageFromDataUrl(dataUrl, file.name);
-      }
-    };
-    reader.readAsDataURL(file);
+  // Import local file with automatic HEIC/iPhone normalization
+  const handleImportFile = async (file: File) => {
+    try {
+      const { dataUrl, name } = await processImportedImageFile(file);
+      await loadImageFromDataUrl(dataUrl, name);
+    } catch (err) {
+      console.warn('Advanced image processing fallback:', err);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        if (dataUrl) {
+          loadImageFromDataUrl(dataUrl, file.name);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Select sample preset
@@ -245,7 +255,7 @@ export default function App() {
       y: posY,
       width: defaultFocusW,
       height: defaultFocusH,
-      zoom: 1.5,
+      zoom: 1.0,
       sourceOffsetX: 0,
       sourceOffsetY: 0,
       borderWidth: 2,
@@ -272,7 +282,7 @@ export default function App() {
       y,
       width: w,
       height: h,
-      zoom: 1.5,
+      zoom: 1.0,
       sourceOffsetX: 0,
       sourceOffsetY: 0,
       borderWidth: 2,
@@ -324,13 +334,29 @@ export default function App() {
     recordHistory(updated);
   };
 
-  // Delete focus
+  // Delete focus and auto-renumber sequentially
   const handleDeleteFocus = (id: string) => {
-    const updated = focuses.filter((f) => f.id !== id);
+    const remaining = focuses.filter((f) => f.id !== id);
+    const updated = remaining.map((f, i) => ({
+      ...f,
+      stepNumber: i + 1,
+    }));
     setFocuses(updated);
     if (selectedFocusId === id) {
       setSelectedFocusId(updated[0]?.id || null);
     }
+    recordHistory(updated);
+  };
+
+  // Renumber all focuses sequentially (1, 2, 3...) sorted from top to bottom
+  const handleAutoRenumberFocuses = () => {
+    if (focuses.length === 0) return;
+    const sorted = [...focuses].sort((a, b) => a.y - b.y);
+    const updated = sorted.map((f, idx) => ({
+      ...f,
+      stepNumber: idx + 1,
+    }));
+    setFocuses(updated);
     recordHistory(updated);
   };
 
@@ -841,6 +867,7 @@ export default function App() {
           onDeleteFocus={handleDeleteFocus}
           onDuplicateFocus={handleDuplicateFocus}
           onCenterFocusHorizontally={handleCenterFocusHorizontally}
+          onRenumberFocuses={handleAutoRenumberFocuses}
           globalStyles={globalStyles}
           onUpdateGlobalStyles={(updated) => setGlobalStyles((prev) => ({ ...prev, ...updated }))}
           blurZones={blurZones}
@@ -870,6 +897,8 @@ export default function App() {
           onSelectSample={handleSelectSample}
           isPreviewMode={isPreviewMode}
           onTogglePreview={() => setIsPreviewMode((prev) => !prev)}
+          panelWidth={panelWidth}
+          onUpdatePanelWidth={setPanelWidth}
         />
       </div>
 

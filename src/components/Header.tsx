@@ -145,7 +145,7 @@ export const Header: React.FC<HeaderProps> = ({
           type="file"
           ref={fileInputRef}
           onChange={handleFileInputChange}
-          accept="image/*"
+          accept="image/*,.heic,.heif"
           className="hidden"
         />
 

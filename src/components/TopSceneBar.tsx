@@ -3,7 +3,6 @@ import {
   Eye, 
   Maximize2, 
   Ruler, 
-  Hand, 
   ZoomIn, 
   ZoomOut, 
   Plus,
@@ -112,29 +111,14 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           <span>Règles {showRulers ? 'ON' : 'OFF'}</span>
         </button>
 
-        {/* Main (Pan) */}
-        <button
-          id="btn-toggle-hand"
-          onClick={onTogglePanMode}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
-            isPanMode 
-              ? 'bg-[#0088cc] text-white shadow-xs' 
-              : 'bg-[#eeeeee]/80 text-[#000000] hover:bg-[#eeeeee]'
-          }`}
-          title="Outil Main : déplacer le plan de travail (ou maintenir Espace)"
-        >
-          <Hand className="w-3.5 h-3.5" />
-          <span>Main</span>
-        </button>
-
         {/* Réglage Zone de travail */}
         <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#eeeeee]/80 text-[11px]">
           <span className="text-[#666666] font-medium">Zone :</span>
           <div className="w-18">
             <NumericInput
-              value={globalStyles.workspaceWidth || 440}
-              onChange={(w) => onUpdateGlobalStyles({ workspaceWidth: Math.min(500, Math.max(240, w)) })}
-              min={240}
+              value={globalStyles.workspaceWidth || 260}
+              onChange={(w) => onUpdateGlobalStyles({ workspaceWidth: Math.min(500, Math.max(200, w)) })}
+              min={200}
               max={500}
               unit="px"
             />
@@ -189,12 +173,6 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
         >
           100%
         </button>
-
-        {/* Coins droits indicator */}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#eeeeee]/80 text-[#666666] text-[11px] font-medium">
-          <span className="w-2 h-2 border border-[#666666] bg-white rounded-none inline-block" />
-          <span>Coins droits</span>
-        </div>
       </div>
     </div>
   );

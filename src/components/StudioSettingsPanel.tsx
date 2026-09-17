@@ -41,6 +41,7 @@ interface StudioSettingsPanelProps {
   onDeleteFocus: (id: string) => void;
   onDuplicateFocus: (id: string) => void;
   onCenterFocusHorizontally: (id: string) => void;
+  onRenumberFocuses?: () => void;
   globalStyles: GlobalStyleSettings;
   onUpdateGlobalStyles: (updated: Partial<GlobalStyleSettings>) => void;
   // Blur Zones
@@ -74,6 +75,8 @@ interface StudioSettingsPanelProps {
   onSelectSample: (id: string) => void;
   isPreviewMode?: boolean;
   onTogglePreview?: () => void;
+  panelWidth?: number;
+  onUpdatePanelWidth?: (width: number) => void;
 }
 
 export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
@@ -86,6 +89,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   onDeleteFocus,
   onDuplicateFocus,
   onCenterFocusHorizontally,
+  onRenumberFocuses,
   globalStyles,
   onUpdateGlobalStyles,
   blurZones,
@@ -115,6 +119,8 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   onSelectSample,
   isPreviewMode,
   onTogglePreview,
+  panelWidth = 340,
+  onUpdatePanelWidth,
 }) => {
   // Requirement: Toutes les sections doivent être fermées par défaut et se déplier SEULEMENT au clic !
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -126,6 +132,32 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
     triangle: false,
     export: false,
   });
+
+  const isResizingRef = React.useRef(false);
+  const startXRef = React.useRef(0);
+  const startWidthRef = React.useRef(panelWidth);
+
+  const handleResizePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = panelWidth;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleResizePointerMove = (e: React.PointerEvent) => {
+    if (!isResizingRef.current || !onUpdatePanelWidth) return;
+    const delta = startXRef.current - e.clientX;
+    const newWidth = Math.min(520, Math.max(260, Math.round(startWidthRef.current + delta)));
+    onUpdatePanelWidth(newWidth);
+  };
+
+  const handleResizePointerUp = (e: React.PointerEvent) => {
+    isResizingRef.current = false;
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+  };
 
   const toggleSection = (section: string) => {
     setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -139,7 +171,21 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   const activeTriangle = triangles.find((t) => t.id === selectedTriangleId) || null;
 
   return (
-    <aside className="w-80 md:w-88 bg-white/70 backdrop-blur-xl border border-white/80 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-[#979797]/15 flex flex-col h-fit max-h-[calc(100vh-7rem)] overflow-y-auto select-none shrink-0 z-20 text-[#000000] text-xs self-start">
+    <aside
+      className="relative bg-white/70 backdrop-blur-xl border border-white/80 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-[#979797]/15 flex flex-col h-fit max-h-[calc(100vh-7rem)] overflow-y-auto select-none shrink-0 z-20 text-[#000000] text-xs self-start max-w-[calc(100vw-2rem)]"
+      style={{ width: `${panelWidth}px` }}
+    >
+      {/* Draggable resize splitter on the left edge */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-2.5 -ml-1 cursor-col-resize hover:bg-[#0088cc]/20 transition-colors z-30 group flex items-center justify-center"
+        title="Glisser pour redimensionner la largeur du panneau"
+        onPointerDown={handleResizePointerDown}
+        onPointerMove={handleResizePointerMove}
+        onPointerUp={handleResizePointerUp}
+      >
+        <div className="w-1 h-8 rounded-full bg-[#979797]/30 group-hover:bg-[#0088cc] transition-colors" />
+      </div>
+
       {/* Panel Header */}
       <div className="p-4 border-b border-[#eeeeee] flex items-center justify-between">
         <div>
@@ -149,9 +195,22 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
               Paramètres du Studio
             </h2>
           </div>
-          <p className="text-[11px] text-[#666666] mt-0.5 ml-4">
-            Configuration & Précision
-          </p>
+          <div className="flex items-center gap-1.5 mt-0.5 ml-4">
+            <span className="text-[11px] text-[#666666]">Largeur :</span>
+            {[300, 340, 420].map((w) => (
+              <button
+                key={w}
+                onClick={() => onUpdatePanelWidth?.(w)}
+                className={`text-[9px] px-1.5 py-0.5 rounded-full transition-all ${
+                  panelWidth === w
+                    ? 'bg-[#000000] text-white font-semibold'
+                    : 'bg-[#eeeeee] text-[#666666] hover:text-[#000000]'
+                }`}
+              >
+                {w}px
+              </button>
+            ))}
+          </div>
         </div>
 
         <button
@@ -190,7 +249,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/png,image/jpeg,image/webp"
+                accept="image/png,image/jpeg,image/webp,image/heic,image/heif,.heic,.heif,image/*"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -273,19 +332,19 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                 <div className="flex items-center gap-2">
                   <div className="w-24">
                     <NumericInput
-                      value={globalStyles.workspaceWidth || 440}
-                      onChange={(w) => onUpdateGlobalStyles({ workspaceWidth: Math.min(500, Math.max(240, w)) })}
-                      min={240}
+                      value={globalStyles.workspaceWidth || 260}
+                      onChange={(w) => onUpdateGlobalStyles({ workspaceWidth: Math.min(500, Math.max(200, w)) })}
+                      min={200}
                       max={500}
                       unit="px"
                     />
                   </div>
                   <input
                     type="range"
-                    min="240"
+                    min="200"
                     max="500"
                     step="10"
-                    value={globalStyles.workspaceWidth || 440}
+                    value={globalStyles.workspaceWidth || 260}
                     onChange={(e) => onUpdateGlobalStyles({
                       workspaceWidth: parseInt(e.target.value),
                     })}
@@ -293,12 +352,12 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   />
                 </div>
                 <div className="flex gap-1.5 mt-1">
-                  {[360, 440, 500].map((w) => (
+                  {[260, 360, 440].map((w) => (
                     <button
                       key={w}
                       onClick={() => onUpdateGlobalStyles({ workspaceWidth: w })}
                       className={`flex-1 py-1 px-2 rounded-full text-[10px] font-semibold transition-all ${
-                        (globalStyles.workspaceWidth || 440) === w
+                        (globalStyles.workspaceWidth || 260) === w
                           ? 'bg-[#000000] text-white shadow-xs'
                           : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                       }`}
@@ -307,17 +366,6 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </button>
                   ))}
                 </div>
-              </div>
-
-              {/* Coins du screenshot (Toujours droits et sans arrondis) */}
-              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#eeeeee]/50 border border-white text-[11px]">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 border border-[#000000] bg-white inline-block rounded-xs" />
-                  <span className="text-[#000000] font-medium">Coins du screenshot</span>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#eeeeee] font-semibold text-[#000000] text-[10px] shadow-2xs">
-                  Droits sans arrondis (0 px)
-                </span>
               </div>
             </div>
           )}
@@ -337,13 +385,25 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
             </button>
 
             <div className="flex items-center gap-1.5">
+              {focuses.length > 1 && onRenumberFocuses && (
+                <button
+                  id="btn-renumber-focuses"
+                  onClick={onRenumberFocuses}
+                  className="px-2 py-1 rounded-full bg-[#eeeeee] hover:bg-[#e0e0e0] text-[#000000] text-[10px] font-medium flex items-center gap-1 transition-all"
+                  title="Renuméroter automatiquement toutes les zones (1, 2, 3...) du haut vers le bas"
+                >
+                  <RotateCcw className="w-2.5 h-2.5 text-[#0088cc]" />
+                  <span>Auto 1,2,3...</span>
+                </button>
+              )}
               <button
+                id="btn-add-focus-nouveau"
                 onClick={onAddFocus}
                 className="px-2.5 py-1 rounded-full bg-[#0088cc] hover:bg-[#0077b3] text-white text-[10px] font-medium flex items-center gap-1 transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
                 title="Ajouter une nouvelle zone de focus"
               >
                 <Plus className="w-3 h-3" />
-                <span>Nouveau</span>
+                <span>+ Nouveau</span>
               </button>
               <button onClick={() => toggleSection('focus')}>
                 {openSections.focus ? <ChevronDown className="w-4 h-4 text-[#979797]" /> : <ChevronRight className="w-4 h-4 text-[#979797]" />}
@@ -353,28 +413,20 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
           {openSections.focus && (
             <div className="px-4 pb-4 pt-1 flex flex-col gap-3">
-              {/* Boutons d'action explicites : Ajouter / Supprimer */}
-              <div className="flex gap-2">
-                <button
-                  id="btn-add-focus-direct"
-                  onClick={onAddFocus}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-[#0088cc] hover:bg-[#0077b3] text-white font-medium text-xs shadow-2xs transition-all hover:scale-[1.01] active:scale-[0.98]"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Ajouter une zone</span>
-                </button>
-                {selectedFocus && (
+              {/* Focus List Selector and quick delete */}
+              {selectedFocus && (
+                <div className="flex justify-end">
                   <button
                     id="btn-delete-focus-direct"
                     onClick={() => onDeleteFocus(selectedFocus.id)}
-                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-[#eeeeee]/80 hover:bg-rose-50 text-[#666666] hover:text-rose-600 font-medium text-xs transition-all"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#eeeeee]/80 hover:bg-rose-50 text-[#666666] hover:text-rose-600 font-medium text-[11px] transition-all"
                     title="Supprimer la zone sélectionnée"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-3 h-3" />
                     <span>Supprimer</span>
                   </button>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Focus List Selector */}
               {focuses.length > 0 && (
@@ -397,6 +449,104 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
               {selectedFocus ? (
                 <>
+                  {/* Pastille d'étape (en tête des paramètres Zone Focus) */}
+                  <div className="flex flex-col gap-2 p-2.5 bg-[#eeeeee]/40 rounded-2xl border border-white">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div>
+                        <span className="text-[#000000] font-semibold block">Pastille d'étape</span>
+                        <span className="text-[10px] text-[#666666]">Centrée sur la bordure du screen • Dépasse de 15 px au-dessus de la zone focus</span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedFocus.showStepBadge !== false}
+                          onChange={(e) => onUpdateFocus({ showStepBadge: e.target.checked })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-8 h-4 bg-[#eeeeee] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#979797]/30 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#0088cc]" />
+                      </label>
+                    </div>
+
+                    {selectedFocus.showStepBadge !== false && (
+                      <div className="flex flex-col gap-2 pt-1 border-t border-white/60">
+                        {/* Numéro d'étape et renumérotation */}
+                        <div className="flex items-center justify-between text-[11px]">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[#666666] font-medium">Numéro :</span>
+                            <div className="w-14">
+                              <NumericInput
+                                value={selectedFocus.stepNumber ?? 1}
+                                onChange={(val) => onUpdateFocus({ stepNumber: Math.max(1, Math.round(val)) })}
+                                min={1}
+                                max={99}
+                              />
+                            </div>
+                          </div>
+
+                          {focuses.length > 1 && onRenumberFocuses && (
+                            <button
+                              type="button"
+                              onClick={onRenumberFocuses}
+                              className="text-[10px] px-2 py-0.5 rounded-full bg-white hover:bg-[#eeeeee] border border-[#eeeeee] text-[#0088cc] font-medium transition-colors"
+                              title="Renuméroter toutes les étapes de haut en bas (1, 2, 3...)"
+                            >
+                              Renuméroter 1..{focuses.length}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Règle automatique Pair / Impair */}
+                        <div className="flex flex-col gap-1.5 pt-1">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="text-[#666666]">Position automatique :</span>
+                            <span className="font-semibold text-[#0088cc]">
+                              {(selectedFocus.stepNumber ?? 1) % 2 !== 0 ? '← Impair (Bord gauche screen)' : 'Pair (Bord droit screen) →'}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-1">
+                            <button
+                              type="button"
+                              onClick={() => onUpdateFocus({ badgePosition: 'auto' })}
+                              className={`py-1 px-1 rounded-lg text-[10px] font-medium text-center transition-all ${
+                                (selectedFocus.badgePosition || 'auto') === 'auto'
+                                  ? 'bg-[#000000] text-white shadow-2xs font-semibold'
+                                  : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
+                              }`}
+                              title="Règle automatique : impair = bordure gauche du screen, pair = bordure droite du screen"
+                            >
+                              Auto (pair/impair)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onUpdateFocus({ badgePosition: 'left' })}
+                              className={`py-1 px-1 rounded-lg text-[10px] font-medium text-center transition-all ${
+                                selectedFocus.badgePosition === 'left'
+                                  ? 'bg-[#000000] text-white shadow-2xs font-semibold'
+                                  : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
+                              }`}
+                              title="Forcer sur la bordure gauche du screen"
+                            >
+                              Bord gauche
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onUpdateFocus({ badgePosition: 'right' })}
+                              className={`py-1 px-1 rounded-lg text-[10px] font-medium text-center transition-all ${
+                                selectedFocus.badgePosition === 'right'
+                                  ? 'bg-[#000000] text-white shadow-2xs font-semibold'
+                                  : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
+                              }`}
+                              title="Forcer sur la bordure droite du screen"
+                            >
+                              Bord droit
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Focus Header & Name */}
                   <div className="flex items-center justify-between pt-1">
                     <input
@@ -465,16 +615,33 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       </div>
                     </div>
 
-                    {/* Bouton Centrer sur screenshot */}
-                    <button
-                      id="btn-center-focus"
-                      onClick={() => onCenterFocusHorizontally(selectedFocus.id)}
-                      className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000] font-semibold text-[11px] transition-all hover:scale-[1.01] active:scale-[0.98]"
-                      title="Centrer parfaitement la zone de focus sur le screenshot (débords gauche et droite identiques)"
-                    >
-                      <AlignHorizontalJustifyCenter className="w-3.5 h-3.5 text-[#0088cc]" />
-                      <span>Centrer sur screenshot (symétrie)</span>
-                    </button>
+                    {/* Presets rapides de largeur pour les pas/étapes */}
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <span className="text-[10px] text-[#666666]">Largeur pas :</span>
+                      {[240, 260].map((pw) => (
+                        <button
+                          key={pw}
+                          onClick={() => onUpdateFocus({ width: pw })}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${
+                            Math.round(selectedFocus.width) === pw
+                              ? 'bg-[#000000] text-white'
+                              : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee]'
+                          }`}
+                        >
+                          {pw}px
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => {
+                          const targetW = globalStyles.workspaceWidth || 260;
+                          onUpdateFocus({ width: Math.max(100, targetW - 20) });
+                        }}
+                        className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#eeeeee]/80 text-[#0088cc] hover:bg-[#eeeeee]"
+                        title="Ajuster la largeur au screenshot/zone de travail"
+                      >
+                        Auto (responsive)
+                      </button>
+                    </div>
                   </div>
 
                   {/* Arrondis de la zone (défaut 10px) */}
@@ -556,63 +723,74 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Grossissement Zoom */}
-                  <div className="flex flex-col gap-1.5 pt-2 border-t border-[#eeeeee]">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-[#666666] font-medium">Grossissement (Zoom)</span>
-                      <span className="font-mono font-semibold text-[#000000]">
-                        {selectedFocus.zoom.toFixed(1)}×
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1.0"
-                      max="3.0"
-                      step="0.1"
-                      value={selectedFocus.zoom}
-                      onChange={(e) => onUpdateFocus({ zoom: parseFloat(e.target.value) })}
-                      className="accent-[#0088cc]"
-                    />
-                  </div>
-
-                  {/* Pastille d'étape numérotée (posée sur le haut du focus, AUCUN contour) */}
-                  <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
-                    <div className="flex items-center justify-between text-[11px]">
-                      <div>
-                        <span className="text-[#000000] font-medium block">Pastille d'étape</span>
-                        <span className="text-[10px] text-[#666666]">Posée sur le haut, aucun contour</span>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedFocus.showStepBadge !== false}
-                          onChange={(e) => onUpdateFocus({ showStepBadge: e.target.checked })}
-                          className="sr-only peer"
-                        />
-                        <div className="w-8 h-4 bg-[#eeeeee] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#979797]/30 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#0088cc]" />
-                      </label>
-                    </div>
-
-                    {selectedFocus.showStepBadge !== false && (
-                      <div className="flex items-center justify-between bg-[#eeeeee]/50 p-2.5 rounded-2xl text-[11px] border border-white">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[#666666] font-medium">Numéro :</span>
-                          <div className="w-14">
+                  {/* Grossissement Zoom (exprimé en pixels, homotétique) */}
+                  {(() => {
+                    const currentZoom = selectedFocus.zoom || 1.0;
+                    const focusW = Math.round(selectedFocus.width);
+                    const zoomPx = Math.round(focusW * currentZoom);
+                    return (
+                      <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <div>
+                            <span className="text-[#666666] font-medium block">Grossissement (Zoom)</span>
+                            <span className="text-[10px] text-[#979797]">Homotétique : {zoomPx} px ({currentZoom.toFixed(2)}×)</span>
+                          </div>
+                          <div className="w-20">
                             <NumericInput
-                              value={selectedFocus.stepNumber ?? 1}
-                              onChange={(val) => onUpdateFocus({ stepNumber: Math.max(1, Math.round(val)) })}
-                              min={1}
-                              max={99}
+                              value={zoomPx}
+                              onChange={(val) => {
+                                const newPx = Math.max(focusW, val);
+                                onUpdateFocus({ zoom: Math.max(1.0, newPx / focusW) });
+                              }}
+                              min={focusW}
+                              max={focusW * 3}
+                              unit="px"
                             />
                           </div>
                         </div>
 
-                        <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-white border border-[#eeeeee] text-[#0088cc] font-semibold">
-                          {(selectedFocus.stepNumber ?? 1) % 2 !== 0 ? '← Impair (Bord gauche)' : 'Pair (Bord droit) →'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min={focusW}
+                            max={Math.round(focusW * 2.5)}
+                            step="2"
+                            value={zoomPx}
+                            onChange={(e) => {
+                              const newPx = parseFloat(e.target.value);
+                              onUpdateFocus({ zoom: Math.max(1.0, newPx / focusW) });
+                            }}
+                            className="flex-1 accent-[#0088cc]"
+                          />
+                        </div>
+
+                        {/* Presets rapides de zoom en pixel */}
+                        <div className="flex gap-1 flex-wrap">
+                          {[
+                            { label: `${focusW}px (1:1)`, factor: 1.0, title: 'Taille originale (défaut = largeur zone focus)' },
+                            { label: `${Math.round(focusW * 1.2)}px`, factor: 1.2, title: '+20% d\'agrandissement' },
+                            { label: `${Math.round(focusW * 1.4)}px`, factor: 1.4, title: '+40% d\'agrandissement' },
+                            { label: `${Math.round(focusW * 1.8)}px`, factor: 1.8, title: '+80% d\'agrandissement' },
+                            { label: `${Math.round(focusW * 2.0)}px`, factor: 2.0, title: '2× agrandissement' },
+                          ].map((p) => (
+                            <button
+                              key={p.factor}
+                              type="button"
+                              onClick={() => onUpdateFocus({ zoom: p.factor })}
+                              title={p.title}
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
+                                Math.abs(currentZoom - p.factor) < 0.05
+                                  ? 'bg-[#000000] text-white shadow-2xs'
+                                  : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
                 </>
               ) : (
                 <div className="text-center py-4 text-[#666666]">
@@ -754,6 +932,53 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         max={400}
                         unit="px"
                       />
+                    </div>
+                  </div>
+
+                  {/* Arrondis des angles de la forme (Flou) */}
+                  <div className="flex flex-col gap-1.5 pt-2 border-t border-[#eeeeee]">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-[#666666] font-medium">Angles de la forme (arrondi)</span>
+                      <div className="w-18">
+                        <NumericInput
+                          value={activeBlur.borderRadius ?? 4}
+                          onChange={(r) => onUpdateBlur(activeBlur.id, { borderRadius: Math.max(0, r) })}
+                          min={0}
+                          max={40}
+                          unit="px"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max="30"
+                        value={activeBlur.borderRadius ?? 4}
+                        onChange={(e) => onUpdateBlur(activeBlur.id, { borderRadius: parseInt(e.target.value) })}
+                        className="flex-1 accent-[#0088cc]"
+                      />
+                    </div>
+                    {/* Presets rapides d'angles */}
+                    <div className="flex gap-1.5 mt-0.5">
+                      {[
+                        { label: 'Droit (0px)', val: 0 },
+                        { label: '4px', val: 4 },
+                        { label: '8px', val: 8 },
+                        { label: '16px', val: 16 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.val}
+                          onClick={() => onUpdateBlur(activeBlur.id, { borderRadius: preset.val })}
+                          className={`flex-1 py-1 px-1.5 rounded-full text-[10px] font-medium transition-all ${
+                            (activeBlur.borderRadius ?? 4) === preset.val
+                              ? 'bg-[#000000] text-white shadow-2xs font-semibold'
+                              : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -981,6 +1206,53 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         max={400}
                         unit="px"
                       />
+                    </div>
+                  </div>
+
+                  {/* Arrondis des angles de la forme (Masque / Forme Bleue) */}
+                  <div className="flex flex-col gap-1.5 pt-2 border-t border-[#eeeeee]">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-[#666666] font-medium">Angles de la forme (arrondi)</span>
+                      <div className="w-18">
+                        <NumericInput
+                          value={activeMask.borderRadius ?? 4}
+                          onChange={(r) => onUpdateMask(activeMask.id, { borderRadius: Math.max(0, r) })}
+                          min={0}
+                          max={40}
+                          unit="px"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max="30"
+                        value={activeMask.borderRadius ?? 4}
+                        onChange={(e) => onUpdateMask(activeMask.id, { borderRadius: parseInt(e.target.value) })}
+                        className="flex-1 accent-[#0088cc]"
+                      />
+                    </div>
+                    {/* Presets rapides d'angles */}
+                    <div className="flex gap-1.5 mt-0.5">
+                      {[
+                        { label: 'Droit (0px)', val: 0 },
+                        { label: '4px', val: 4 },
+                        { label: '8px', val: 8 },
+                        { label: '16px', val: 16 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.val}
+                          onClick={() => onUpdateMask(activeMask.id, { borderRadius: preset.val })}
+                          className={`flex-1 py-1 px-1.5 rounded-full text-[10px] font-medium transition-all ${
+                            (activeMask.borderRadius ?? 4) === preset.val
+                              ? 'bg-[#000000] text-white shadow-2xs font-semibold'
+                              : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 

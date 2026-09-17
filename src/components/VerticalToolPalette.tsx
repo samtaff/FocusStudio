@@ -1,14 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { 
   Square, 
-  Hand, 
   Eye, 
   Download, 
   Maximize2,
   Plus,
   Trash2,
   Droplet,
-  ZoomIn,
   GripVertical,
   Triangle
 } from 'lucide-react';
@@ -36,6 +34,9 @@ interface VerticalToolPaletteProps {
   onExportClick: () => void;
   onCenterWorkspace?: () => void;
   onToggleMiniWidget?: () => void;
+  onSelectFocus?: (id: string) => void;
+  onHoverFocus?: (id: string | null) => void;
+  onDeleteFocusWithId?: (id: string) => void;
   isPreviewMode?: boolean;
   onTogglePreview?: () => void;
 }
@@ -57,9 +58,13 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
   onExportClick,
   onCenterWorkspace,
   onToggleMiniWidget,
+  onSelectFocus,
+  onHoverFocus,
+  onDeleteFocusWithId,
   isPreviewMode,
   onTogglePreview,
 }) => {
+  const [showZonesMenu, setShowZonesMenu] = useState(false);
   // Draggable position with local storage memory
   const [position, setPosition] = useState<{ x: number; y: number }>(() => {
     try {
@@ -114,7 +119,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
 
   return (
     <div 
-      className="absolute bg-white/75 backdrop-blur-xl border border-white/80 rounded-full p-2 flex flex-col items-center gap-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.06)] ring-1 ring-[#979797]/15 z-30 select-none"
+      className="absolute bg-white/75 backdrop-blur-xl border border-white/80 rounded-full p-2 flex flex-col items-center gap-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.12)] ring-1 ring-[#979797]/20 z-50 select-none"
       style={{ left: `${position.x}px`, top: `${position.y}px` }}
     >
       {/* Drag handle */}
@@ -128,15 +133,102 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
         <GripVertical className="w-3.5 h-3.5" />
       </div>
 
-      {/* Top Zone Indicator */}
-      <button 
-        id="tool-zone-indicator"
-        onClick={onToggleMiniWidget}
-        className="w-8 h-8 rounded-full bg-[#000000] hover:bg-[#0088cc] active:scale-95 text-white flex items-center justify-center font-semibold text-xs shadow-xs cursor-pointer transition-all"
-        title={`Zone ${activeZoneLabel} • Cliquer pour ouvrir la petite fenêtre des zones`}
-      >
-        {activeZoneLabel}
-      </button>
+      {/* Top Zone Indicator & Integrated Popover (Rangé dans Z1) */}
+      <div className="relative">
+        <button 
+          id="tool-zone-indicator"
+          onClick={() => setShowZonesMenu((prev) => !prev)}
+          className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs shadow-xs cursor-pointer transition-all ${
+            showZonesMenu 
+              ? 'bg-[#0088cc] text-white ring-2 ring-[#0088cc]/30' 
+              : 'bg-[#000000] hover:bg-[#0088cc] active:scale-95 text-white'
+          }`}
+          title={`Zone ${activeZoneLabel} • Cliquer pour gérer les zones`}
+        >
+          {activeZoneLabel}
+        </button>
+
+        {/* Panneau rangé dans Z1 */}
+        {showZonesMenu && (
+          <div className="absolute left-11 top-0 w-56 bg-white/95 backdrop-blur-xl border border-white/90 rounded-2xl p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.12)] ring-1 ring-[#979797]/15 z-50 text-xs">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-[#eeeeee] mb-2">
+              <span className="font-semibold text-[#000000] text-[11px] tracking-tight">
+                Zones ({focuses.length})
+              </span>
+              <button
+                onClick={() => {
+                  onAddFocus();
+                }}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0088cc] hover:bg-[#0077b3] text-white text-[10px] font-medium transition-all"
+                title="Ajouter une zone"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Nouveau</span>
+              </button>
+            </div>
+
+            {/* List */}
+            <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5">
+              {focuses.length === 0 ? (
+                <div className="text-[11px] text-[#979797] text-center py-2">
+                  Aucune zone active
+                </div>
+              ) : (
+                focuses.map((f, idx) => {
+                  const isSelected = selectedFocus?.id === f.id;
+                  return (
+                    <div
+                      key={f.id}
+                      onMouseEnter={() => onHoverFocus?.(f.id)}
+                      onMouseLeave={() => onHoverFocus?.(null)}
+                      className={`group flex items-center justify-between px-2 py-1.5 rounded-xl transition-all ${
+                        isSelected 
+                          ? 'bg-[#0088cc] text-white font-medium shadow-2xs' 
+                          : 'bg-[#eeeeee]/60 hover:bg-[#eeeeee] text-[#000000]'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectFocus?.(f.id);
+                        }}
+                        className="flex items-center gap-2 flex-1 text-left min-w-0"
+                      >
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                          isSelected ? 'bg-white text-[#0088cc]' : 'bg-[#000000] text-white'
+                        }`}>
+                          {f.stepNumber || idx + 1}
+                        </span>
+                        <span className="truncate text-[11px] font-medium">
+                          {f.name || `Zone ${f.stepNumber || idx + 1}`}
+                        </span>
+                      </button>
+                      {onDeleteFocusWithId && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteFocusWithId(f.id);
+                          }}
+                          className={`p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all ${
+                            isSelected 
+                              ? 'text-white hover:bg-white/20' 
+                              : 'text-[#979797] hover:text-rose-600 hover:bg-rose-50'
+                          }`}
+                          title="Supprimer cette zone"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="w-5 h-px bg-[#eeeeee] my-0.5" />
 
@@ -240,34 +332,6 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
           <Maximize2 className="w-4 h-4" />
         </button>
       )}
-
-      {/* Outil Zoom */}
-      <button
-        id="tool-photoshop-zoom"
-        onClick={() => onSelectTool(activeTool === 'zoom' ? 'select' : 'zoom')}
-        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-          activeTool === 'zoom' 
-            ? 'bg-[#000000] text-white shadow-xs' 
-            : 'text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
-        }`}
-        title="Outil Zoom (Clic = Zoom avant, Alt+Clic = Zoom arrière)"
-      >
-        <ZoomIn className="w-4 h-4" />
-      </button>
-
-      {/* Mode Pan (Main) */}
-      <button
-        id="tool-pan-hand"
-        onClick={onTogglePanMode}
-        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-          isPanMode 
-            ? 'bg-[#0088cc] text-white shadow-xs' 
-            : 'text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
-        }`}
-        title="Outil Main (Espace + Glisser pour déplacer la vue)"
-      >
-        <Hand className="w-4 h-4" />
-      </button>
 
       {/* Sélection / Poignées de transformation */}
       <button

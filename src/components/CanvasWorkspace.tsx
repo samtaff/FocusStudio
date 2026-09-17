@@ -20,7 +20,6 @@ import {
 } from '../utils/canvasRenderer';
 import { TopSceneBar } from './TopSceneBar';
 import { VerticalToolPalette, ToolType } from './VerticalToolPalette';
-import { MiniZonesWidget } from './MiniZonesWidget';
 import { Eye, X } from 'lucide-react';
 
 interface CanvasWorkspaceProps {
@@ -177,7 +176,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const [hoveredTriangleId, setHoveredTriangleId] = useState<string | null>(null);
   const [hoveredHandle, setHoveredHandle] = useState<ResizeHandle | null>(null);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
-  const [showMiniWidget, setShowMiniWidget] = useState<boolean>(true);
+  const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
 
   // Dynamic Alignment Guides
   const [activeGuides, setActiveGuides] = useState<SmartGuide[]>([]);
@@ -186,12 +185,17 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const keySequenceRef = useRef<string>('');
   const sequenceTimerRef = useRef<number | null>(null);
 
-  // Key listener for Alt key, Escape (preview), and "Z3" shortcut
+  // Key listener for Spacebar, Alt key, Escape (preview), and "Z3" shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return;
+      }
+
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        setIsSpacePressed(true);
       }
 
       if (e.key === 'Alt') setIsAltPressed(true);
@@ -210,7 +214,6 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         }, 1500);
       } else if (keySequenceRef.current === 'Z' && /^[0-9]$/.test(keyUpper)) {
         e.preventDefault();
-        setShowMiniWidget(true);
         const zoneNum = parseInt(keyUpper, 10);
         const targetFocus = focuses.find((f) => (f.stepNumber || 1) === zoneNum) || focuses[zoneNum - 1];
         if (targetFocus) {
@@ -221,14 +224,36 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setIsSpacePressed(false);
       if (e.key === 'Alt') setIsAltPressed(false);
+    };
+
+    // Global mouseup and window blur so dragging / panning never gets stuck
+    const handleGlobalMouseUp = () => {
+      setIsPanning(false);
+      setDragState(null);
+      setDragBlurState(null);
+      setDragMaskState(null);
+      setDragTriangleState(null);
+      setActiveGuides([]);
+    };
+
+    const handleWindowBlur = () => {
+      setIsAltPressed(false);
+      setIsSpacePressed(false);
+      setIsPanning(false);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    window.addEventListener('blur', handleWindowBlur);
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('blur', handleWindowBlur);
     };
   }, [isPreviewMode, onTogglePreview, focuses, onSelectFocus]);
 
@@ -403,7 +428,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    if (isPanMode || activeTool === 'zoom') return;
+    if (activeTool === 'zoom') return;
 
     const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
 
@@ -632,8 +657,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // If middle click, spacebar, or Pan mode active
-    if (e.button === 1 || e.spaceKey || isPanMode || (e.altKey && e.button === 0)) {
+    // Middle click OR holding Spacebar -> Pan workspace immediately
+    if (e.button === 1 || isSpacePressed) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
       return;
@@ -778,7 +803,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 8. Clicked empty background: deselect all
+    // 8. Clicked empty background
+    if (isPanMode) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+      return;
+    }
+
     onSelectFocus(null);
     onSelectBlur(null);
     onSelectMask(null);
@@ -843,9 +874,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
   // Cursor style calculation
   const getCursor = () => {
+    if (isSpacePressed || isPanning) return isPanning ? 'grabbing' : 'grab';
     if (activeTool === 'zoom') return isAltPressed ? 'zoom-out' : 'zoom-in';
     if (activeTool === 'blur' || activeTool === 'mask' || activeTool === 'triangle') return 'crosshair';
-    if (isPanMode || isPanning) return isPanning ? 'grabbing' : 'grab';
+    if (isPanMode) return 'grab';
     if (dragState?.isDragging || dragBlurState || dragMaskState || dragTriangleState) return 'move';
     if (dragState?.isResizing && dragState.handle) {
       const h = dragState.handle;
@@ -937,22 +969,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             onToggleHandles={() => onUpdateGlobalStyles({ showHandles: !globalStyles.showHandles })}
             onExportClick={onExportClick}
             onCenterWorkspace={handleCenterWorkspace}
-            onToggleMiniWidget={() => setShowMiniWidget((prev) => !prev)}
+            onSelectFocus={(id) => onSelectFocus(id)}
+            onHoverFocus={(id) => setHoveredFocusId(id)}
+            onDeleteFocusWithId={(id) => onDeleteFocus?.(id)}
             isPreviewMode={isPreviewMode}
             onTogglePreview={onTogglePreview}
-          />
-        )}
-
-        {/* Floating Mini Zones Inspector */}
-        {!isPreviewMode && showMiniWidget && (
-          <MiniZonesWidget
-            focuses={focuses}
-            selectedFocusId={selectedFocusId}
-            onSelectFocus={(id) => onSelectFocus(id)}
-            onDeleteFocus={(id) => onDeleteFocus?.(id)}
-            onHoverFocus={(id) => setHoveredFocusId(id)}
-            onAddFocus={onAddFocus}
-            onClose={() => setShowMiniWidget(false)}
           />
         )}
 

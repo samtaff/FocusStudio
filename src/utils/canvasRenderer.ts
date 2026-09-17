@@ -147,12 +147,12 @@ export function calculateExportBounds(
     minY = Math.min(minY, f.y);
     maxY = Math.max(maxY, f.y + f.height);
 
-    // Also account for 20x20 step badge: badgeY = f.y - 14
+    // Also account for 20x20 step badge: centered on screen border, 15px exceeding above focus zone (5px overlapping top)
     if (f.showStepBadge !== false && f.stepNumber !== undefined) {
       const num = f.stepNumber || 1;
       const alignLeft = f.badgePosition === 'left' ? true : f.badgePosition === 'right' ? false : (num % 2 !== 0);
       const badgeX = alignLeft ? bgX - 10 : bgX + bgWidth - 10;
-      const badgeY = f.y - 14;
+      const badgeY = f.y - 15;
       minX = Math.min(minX, badgeX);
       maxX = Math.max(maxX, badgeX + 20);
       minY = Math.min(minY, badgeY);
@@ -246,7 +246,7 @@ export function drawComposition(
   ctx.beginPath();
   ctx.rect(bgX, bgY, bgWidth, bgHeight);
   ctx.clip();
-  ctx.drawImage(image.element, bgX, bgY, bgWidth, bgHeight);
+  drawImageHighQualityDownscale(ctx, image.element, bgX, bgY, bgWidth, bgHeight);
 
   // 2. Apply blue tint (#25465F at 50% opacity by default)
   const tintColor = globalStyles.bgTintColor || BASE_COLOR;
@@ -387,7 +387,7 @@ function drawSingleFocusContentAndBorder(
   bounds: { bgX: number; bgY: number; bgWidth: number; bgHeight: number; scale: number }
 ) {
   const { bgX, bgY, scale } = bounds;
-  const zoom = Math.max(1.0, focus.zoom || 1.4);
+  const zoom = Math.max(1.0, focus.zoom || 1.0);
   const radius = Math.max(0, focus.borderRadius ?? 10);
 
   const destX = Math.round(focus.x);
@@ -434,7 +434,11 @@ function drawSingleFocusContentAndBorder(
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
-  ctx.drawImage(
+  const origImgW = image.originalWidth || image.element.naturalWidth || image.element.width;
+  const origImgH = image.originalHeight || image.element.naturalHeight || image.element.height;
+
+  drawImageSafeClipped(
+    ctx,
     image.element,
     origSrcX,
     origSrcY,
@@ -443,7 +447,9 @@ function drawSingleFocusContentAndBorder(
     destX,
     destY,
     destW,
-    destH
+    destH,
+    origImgW,
+    origImgH
   );
 
   ctx.restore();
@@ -491,14 +497,14 @@ function drawStepBadge(
     alignLeft = num % 2 !== 0;
   }
 
-  // Centered on the vertical edge of the imported screenshot
+  // Centered horizontally on the vertical edge of the imported screenshot
   const badgeX = alignLeft
     ? Math.round(bgX - badgeW / 2)
     : Math.round(bgX + bgWidth - badgeW / 2);
 
-  // Position exactly as shown in the reference image:
-  // Badge top is 14px above focus top, number is centered, bottom overlaps top of focus by 6px
-  const badgeY = Math.round(focus.y - 14);
+  // Position: la pastille dépasse de 15 px au-dessus de la zone focus
+  // (15 px au-dessus de focus.y, et les 5 px du bas reposent sur le haut de la zone focus)
+  const badgeY = Math.round(focus.y - 15);
 
   ctx.save();
   // Fill badge (strictly no contour / stroke)
@@ -507,12 +513,21 @@ function drawStepBadge(
   ctx.roundRect(badgeX, badgeY, badgeW, badgeH, badgeRadius);
   ctx.fill();
 
-  // Text: White, Bold, Centered
+  // Text: White, Bold, perfectly and equally centered in the badge box
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(num), badgeX + badgeW / 2, badgeY + badgeH / 2);
+  ctx.textBaseline = 'alphabetic';
+
+  const text = String(num);
+  const metrics = ctx.measureText(text);
+  const ascent = metrics.actualBoundingBoxAscent;
+  const descent = metrics.actualBoundingBoxDescent;
+  // Mathematical optical vertical and horizontal center
+  const centerY = badgeY + (badgeH + ascent - descent) / 2;
+  const centerX = badgeX + badgeW / 2;
+
+  ctx.fillText(text, centerX, centerY);
   ctx.restore();
 }
 
@@ -722,11 +737,6 @@ function drawSingleTriangle(
     ctx.strokeStyle = triangle.borderColor || '#ffffff';
     ctx.lineWidth = triangle.borderWidth;
     ctx.stroke();
-  } else if (color === '#ffffff' || color?.toLowerCase() === '#fff') {
-    // Subtle hairline stroke for white triangle on light backgrounds
-    ctx.strokeStyle = 'rgba(37, 70, 95, 0.3)';
-    ctx.lineWidth = 0.75;
-    ctx.stroke();
   }
 
   ctx.restore();
@@ -739,81 +749,31 @@ function drawFocusHoverHighlight(ctx: CanvasRenderingContext2D, focus: FocusZone
   const { x, y, width: w, height: h, borderRadius = 10 } = focus;
 
   ctx.save();
-  // 1. Soft glowing outer halo
+  // Soft glowing outer halo without obscuring tags
   ctx.shadowColor = 'rgba(56, 189, 248, 0.4)';
-  ctx.shadowBlur = 8;
+  ctx.shadowBlur = 6;
   ctx.strokeStyle = '#0284c7';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
   ctx.stroke();
   ctx.restore();
-
-  // 2. Clear floating tooltip badge above the hovered zone
-  ctx.save();
-  const label = `${focus.name || `Zone ${focus.stepNumber || 1}`} • Cliquer pour sélectionner`;
-  ctx.font = 'bold 9.5px system-ui, sans-serif';
-  const textW = ctx.measureText(label).width;
-  const pillW = textW + 14;
-  const pillH = 18;
-  const pillX = Math.round(x + w / 2 - pillW / 2);
-  const pillY = Math.round(y - pillH - 6);
-
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 2;
-  ctx.beginPath();
-  ctx.roundRect(pillX, pillY, pillW, pillH, 4);
-  ctx.fill();
-
-  ctx.shadowColor = 'transparent';
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, pillX + pillW / 2, pillY + pillH / 2);
-  ctx.restore();
 }
 
 /**
- * High-visibility ergonomic hover highlight for Blur zone:
- * Luminous cyan halo + pill tooltip indicating size and action
+ * High-visibility ergonomic hover highlight for Blur zone
  */
 function drawBlurHoverHighlight(ctx: CanvasRenderingContext2D, blur: BlurZone) {
   const { x, y, width: w, height: h, borderRadius = 4 } = blur;
 
   ctx.save();
-  ctx.shadowColor = 'rgba(56, 189, 248, 0.6)';
-  ctx.shadowBlur = 8;
+  ctx.shadowColor = 'rgba(56, 189, 248, 0.5)';
+  ctx.shadowBlur = 6;
   ctx.strokeStyle = '#0284c7';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
   ctx.stroke();
-  ctx.restore();
-
-  ctx.save();
-  const label = `${blur.name || 'Flou'} (${Math.round(w)}×${Math.round(h)}) • Cliquer pour sélectionner`;
-  ctx.font = 'bold 9.5px system-ui, sans-serif';
-  const textW = ctx.measureText(label).width;
-  const pillW = textW + 14;
-  const pillH = 18;
-  const pillX = Math.round(x + w / 2 - pillW / 2);
-  const pillY = Math.round(y - pillH - 6);
-
-  ctx.fillStyle = 'rgba(12, 74, 110, 0.94)';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 2;
-  ctx.beginPath();
-  ctx.roundRect(pillX, pillY, pillW, pillH, 4);
-  ctx.fill();
-
-  ctx.shadowColor = 'transparent';
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, pillX + pillW / 2, pillY + pillH / 2);
   ctx.restore();
 }
 
@@ -825,36 +785,12 @@ function drawMaskHoverHighlight(ctx: CanvasRenderingContext2D, mask: MaskShape) 
 
   ctx.save();
   ctx.shadowColor = 'rgba(56, 189, 248, 0.5)';
-  ctx.shadowBlur = 8;
+  ctx.shadowBlur = 6;
   ctx.strokeStyle = '#38bdf8';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
   ctx.stroke();
-  ctx.restore();
-
-  ctx.save();
-  const label = `${mask.name || 'Forme'} • Cliquer pour sélectionner`;
-  ctx.font = 'bold 9.5px system-ui, sans-serif';
-  const textW = ctx.measureText(label).width;
-  const pillW = textW + 14;
-  const pillH = 18;
-  const pillX = Math.round(x + w / 2 - pillW / 2);
-  const pillY = Math.round(y - pillH - 6);
-
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 2;
-  ctx.beginPath();
-  ctx.roundRect(pillX, pillY, pillW, pillH, 4);
-  ctx.fill();
-
-  ctx.shadowColor = 'transparent';
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, pillX + pillW / 2, pillY + pillH / 2);
   ctx.restore();
 }
 
@@ -868,24 +804,6 @@ function drawTriangleHoverHighlight(ctx: CanvasRenderingContext2D, triangle: Tri
   ctx.strokeStyle = '#f59e0b';
   ctx.lineWidth = 1.5;
   ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
-
-  const label = `Triangle (15×13) • Cliquer pour sélectionner`;
-  ctx.font = 'bold 9.5px system-ui, sans-serif';
-  const textW = ctx.measureText(label).width;
-  const pillW = textW + 14;
-  const pillH = 18;
-  const pillX = Math.round(x + w / 2 - pillW / 2);
-  const pillY = Math.round(y - pillH - 6);
-
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-  ctx.beginPath();
-  ctx.roundRect(pillX, pillY, pillW, pillH, 4);
-  ctx.fill();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, pillX + pillW / 2, pillY + pillH / 2);
   ctx.restore();
 }
 
@@ -909,23 +827,7 @@ function drawGenericSelectionHandles(
   ctx.setLineDash([]);
 
   // Tag badge with dimensions
-  if (label) {
-    ctx.font = 'bold 9px system-ui, sans-serif';
-    const tagText = `${label} (${Math.round(w)}×${Math.round(h)})`;
-    const tagW = ctx.measureText(tagText).width + 8;
-    const tagH = 14;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.roundRect(x, y - tagH - 3, tagW, tagH, 3);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(tagText, x + 4, y - tagH / 2 - 3);
-  }
-
-  const handleSize = 5;
-  const half = handleSize / 2;
+  const radius = 3;
   const corners = [
     { cx: x, cy: y },
     { cx: x + w / 2, cy: y },
@@ -937,12 +839,11 @@ function drawGenericSelectionHandles(
     { cx: x + w, cy: y + h },
   ];
 
-  ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1;
+  ctx.fillStyle = color;
   corners.forEach(({ cx, cy }) => {
-    ctx.fillRect(cx - half, cy - half, handleSize, handleSize);
-    ctx.strokeRect(cx - half, cy - half, handleSize, handleSize);
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
   });
   ctx.restore();
 }
@@ -1110,44 +1011,15 @@ function drawFocusSelectionHandles(ctx: CanvasRenderingContext2D, focus: FocusZo
   ctx.setLineDash([]);
 
   const handles = getFocusHandles(focus);
-  const hs = HANDLE_SIZE;
-  const half = hs / 2;
+  const radius = 3;
 
   (Object.keys(handles) as ResizeHandle[]).forEach((handleKey) => {
     const pt = handles[handleKey];
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(pt.x - half, pt.y - half, hs, hs);
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(pt.x - half, pt.y - half, hs, hs);
+    ctx.fillStyle = '#0088cc';
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+    ctx.fill();
   });
-
-  // Name pill tag above focus
-  const label = focus.name || `Zone ${focus.stepNumber || 1}`;
-  ctx.font = 'bold 9px system-ui, sans-serif';
-  const textWidth = ctx.measureText(label).width;
-  const tagW = textWidth + 10;
-  const tagH = 14;
-  const tagX = x;
-  const tagY = y - tagH - 4;
-
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-  ctx.beginPath();
-  ctx.roundRect(tagX, tagY, tagW, tagH, 3);
-  ctx.fill();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(label, tagX + 5, tagY + 10);
-
-  // Zoom indicator pill
-  const zoomText = `${focus.zoom.toFixed(1)}×`;
-  const zWidth = ctx.measureText(zoomText).width + 8;
-  ctx.fillStyle = 'rgba(37, 70, 95, 0.85)';
-  ctx.beginPath();
-  ctx.roundRect(x + w - zWidth, tagY, zWidth, tagH, 3);
-  ctx.fill();
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(zoomText, x + w - zWidth + 4, tagY + 10);
 
   ctx.restore();
 }
@@ -1161,4 +1033,141 @@ function hexToRgba(hex: string, alpha: number): string {
   const g = parseInt(c.substring(2, 4), 16) || 70;
   const b = parseInt(c.substring(4, 6), 16) || 95;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * High-quality multi-step downsampler (bilinear mipmap pass).
+ * Prevents severe aliasing, pixel skipping, and glyph disintegration
+ * when downscaling high-resolution images (like Retina iPhone screenshots) by >2x.
+ */
+function drawImageHighQualityDownscale(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number
+) {
+  const origW = img.naturalWidth || img.width;
+  const origH = img.naturalHeight || img.height;
+
+  if (origW > dw * 2 && origH > dh * 2) {
+    let curCanvas = document.createElement('canvas');
+    curCanvas.width = origW;
+    curCanvas.height = origH;
+    let curCtx = curCanvas.getContext('2d');
+    if (!curCtx) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, dx, dy, dw, dh);
+      return;
+    }
+
+    curCtx.imageSmoothingEnabled = true;
+    curCtx.imageSmoothingQuality = 'high';
+    curCtx.drawImage(img, 0, 0, origW, origH);
+
+    let curW = origW;
+    let curH = origH;
+
+    while (curW > dw * 2 && curH > dh * 2) {
+      const nextW = Math.max(dw, Math.floor(curW / 2));
+      const nextH = Math.max(dh, Math.floor(curH / 2));
+
+      const nextCanvas = document.createElement('canvas');
+      nextCanvas.width = nextW;
+      nextCanvas.height = nextH;
+      const nextCtx = nextCanvas.getContext('2d');
+      if (!nextCtx) break;
+
+      nextCtx.imageSmoothingEnabled = true;
+      nextCtx.imageSmoothingQuality = 'high';
+      nextCtx.drawImage(curCanvas, 0, 0, curW, curH, 0, 0, nextW, nextH);
+
+      curCanvas = nextCanvas;
+      curW = nextW;
+      curH = nextH;
+    }
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(curCanvas, 0, 0, curW, curH, dx, dy, dw, dh);
+  } else {
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, dx, dy, dw, dh);
+  }
+}
+
+/**
+ * Safely clips source and destination coordinates to ensure drawImage never samples
+ * out-of-bounds pixels, preventing canvas wrap-around, blank tiles, or browser-specific rendering bugs.
+ */
+function drawImageSafeClipped(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number,
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number,
+  imgW: number,
+  imgH: number
+) {
+  if (sx + sw <= 0 || sy + sh <= 0 || sx >= imgW || sy >= imgH || sw <= 0 || sh <= 0) {
+    return;
+  }
+
+  let clampSx = sx;
+  let clampSy = sy;
+  let clampSw = sw;
+  let clampSh = sh;
+
+  let clampDx = dx;
+  let clampDy = dy;
+  let clampDw = dw;
+  let clampDh = dh;
+
+  if (clampSx < 0) {
+    const diff = -clampSx;
+    const ratio = diff / clampSw;
+    clampDx += clampDw * ratio;
+    clampDw -= clampDw * ratio;
+    clampSw -= diff;
+    clampSx = 0;
+  }
+
+  if (clampSy < 0) {
+    const diff = -clampSy;
+    const ratio = diff / clampSh;
+    clampDy += clampDh * ratio;
+    clampDh -= clampDh * ratio;
+    clampSh -= diff;
+    clampSy = 0;
+  }
+
+  if (clampSx + clampSw > imgW) {
+    const excess = (clampSx + clampSw) - imgW;
+    const ratio = excess / clampSw;
+    clampDw -= clampDw * ratio;
+    clampSw = imgW - clampSx;
+  }
+
+  if (clampSy + clampSh > imgH) {
+    const excess = (clampSy + clampSh) - imgH;
+    const ratio = excess / clampSh;
+    clampDh -= clampDh * ratio;
+    clampSh = imgH - clampSy;
+  }
+
+  if (clampSw <= 0 || clampSh <= 0 || clampDw <= 0 || clampDh <= 0) {
+    return;
+  }
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, clampSx, clampSy, clampSw, clampSh, clampDx, clampDy, clampDw, clampDh);
 }

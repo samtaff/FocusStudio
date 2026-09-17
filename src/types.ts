@@ -12,7 +12,7 @@ export interface FocusZone {
   height: number;
   
   // Magnification & Source sampling
-  zoom: number; // e.g., 1.0 to 3.5 (default e.g. 1.6)
+  zoom: number; // e.g., 1.0 to 3.5 (default: 1.4)
   
   // Source area offset relative to the focus center
   sourceOffsetX: number;
