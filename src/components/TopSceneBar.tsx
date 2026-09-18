@@ -8,7 +8,9 @@ import {
   Plus,
   Trash2,
   Droplet,
-  Square
+  Square,
+  Undo2,
+  Redo2
 } from 'lucide-react';
 import { GlobalStyleSettings } from '../types';
 import { NumericInput } from './NumericInput';
@@ -31,6 +33,11 @@ interface TopSceneBarProps {
   // Preview Mode
   isPreviewMode: boolean;
   onTogglePreview: () => void;
+  // Undo / Redo
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 export const TopSceneBar: React.FC<TopSceneBarProps> = ({
@@ -49,12 +56,16 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
   hasSelectedFocus,
   isPreviewMode,
   onTogglePreview,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }) => {
   const { showRulers, showHandles, previewHD } = globalStyles;
 
   return (
     <div className="w-full bg-white/70 backdrop-blur-xl border border-[#eeeeee] rounded-2xl px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 shadow-xs text-xs select-none">
-      {/* Left: Title + Dimensions Badge */}
+      {/* Left: Title + Dimensions Badge + Undo/Redo Pills */}
       <div className="flex items-center gap-2">
         <span className="font-semibold text-[#000000] tracking-tight text-xs">
           Scène Studio
@@ -62,6 +73,39 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
         <span className="px-2.5 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono text-[11px] font-medium">
           {screenWidth} × {screenHeight} px
         </span>
+
+        {/* Undo / Redo Pills */}
+        {(onUndo || onRedo) && (
+          <div className="flex items-center gap-0.5 bg-[#eeeeee]/80 p-0.5 rounded-full border border-[#eeeeee]">
+            <button
+              id="btn-scene-undo"
+              onClick={onUndo}
+              disabled={!canUndo}
+              className={`p-1.5 rounded-full transition-all ${
+                canUndo 
+                  ? 'text-[#000000] hover:bg-white shadow-2xs' 
+                  : 'text-[#979797] cursor-not-allowed opacity-40'
+              }`}
+              title="Annuler (Ctrl+Z)"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              id="btn-scene-redo"
+              onClick={onRedo}
+              disabled={!canRedo}
+              className={`p-1.5 rounded-full transition-all ${
+                canRedo 
+                  ? 'text-[#000000] hover:bg-white shadow-2xs' 
+                  : 'text-[#979797] cursor-not-allowed opacity-40'
+              }`}
+              title="Rétablir (Ctrl+Y ou Ctrl+Shift+Z)"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Bouton Prévisualisation mis en valeur */}
         <button

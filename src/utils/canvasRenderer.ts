@@ -829,13 +829,14 @@ function drawGenericSelectionHandles(
 ) {
   ctx.save();
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1.25;
-  ctx.setLineDash([3, 2]);
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 2]);
   ctx.strokeRect(x, y, w, h);
   ctx.setLineDash([]);
 
-  // Tag badge with dimensions
-  const radius = 3;
+  // Discreet micro-handles (1.75px radius, soft alpha)
+  const radius = 1.75;
   const corners = [
     { cx: x, cy: y },
     { cx: x + w / 2, cy: y },
@@ -847,11 +848,15 @@ function drawGenericSelectionHandles(
     { cx: x + w, cy: y + h },
   ];
 
-  ctx.fillStyle = color;
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 0.75;
+  ctx.globalAlpha = 0.8;
   corners.forEach(({ cx, cy }) => {
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
   });
   ctx.restore();
 }
@@ -1010,23 +1015,27 @@ function drawFocusSelectionHandles(ctx: CanvasRenderingContext2D, focus: FocusZo
   const { x, y, width: w, height: h, borderRadius = 10 } = focus;
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(239, 68, 68, 0.55)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = 'rgba(0, 136, 204, 0.45)';
+  ctx.lineWidth = 0.85;
+  ctx.setLineDash([2, 2]);
   ctx.beginPath();
-  ctx.roundRect(x - 1.5, y - 1.5, w + 3, h + 3, borderRadius + 1.5);
+  ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
   ctx.stroke();
   ctx.setLineDash([]);
 
   const handles = getFocusHandles(focus);
-  const radius = 3;
+  const radius = 1.75;
 
   (Object.keys(handles) as ResizeHandle[]).forEach((handleKey) => {
     const pt = handles[handleKey];
-    ctx.fillStyle = '#0088cc';
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#0088cc';
+    ctx.lineWidth = 0.75;
+    ctx.globalAlpha = 0.8;
     ctx.beginPath();
     ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
   });
 
   ctx.restore();

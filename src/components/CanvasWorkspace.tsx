@@ -79,6 +79,11 @@ interface CanvasWorkspaceProps {
   onAddGuideH: () => void;
   onAddGuideV: () => void;
   onImportClick: () => void;
+  // History
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
@@ -130,6 +135,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onAddGuideH,
   onAddGuideV,
   onImportClick,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -934,6 +943,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         hasSelectedFocus={!!selectedFocusId}
         isPreviewMode={isPreviewMode}
         onTogglePreview={onTogglePreview}
+        onUndo={onUndo}
+        onRedo={onRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
       />
 
       {/* Main Canvas Viewport Area */}
@@ -988,6 +1001,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             onDeleteFocusWithId={(id) => onDeleteFocus?.(id)}
             isPreviewMode={isPreviewMode}
             onTogglePreview={onTogglePreview}
+            onUndo={onUndo}
+            onRedo={onRedo}
+            canUndo={canUndo}
+            canRedo={canRedo}
           />
         )}
 
@@ -1005,11 +1022,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               {/* Top Ruler Row */}
               <div className="flex items-stretch">
                 <div 
-                  className="w-4 h-4 bg-[#f8fafc] border-t border-l border-r border-b border-[#e2e8f0] flex items-center justify-center text-[7px] font-mono text-[#94a3b8] font-bold select-none shrink-0"
-                  title="Règles (pixels)"
-                >
-                  px
-                </div>
+                  className="w-2.5 h-2.5 bg-transparent border-t border-l border-r border-b border-slate-300/40 select-none shrink-0"
+                  title="Règles discrètes"
+                />
                 <TopRuler
                   width={bounds.canvasWidth}
                   bgX={bounds.bgX}

@@ -66,6 +66,10 @@ interface StudioSettingsPanelProps {
   onUpdateTriangle?: (id: string, updated: Partial<TriangleShape>) => void;
   onDeleteTriangle?: (id: string) => void;
   // Actions
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
   onResetToDefaults: () => void;
   onExportPng: () => void;
   onCopyClipboard: () => void;
@@ -110,6 +114,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   onAddTriangle,
   onUpdateTriangle,
   onDeleteTriangle,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
   onResetToDefaults,
   onExportPng,
   onCopyClipboard,

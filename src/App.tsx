@@ -890,11 +890,6 @@ export default function App() {
       {/* Top Header */}
       <Header
         onImportFile={handleImportFile}
-        onSelectSample={handleSelectSample}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        canUndo={historyIndex > 0}
-        canRedo={historyIndex < history.length - 1}
         onExportPng={handleExportPng}
         onCopyClipboard={handleCopyClipboard}
         isExporting={isExporting}
@@ -953,6 +948,10 @@ export default function App() {
           userGuides={userGuides}
           onAddGuideH={handleAddGuideH}
           onAddGuideV={handleAddGuideV}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canUndo={historyIndex > 0}
+          canRedo={historyIndex < history.length - 1}
           onImportClick={() => {
             const el = document.getElementById('header-import-button');
             el?.click();
@@ -991,6 +990,10 @@ export default function App() {
           onAddTriangle={() => handleAddTriangle()}
           onUpdateTriangle={handleUpdateTriangle}
           onDeleteTriangle={handleDeleteTriangle}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canUndo={historyIndex > 0}
+          canRedo={historyIndex < history.length - 1}
           onResetToDefaults={handleResetToDefaults}
           onExportPng={handleExportPng}
           onCopyClipboard={handleCopyClipboard}

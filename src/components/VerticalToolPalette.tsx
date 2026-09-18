@@ -9,7 +9,9 @@ import {
   Droplet,
   GripVertical,
   Triangle,
-  RotateCcw
+  RotateCcw,
+  Undo2,
+  Redo2
 } from 'lucide-react';
 import { FocusZone } from '../types';
 
@@ -42,6 +44,11 @@ interface VerticalToolPaletteProps {
   onDeleteFocusWithId?: (id: string) => void;
   isPreviewMode?: boolean;
   onTogglePreview?: () => void;
+  // Undo / Redo
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
@@ -68,6 +75,10 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
   onDeleteFocusWithId,
   isPreviewMode,
   onTogglePreview,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }) => {
   const [showZonesMenu, setShowZonesMenu] = useState(false);
   // Draggable position with local storage memory
@@ -420,6 +431,40 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       >
         <Square className="w-4 h-4" />
       </button>
+
+      {/* Boutons Annuler / Rétablir */}
+      {(onUndo || onRedo) && (
+        <>
+          <div className="w-5 h-px bg-[#eeeeee] my-0.5" />
+          <button
+            id="tool-undo"
+            onClick={onUndo}
+            disabled={!canUndo}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+              canUndo 
+                ? 'text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]' 
+                : 'text-[#979797] opacity-35 cursor-not-allowed'
+            }`}
+            title="Annuler l'action précédente (Ctrl+Z)"
+          >
+            <Undo2 className="w-4 h-4" />
+          </button>
+
+          <button
+            id="tool-redo"
+            onClick={onRedo}
+            disabled={!canRedo}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+              canRedo 
+                ? 'text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]' 
+                : 'text-[#979797] opacity-35 cursor-not-allowed'
+            }`}
+            title="Rétablir l'action annulée (Ctrl+Y ou Ctrl+Shift+Z)"
+          >
+            <Redo2 className="w-4 h-4" />
+          </button>
+        </>
+      )}
 
       <div className="w-5 h-px bg-[#eeeeee] my-0.5" />
 

@@ -2,24 +2,16 @@ import React, { useRef } from 'react';
 import { 
   Download, 
   Upload, 
-  Undo2, 
-  Redo2, 
   Copy, 
   HelpCircle, 
   Check,
-  Smartphone,
   Layers,
-  Sparkles
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
-import { SAMPLE_PRESETS } from '../utils/sampleImages';
 
 interface HeaderProps {
   onImportFile: (file: File) => void;
-  onSelectSample: (presetId: string) => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
   onExportPng: () => void;
   onCopyClipboard: () => void;
   isExporting: boolean;
@@ -30,11 +22,6 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   onImportFile,
-  onSelectSample,
-  onUndo,
-  onRedo,
-  canUndo,
-  canRedo,
   onExportPng,
   onCopyClipboard,
   isExporting,
@@ -70,72 +57,29 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <div className="h-4 w-px bg-[#eeeeee] mx-2 hidden md:block" />
-
-        {/* Preset Selector Dropdown */}
-        <div className="hidden sm:flex items-center gap-1.5">
-          <div className="relative group">
-            <button
-              id="header-sample-button"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium text-[#666666] hover:text-[#000000] bg-[#eeeeee]/80 hover:bg-[#eeeeee] transition-all"
-              title="Charger un exemple de capture d'écran"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-[#666666]" />
-              <span>Modèles d'écran</span>
-            </button>
-
-            <div className="absolute top-full left-0 mt-2 w-64 bg-white/95 backdrop-blur-xl border border-[#eeeeee] rounded-2xl shadow-xl py-2 hidden group-hover:block z-50 ring-1 ring-[#979797]/15">
-              <div className="px-3.5 py-1 text-[10px] font-bold text-[#979797] uppercase tracking-wider">
-                Exemples prêts à l'emploi
-              </div>
-              {SAMPLE_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  onClick={() => onSelectSample(preset.id)}
-                  className="w-full px-3.5 py-2 text-left hover:bg-[#eeeeee]/60 flex flex-col transition-colors"
-                >
-                  <span className="text-xs font-semibold text-[#000000]">
-                    {preset.name}
-                  </span>
-                  <span className="text-[10px] text-[#666666] truncate">
-                    {preset.description}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Center Controls: Undo / Redo */}
-      <div className="flex items-center gap-1 bg-[#eeeeee]/80 p-0.5 rounded-full border border-[#eeeeee]">
-        <button
-          id="btn-undo"
-          onClick={onUndo}
-          disabled={!canUndo}
-          className={`p-1.5 rounded-full transition-all ${
-            canUndo 
-              ? 'text-[#000000] hover:bg-white shadow-2xs' 
-              : 'text-[#979797] cursor-not-allowed opacity-50'
-          }`}
-          title="Annuler (Ctrl+Z)"
+        {/* Bouton de switch vers FocusFrame (même onglet) */}
+        <a
+          id="btn-switch-focusframe"
+          href="https://focusframe-eight.vercel.app/"
+          target="_self"
+          onClick={(e) => {
+            // Naviguer sur le même onglet, y compris si l'application est dans une iframe
+            e.preventDefault();
+            try {
+              window.top ? (window.top.location.href = 'https://focusframe-eight.vercel.app/') : (window.location.href = 'https://focusframe-eight.vercel.app/');
+            } catch {
+              window.location.href = 'https://focusframe-eight.vercel.app/';
+            }
+          }}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[#eeeeee]/80 hover:bg-[#000000] text-[#666666] hover:text-white transition-all shadow-2xs group cursor-pointer"
+          title="Basculer vers FocusFrame (même onglet)"
         >
-          <Undo2 className="w-3.5 h-3.5" />
-        </button>
+          <span className="tracking-tight">FocusFrame</span>
+          <ArrowRight className="w-3 h-3 text-[#979797] group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+        </a>
 
-        <button
-          id="btn-redo"
-          onClick={onRedo}
-          disabled={!canRedo}
-          className={`p-1.5 rounded-full transition-all ${
-            canRedo 
-              ? 'text-[#000000] hover:bg-white shadow-2xs' 
-              : 'text-[#979797] cursor-not-allowed opacity-50'
-          }`}
-          title="Rétablir (Ctrl+Y ou Ctrl+Shift+Z)"
-        >
-          <Redo2 className="w-3.5 h-3.5" />
-        </button>
+        {/* Center / Brand divider */}
+        <div className="h-4 w-px bg-[#eeeeee] mx-1 hidden md:block" />
       </div>
 
       {/* Right Controls: Import, Copy, Export */}
