@@ -44,12 +44,9 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Brand & Logo */}
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-full bg-[#000000] flex items-center justify-center shadow-xs">
-            <span className="text-white font-bold text-xs tracking-tighter">F</span>
-          </div>
-          <div className="flex items-center gap-2">
+          <img src="/logo_focus_studio.png" alt="Logo" className="w-7 h-7 rounded-full object-cover" />          <div className="flex items-center gap-2">
             <span className="font-semibold text-[#000000] tracking-tight text-sm font-sans">
-              Focus Studio
+              FOCUS STUDIO
             </span>
             <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-[#eeeeee] text-[#666666]">
               PRO
