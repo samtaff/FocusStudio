@@ -302,10 +302,8 @@ export function drawComposition(
     return;
   }
 
-  // 9. If interactive, draw Rulers (discreet and small)
-  if (interactive && showRulers) {
-    drawRulers(ctx, bgX, bgY, bgWidth, bgHeight);
-  }
+  // 9. Rulers are rendered outside the checkerboard damier in CanvasWorkspace
+  // (Not drawn on canvas to keep the transparency checkerboard clean)
 
   // 10. If interactive, draw smart alignment guides & user guides (ultra-discreet & small)
   if (interactive && showGuides) {
@@ -407,13 +405,23 @@ function drawSingleFocusContentAndBorder(
   const origSrcX = origCenterX - origCropW / 2;
   const origSrcY = origCenterY - origCropH / 2;
 
-  // A. Drop Shadow under the focus card
+  // A. Drop Shadow under the focus card (Photoshop: opacité 30%, angle 90°, distance 2px, taille 2px, #25465F)
   if (focus.hasShadow !== false) {
     ctx.save();
-    ctx.shadowColor = 'rgba(15, 23, 42, 0.28)';
-    ctx.shadowBlur = focus.shadowBlur ?? 14;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = focus.shadowOffsetY ?? 5;
+    const shadowColorHex = focus.shadowColor || BASE_COLOR;
+    const shadowOpacity = focus.shadowOpacity ?? 0.30;
+    ctx.shadowColor = hexToRgba(shadowColorHex, shadowOpacity);
+
+    // Angle 90°: light from top to bottom (dx = 0, dy = distance)
+    const angle = focus.shadowAngle ?? 90;
+    const distance = focus.shadowDistance ?? (focus.shadowOffsetY ?? 2);
+    const size = focus.shadowSize ?? (focus.shadowBlur ?? 2);
+
+    // Convert angle to rad (90° means straight down)
+    const rad = (angle * Math.PI) / 180;
+    ctx.shadowOffsetX = focus.shadowOffsetX ?? Math.round(distance * Math.cos(rad - Math.PI / 2) * 0); // 0 at 90°
+    ctx.shadowOffsetY = focus.shadowOffsetY ?? (angle === 90 ? distance : Math.round(distance * Math.sin(rad)));
+    ctx.shadowBlur = size;
 
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();

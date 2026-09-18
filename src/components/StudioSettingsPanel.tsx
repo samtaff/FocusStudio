@@ -27,7 +27,7 @@ import {
   MaskShape,
   TriangleShape
 } from '../types';
-import { BASE_COLOR } from '../utils/canvasRenderer';
+import { BASE_COLOR, calculateCompositionBounds } from '../utils/canvasRenderer';
 import { SAMPLE_PRESETS } from '../utils/sampleImages';
 import { NumericInput } from './NumericInput';
 
@@ -385,25 +385,13 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
             </button>
 
             <div className="flex items-center gap-1.5">
-              {focuses.length > 1 && onRenumberFocuses && (
-                <button
-                  id="btn-renumber-focuses"
-                  onClick={onRenumberFocuses}
-                  className="px-2 py-1 rounded-full bg-[#eeeeee] hover:bg-[#e0e0e0] text-[#000000] text-[10px] font-medium flex items-center gap-1 transition-all"
-                  title="Renuméroter automatiquement toutes les zones (1, 2, 3...) du haut vers le bas"
-                >
-                  <RotateCcw className="w-2.5 h-2.5 text-[#0088cc]" />
-                  <span>Auto 1,2,3...</span>
-                </button>
-              )}
               <button
                 id="btn-add-focus-nouveau"
                 onClick={onAddFocus}
-                className="px-2.5 py-1 rounded-full bg-[#0088cc] hover:bg-[#0077b3] text-white text-[10px] font-medium flex items-center gap-1 transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
+                className="w-6 h-6 rounded-full bg-[#0088cc] hover:bg-[#0077b3] text-white flex items-center justify-center transition-all shadow-2xs hover:scale-105 active:scale-95"
                 title="Ajouter une nouvelle zone de focus"
               >
-                <Plus className="w-3 h-3" />
-                <span>+ Nouveau</span>
+                <Plus className="w-3.5 h-3.5" />
               </button>
               <button onClick={() => toggleSection('focus')}>
                 {openSections.focus ? <ChevronDown className="w-4 h-4 text-[#979797]" /> : <ChevronRight className="w-4 h-4 text-[#979797]" />}
@@ -725,25 +713,28 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
                   {/* Grossissement Zoom (exprimé en pixels, homotétique) */}
                   {(() => {
-                    const currentZoom = selectedFocus.zoom || 1.0;
+                    const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
+                    const bgWidth = bounds.bgWidth > 0 ? bounds.bgWidth : 180;
                     const focusW = Math.round(selectedFocus.width);
-                    const zoomPx = Math.round(focusW * currentZoom);
+                    const defaultZoom = Number((focusW / bgWidth).toFixed(3));
+                    const currentZoom = selectedFocus.zoom || defaultZoom;
+                    const zoomPx = Math.round(bgWidth * currentZoom);
                     return (
                       <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
                         <div className="flex items-center justify-between text-[11px]">
                           <div>
                             <span className="text-[#666666] font-medium block">Grossissement (Zoom)</span>
-                            <span className="text-[10px] text-[#979797]">Homotétique : {zoomPx} px ({currentZoom.toFixed(2)}×)</span>
+                            <span className="text-[10px] text-[#979797]">Largeur screenshot : {zoomPx} px ({currentZoom.toFixed(2)}×)</span>
                           </div>
                           <div className="w-20">
                             <NumericInput
                               value={zoomPx}
                               onChange={(val) => {
-                                const newPx = Math.max(focusW, val);
-                                onUpdateFocus({ zoom: Math.max(1.0, newPx / focusW) });
+                                const newPx = Math.max(bgWidth, val);
+                                onUpdateFocus({ zoom: Math.max(1.0, Number((newPx / bgWidth).toFixed(3))) });
                               }}
-                              min={focusW}
-                              max={focusW * 3}
+                              min={Math.round(bgWidth)}
+                              max={Math.round(focusW * 3)}
                               unit="px"
                             />
                           </div>
@@ -752,13 +743,13 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         <div className="flex items-center gap-2">
                           <input
                             type="range"
-                            min={focusW}
+                            min={Math.round(bgWidth)}
                             max={Math.round(focusW * 2.5)}
                             step="2"
                             value={zoomPx}
                             onChange={(e) => {
                               const newPx = parseFloat(e.target.value);
-                              onUpdateFocus({ zoom: Math.max(1.0, newPx / focusW) });
+                              onUpdateFocus({ zoom: Math.max(1.0, Number((newPx / bgWidth).toFixed(3))) });
                             }}
                             className="flex-1 accent-[#0088cc]"
                           />
@@ -767,11 +758,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         {/* Presets rapides de zoom en pixel */}
                         <div className="flex gap-1 flex-wrap">
                           {[
-                            { label: `${focusW}px (1:1)`, factor: 1.0, title: 'Taille originale (défaut = largeur zone focus)' },
-                            { label: `${Math.round(focusW * 1.2)}px`, factor: 1.2, title: '+20% d\'agrandissement' },
-                            { label: `${Math.round(focusW * 1.4)}px`, factor: 1.4, title: '+40% d\'agrandissement' },
-                            { label: `${Math.round(focusW * 1.8)}px`, factor: 1.8, title: '+80% d\'agrandissement' },
-                            { label: `${Math.round(focusW * 2.0)}px`, factor: 2.0, title: '2× agrandissement' },
+                            { label: `Défaut (${focusW}px)`, factor: defaultZoom, title: `Par défaut : largeur screenshot (${focusW}px) = largeur zone focus (${focusW}px)` },
+                            { label: `+20% (${Math.round(focusW * 1.2)}px)`, factor: Number((defaultZoom * 1.2).toFixed(3)), title: '+20% d\'agrandissement' },
+                            { label: `+40% (${Math.round(focusW * 1.4)}px)`, factor: Number((defaultZoom * 1.4).toFixed(3)), title: '+40% d\'agrandissement' },
+                            { label: `+80% (${Math.round(focusW * 1.8)}px)`, factor: Number((defaultZoom * 1.8).toFixed(3)), title: '+80% d\'agrandissement' },
+                            { label: `2× (${Math.round(focusW * 2.0)}px)`, factor: Number((defaultZoom * 2.0).toFixed(3)), title: '2× agrandissement' },
                           ].map((p) => (
                             <button
                               key={p.factor}
@@ -791,6 +782,106 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       </div>
                     );
                   })()}
+
+                  {/* Ombre Portée (Photoshop : opacité 30%, angle 90°, distance 2px, taille 2px, #25465F) */}
+                  <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[#666666] font-medium">Ombre portée</span>
+                        <span className="text-[10px] text-[#979797] font-mono">30%, 90°, 2px, 2px</span>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedFocus.hasShadow !== false}
+                          onChange={(e) => onUpdateFocus({ hasShadow: e.target.checked })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-8 h-4 bg-[#eeeeee] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#979797]/30 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#0088cc]" />
+                      </label>
+                    </div>
+
+                    {selectedFocus.hasShadow !== false && (
+                      <div className="grid grid-cols-2 gap-2 bg-[#eeeeee]/40 p-2 rounded-xl text-[10px]">
+                        <div>
+                          <span className="text-[#666666] block">Opacité : {Math.round((selectedFocus.shadowOpacity ?? 0.30) * 100)}%</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={selectedFocus.shadowOpacity ?? 0.30}
+                            onChange={(e) => onUpdateFocus({ shadowOpacity: parseFloat(e.target.value) })}
+                            className="w-full accent-[#0088cc]"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[#666666] block">Angle : {selectedFocus.shadowAngle ?? 90}°</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="360"
+                            step="5"
+                            value={selectedFocus.shadowAngle ?? 90}
+                            onChange={(e) => onUpdateFocus({ shadowAngle: parseInt(e.target.value) })}
+                            className="w-full accent-[#0088cc]"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[#666666] block">Distance : {selectedFocus.shadowDistance ?? 2}px</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="20"
+                            step="1"
+                            value={selectedFocus.shadowDistance ?? 2}
+                            onChange={(e) => onUpdateFocus({ shadowDistance: parseInt(e.target.value), shadowOffsetY: parseInt(e.target.value) })}
+                            className="w-full accent-[#0088cc]"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[#666666] block">Taille (Flou) : {selectedFocus.shadowSize ?? 2}px</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="20"
+                            step="1"
+                            value={selectedFocus.shadowSize ?? 2}
+                            onChange={(e) => onUpdateFocus({ shadowSize: parseInt(e.target.value), shadowBlur: parseInt(e.target.value) })}
+                            className="w-full accent-[#0088cc]"
+                          />
+                        </div>
+                        <div className="col-span-2 flex items-center justify-between pt-1 border-t border-white/60">
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="color"
+                              value={selectedFocus.shadowColor || '#25465F'}
+                              onChange={(e) => onUpdateFocus({ shadowColor: e.target.value })}
+                              className="w-5 h-5 rounded-full border border-[#979797]/40 cursor-pointer p-0 bg-white"
+                            />
+                            <span className="font-mono text-[9px] uppercase text-[#666666]">{selectedFocus.shadowColor || '#25465F'}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateFocus({
+                              shadowOpacity: 0.30,
+                              shadowAngle: 90,
+                              shadowDistance: 2,
+                              shadowSize: 2,
+                              shadowBlur: 2,
+                              shadowOffsetY: 2,
+                              shadowColor: '#25465F',
+                              hasShadow: true,
+                            })}
+                            className="px-2 py-0.5 rounded-full bg-white hover:bg-[#e0e0e0] text-[#0088cc] font-medium text-[9px] transition-colors"
+                            title="Réinitialiser l'ombre aux réglages Photoshop demandés (30%, 90°, 2px, 2px, #25465F)"
+                          >
+                            Réinitialiser (30%, 90°, 2px)
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : (
                 <div className="text-center py-4 text-[#666666]">
@@ -824,11 +915,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={onAddBlur}
-                className="px-2.5 py-1 rounded-full bg-[#0088cc] hover:bg-[#0077b3] text-white text-[10px] font-medium flex items-center gap-1 transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
+                className="w-6 h-6 rounded-full bg-[#0088cc] hover:bg-[#0077b3] text-white flex items-center justify-center transition-all shadow-2xs hover:scale-105 active:scale-95"
                 title="Ajouter une zone de flou"
               >
-                <Plus className="w-3 h-3" />
-                <span>+ Flou</span>
+                <Plus className="w-3.5 h-3.5" />
               </button>
               <button onClick={() => toggleSection('blur')}>
                 {openSections.blur ? <ChevronDown className="w-4 h-4 text-[#979797]" /> : <ChevronRight className="w-4 h-4 text-[#979797]" />}
@@ -1008,11 +1098,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={onAddMask}
-                className="px-2.5 py-1 rounded-full bg-[#000000] hover:bg-[#333333] text-white text-[10px] font-medium flex items-center gap-1 transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
+                className="w-6 h-6 rounded-full bg-[#25465F] hover:bg-[#1a3245] text-white flex items-center justify-center transition-all shadow-2xs hover:scale-105 active:scale-95"
                 title="Ajouter une forme bleue"
               >
-                <Plus className="w-3 h-3" />
-                <span>+ Forme</span>
+                <Plus className="w-3.5 h-3.5" />
               </button>
               <button onClick={() => toggleSection('mask')}>
                 {openSections.mask ? <ChevronDown className="w-4 h-4 text-[#979797]" /> : <ChevronRight className="w-4 h-4 text-[#979797]" />}
@@ -1382,11 +1471,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
               {onAddTriangle && (
                 <button
                   onClick={onAddTriangle}
-                  className="px-2.5 py-1 rounded-full bg-[#000000] hover:bg-[#333333] text-white text-[10px] font-medium flex items-center gap-1 transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
+                  className="w-6 h-6 rounded-full bg-[#000000] hover:bg-[#333333] text-white flex items-center justify-center transition-all shadow-2xs hover:scale-105 active:scale-95"
                   title="Ajouter un triangle 15x13px"
                 >
-                  <Plus className="w-3 h-3" />
-                  <span>+ Triangle</span>
+                  <Plus className="w-3.5 h-3.5" />
                 </button>
               )}
               <button onClick={() => toggleSection('triangle')}>

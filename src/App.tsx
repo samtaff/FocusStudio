@@ -42,6 +42,43 @@ export default function App() {
   const [triangles, setTriangles] = useState<TriangleShape[]>([]);
   const [selectedTriangleId, setSelectedTriangleId] = useState<string | null>(null);
 
+  // Mutually exclusive selection handlers so arrow keys and panels target the exact active object
+  const handleSelectFocus = useCallback((id: string | null) => {
+    setSelectedFocusId(id);
+    if (id) {
+      setSelectedBlurId(null);
+      setSelectedMaskId(null);
+      setSelectedTriangleId(null);
+    }
+  }, []);
+
+  const handleSelectBlur = useCallback((id: string | null) => {
+    setSelectedBlurId(id);
+    if (id) {
+      setSelectedFocusId(null);
+      setSelectedMaskId(null);
+      setSelectedTriangleId(null);
+    }
+  }, []);
+
+  const handleSelectMask = useCallback((id: string | null) => {
+    setSelectedMaskId(id);
+    if (id) {
+      setSelectedFocusId(null);
+      setSelectedBlurId(null);
+      setSelectedTriangleId(null);
+    }
+  }, []);
+
+  const handleSelectTriangle = useCallback((id: string | null) => {
+    setSelectedTriangleId(id);
+    if (id) {
+      setSelectedFocusId(null);
+      setSelectedBlurId(null);
+      setSelectedMaskId(null);
+    }
+  }, []);
+
   // Active Tool & Preview Mode
   const [activeTool, setActiveTool] = useState<ToolType>('select');
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(false);
@@ -136,13 +173,14 @@ export default function App() {
 
     setImage(loaded);
 
-    // Initial default focus: 240 × 50 px, rounded corners 10px
+    // Initial default focus: 240 × 50 px, zoom = screenshot width in zone focus (240px)
     const bounds = calculateCompositionBounds(loaded, [], globalStyles.workspaceWidth);
     const defaultFocusW = 240;
     const defaultFocusH = 50;
     const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
     const defaultX = Math.round(phoneCenterX - defaultFocusW / 2);
     const defaultY = Math.round(bounds.bgY + bounds.bgHeight * 0.42);
+    const defaultZoom = bounds.bgWidth > 0 ? Number((defaultFocusW / bounds.bgWidth).toFixed(3)) : 1.0;
 
     const initialFocus: FocusZone = {
       id: `focus-${Date.now()}`,
@@ -151,7 +189,7 @@ export default function App() {
       y: defaultY,
       width: defaultFocusW,
       height: defaultFocusH,
-      zoom: 1.0,
+      zoom: defaultZoom,
       sourceOffsetX: 0,
       sourceOffsetY: 0,
       borderWidth: 2,
@@ -161,10 +199,18 @@ export default function App() {
       showStepBadge: true,
       badgePosition: 'auto',
       badgeColor: BASE_COLOR,
+      hasShadow: true,
+      shadowColor: BASE_COLOR,
+      shadowOpacity: 0.30,
+      shadowAngle: 90,
+      shadowDistance: 2,
+      shadowSize: 2,
+      shadowBlur: 2,
+      shadowOffsetY: 2,
     };
 
     setFocuses([initialFocus]);
-    setSelectedFocusId(initialFocus.id);
+    handleSelectFocus(initialFocus.id);
     setHistory([[initialFocus]]);
     setHistoryIndex(0);
 
@@ -238,7 +284,7 @@ export default function App() {
     }
   };
 
-  // Add Focus Zone: 240px × 50px, border-radius 10px
+  // Add Focus Zone: default width = 240px, default zoom = screenshot width in focus zone (240px)
   const handleAddFocus = () => {
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
     const nextStep = focuses.length + 1;
@@ -247,6 +293,7 @@ export default function App() {
     const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
     const posX = Math.round(phoneCenterX - defaultFocusW / 2);
     const posY = Math.round(bounds.bgY + 40 + (nextStep - 1) * 60);
+    const defaultZoom = bounds.bgWidth > 0 ? Number((defaultFocusW / bounds.bgWidth).toFixed(3)) : 1.0;
 
     const newFocus: FocusZone = {
       id: `focus-${Date.now()}`,
@@ -255,7 +302,7 @@ export default function App() {
       y: posY,
       width: defaultFocusW,
       height: defaultFocusH,
-      zoom: 1.0,
+      zoom: defaultZoom,
       sourceOffsetX: 0,
       sourceOffsetY: 0,
       borderWidth: 2,
@@ -265,24 +312,36 @@ export default function App() {
       showStepBadge: true,
       badgePosition: 'auto',
       badgeColor: BASE_COLOR,
+      hasShadow: true,
+      shadowColor: BASE_COLOR,
+      shadowOpacity: 0.30,
+      shadowAngle: 90,
+      shadowDistance: 2,
+      shadowSize: 2,
+      shadowBlur: 2,
+      shadowOffsetY: 2,
     };
 
     const updated = [...focuses, newFocus];
     setFocuses(updated);
-    setSelectedFocusId(newFocus.id);
+    handleSelectFocus(newFocus.id);
     recordHistory(updated);
   };
 
-  const handleAddFocusAt = (x: number, y: number, w = 240, h = 50, label?: string) => {
+  const handleAddFocusAt = (x: number, y: number, w?: number, h = 50, label?: string) => {
+    const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
     const nextStep = focuses.length + 1;
+    const defaultFocusW = 240;
+    const focusW = w !== undefined ? w : defaultFocusW;
+    const defaultZoom = bounds.bgWidth > 0 ? Number((focusW / bounds.bgWidth).toFixed(3)) : 1.0;
     const newFocus: FocusZone = {
       id: `focus-${Date.now()}`,
       name: label || `Zone ${nextStep}`,
       x,
       y,
-      width: w,
+      width: focusW,
       height: h,
-      zoom: 1.0,
+      zoom: defaultZoom,
       sourceOffsetX: 0,
       sourceOffsetY: 0,
       borderWidth: 2,
@@ -292,11 +351,19 @@ export default function App() {
       showStepBadge: true,
       badgePosition: 'auto',
       badgeColor: BASE_COLOR,
+      hasShadow: true,
+      shadowColor: BASE_COLOR,
+      shadowOpacity: 0.30,
+      shadowAngle: 90,
+      shadowDistance: 2,
+      shadowSize: 2,
+      shadowBlur: 2,
+      shadowOffsetY: 2,
     };
 
     const updated = [...focuses, newFocus];
     setFocuses(updated);
-    setSelectedFocusId(newFocus.id);
+    handleSelectFocus(newFocus.id);
     recordHistory(updated);
   };
 
@@ -397,7 +464,7 @@ export default function App() {
       blurRadius: 10,
     };
     setBlurZones((prev) => [...prev, newBlur]);
-    setSelectedBlurId(newBlur.id);
+    handleSelectBlur(newBlur.id);
   };
 
   const handleUpdateBlurZone = (id: string, updated: Partial<BlurZone>) => {
@@ -426,7 +493,7 @@ export default function App() {
       borderRadius: 4,
     };
     setMaskShapes((prev) => [...prev, newMask]);
-    setSelectedMaskId(newMask.id);
+    handleSelectMask(newMask.id);
   };
 
   const handleUpdateMaskShape = (id: string, updated: Partial<MaskShape>) => {
@@ -455,7 +522,7 @@ export default function App() {
       opacity: 1,
     };
     setTriangles((prev) => [...prev, newTriangle]);
-    setSelectedTriangleId(newTriangle.id);
+    handleSelectTriangle(newTriangle.id);
   };
 
   const handleUpdateTriangle = (id: string, updated: Partial<TriangleShape>) => {
@@ -735,13 +802,9 @@ export default function App() {
         return;
       }
 
-      // Arrow keys to nudge selected focus
-      if (selectedFocusId && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        e.preventDefault();
+      // Arrow keys to nudge selected object (Photoshop style: 1px by default, 10px with Shift)
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         const step = e.shiftKey ? 10 : 1;
-        const current = focuses.find((f) => f.id === selectedFocusId);
-        if (!current) return;
-
         let dx = 0;
         let dy = 0;
         if (e.key === 'ArrowUp') dy = -step;
@@ -749,10 +812,49 @@ export default function App() {
         if (e.key === 'ArrowLeft') dx = -step;
         if (e.key === 'ArrowRight') dx = step;
 
-        handleUpdateFocus({
-          x: current.x + dx,
-          y: current.y + dy,
-        });
+        let handled = false;
+
+        if (selectedFocusId) {
+          const current = focuses.find((f) => f.id === selectedFocusId);
+          if (current) {
+            handleUpdateFocus({
+              x: current.x + dx,
+              y: current.y + dy,
+            });
+            handled = true;
+          }
+        } else if (selectedBlurId) {
+          const current = blurZones.find((b) => b.id === selectedBlurId);
+          if (current) {
+            handleUpdateBlurZone(selectedBlurId, {
+              x: current.x + dx,
+              y: current.y + dy,
+            });
+            handled = true;
+          }
+        } else if (selectedMaskId) {
+          const current = maskShapes.find((m) => m.id === selectedMaskId);
+          if (current) {
+            handleUpdateMaskShape(selectedMaskId, {
+              x: current.x + dx,
+              y: current.y + dy,
+            });
+            handled = true;
+          }
+        } else if (selectedTriangleId) {
+          const current = triangles.find((t) => t.id === selectedTriangleId);
+          if (current) {
+            handleUpdateTriangle(selectedTriangleId, {
+              x: current.x + dx,
+              y: current.y + dy,
+            });
+            handled = true;
+          }
+        }
+
+        if (handled) {
+          e.preventDefault();
+        }
       }
     };
 
@@ -779,7 +881,7 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('paste', handlePaste);
     };
-  }, [focuses, selectedFocusId, selectedBlurId, selectedMaskId, selectedTriangleId, isPreviewMode, historyIndex, history]);
+  }, [focuses, blurZones, maskShapes, triangles, selectedFocusId, selectedBlurId, selectedMaskId, selectedTriangleId, isPreviewMode, historyIndex, history]);
 
   const selectedFocus = focuses.find((f) => f.id === selectedFocusId) || null;
 
@@ -808,28 +910,29 @@ export default function App() {
           image={image}
           focuses={focuses}
           selectedFocusId={selectedFocusId}
-          onSelectFocus={setSelectedFocusId}
+          onSelectFocus={handleSelectFocus}
           onUpdateFocus={handleUpdateFocus}
+          onRenumberFocuses={handleAutoRenumberFocuses}
           onAddFocus={handleAddFocus}
           onDeleteFocus={handleDeleteFocus}
           onAddFocusAt={handleAddFocusAt}
           blurZones={blurZones}
           selectedBlurId={selectedBlurId}
-          onSelectBlur={setSelectedBlurId}
+          onSelectBlur={handleSelectBlur}
           onAddBlur={() => handleAddBlurZone()}
           onAddBlurAt={handleAddBlurZone}
           onUpdateBlur={handleUpdateBlurZone}
           onDeleteBlur={handleDeleteBlurZone}
           maskShapes={maskShapes}
           selectedMaskId={selectedMaskId}
-          onSelectMask={setSelectedMaskId}
+          onSelectMask={handleSelectMask}
           onAddMask={() => handleAddMaskShape()}
           onAddMaskAt={handleAddMaskShape}
           onUpdateMask={handleUpdateMaskShape}
           onDeleteMask={handleDeleteMaskShape}
           triangles={triangles}
           selectedTriangleId={selectedTriangleId}
-          onSelectTriangle={setSelectedTriangleId}
+          onSelectTriangle={handleSelectTriangle}
           onAddTriangle={() => handleAddTriangle()}
           onAddTriangleAt={handleAddTriangle}
           onUpdateTriangle={handleUpdateTriangle}
@@ -861,7 +964,7 @@ export default function App() {
           image={image}
           focuses={focuses}
           selectedFocus={selectedFocus}
-          onSelectFocus={setSelectedFocusId}
+          onSelectFocus={handleSelectFocus}
           onAddFocus={handleAddFocus}
           onUpdateFocus={handleUpdateFocus}
           onDeleteFocus={handleDeleteFocus}
@@ -872,19 +975,19 @@ export default function App() {
           onUpdateGlobalStyles={(updated) => setGlobalStyles((prev) => ({ ...prev, ...updated }))}
           blurZones={blurZones}
           selectedBlurId={selectedBlurId}
-          onSelectBlur={setSelectedBlurId}
+          onSelectBlur={handleSelectBlur}
           onAddBlur={() => handleAddBlurZone()}
           onUpdateBlur={handleUpdateBlurZone}
           onDeleteBlur={handleDeleteBlurZone}
           maskShapes={maskShapes}
           selectedMaskId={selectedMaskId}
-          onSelectMask={setSelectedMaskId}
+          onSelectMask={handleSelectMask}
           onAddMask={() => handleAddMaskShape()}
           onUpdateMask={handleUpdateMaskShape}
           onDeleteMask={handleDeleteMaskShape}
           triangles={triangles}
           selectedTriangleId={selectedTriangleId}
-          onSelectTriangle={setSelectedTriangleId}
+          onSelectTriangle={handleSelectTriangle}
           onAddTriangle={() => handleAddTriangle()}
           onUpdateTriangle={handleUpdateTriangle}
           onDeleteTriangle={handleDeleteTriangle}

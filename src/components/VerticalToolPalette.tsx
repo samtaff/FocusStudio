@@ -8,7 +8,8 @@ import {
   Trash2,
   Droplet,
   GripVertical,
-  Triangle
+  Triangle,
+  RotateCcw
 } from 'lucide-react';
 import { FocusZone } from '../types';
 
@@ -35,6 +36,8 @@ interface VerticalToolPaletteProps {
   onCenterWorkspace?: () => void;
   onToggleMiniWidget?: () => void;
   onSelectFocus?: (id: string) => void;
+  onUpdateFocus?: (id: string, updated: Partial<FocusZone>) => void;
+  onRenumberFocuses?: () => void;
   onHoverFocus?: (id: string | null) => void;
   onDeleteFocusWithId?: (id: string) => void;
   isPreviewMode?: boolean;
@@ -59,6 +62,8 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
   onCenterWorkspace,
   onToggleMiniWidget,
   onSelectFocus,
+  onUpdateFocus,
+  onRenumberFocuses,
   onHoverFocus,
   onDeleteFocusWithId,
   isPreviewMode,
@@ -148,28 +153,39 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
           {activeZoneLabel}
         </button>
 
-        {/* Panneau rangé dans Z1 */}
+        {/* Panneau rangé dans Z1 / Z2 */}
         {showZonesMenu && (
-          <div className="absolute left-11 top-0 w-56 bg-white/95 backdrop-blur-xl border border-white/90 rounded-2xl p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.12)] ring-1 ring-[#979797]/15 z-50 text-xs">
+          <div className="absolute left-11 top-0 w-64 bg-white/95 backdrop-blur-xl border border-white/90 rounded-2xl p-2.5 shadow-[0_12px_36px_rgba(0,0,0,0.14)] ring-1 ring-[#979797]/15 z-50 text-xs">
             {/* Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-[#eeeeee] mb-2">
+            <div className="flex items-center justify-between pb-2 border-b border-[#eeeeee] mb-2 gap-1.5">
               <span className="font-semibold text-[#000000] text-[11px] tracking-tight">
-                Zones ({focuses.length})
+                Chiffres & Zones ({focuses.length})
               </span>
-              <button
-                onClick={() => {
-                  onAddFocus();
-                }}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0088cc] hover:bg-[#0077b3] text-white text-[10px] font-medium transition-all"
-                title="Ajouter une zone"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Nouveau</span>
-              </button>
+              <div className="flex items-center gap-1">
+                {focuses.length > 1 && onRenumberFocuses && (
+                  <button
+                    type="button"
+                    onClick={onRenumberFocuses}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#eeeeee] hover:bg-[#e0e0e0] text-[#000000] text-[9px] font-medium transition-all"
+                    title="Renuméroter 1, 2, 3... du haut vers le bas"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5 text-[#0088cc]" />
+                    <span>Auto 1..N</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onAddFocus}
+                  className="w-5 h-5 rounded-full bg-[#0088cc] hover:bg-[#0077b3] text-white flex items-center justify-center transition-all shadow-2xs hover:scale-105 active:scale-95"
+                  title="Ajouter une zone"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
             </div>
 
             {/* List */}
-            <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5">
+            <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto pr-0.5">
               {focuses.length === 0 ? (
                 <div className="text-[11px] text-[#979797] text-center py-2">
                   Aucune zone active
@@ -177,6 +193,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
               ) : (
                 focuses.map((f, idx) => {
                   const isSelected = selectedFocus?.id === f.id;
+                  const currentNum = f.stepNumber || idx + 1;
                   return (
                     <div
                       key={f.id}
@@ -184,43 +201,100 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
                       onMouseLeave={() => onHoverFocus?.(null)}
                       className={`group flex items-center justify-between px-2 py-1.5 rounded-xl transition-all ${
                         isSelected 
-                          ? 'bg-[#0088cc] text-white font-medium shadow-2xs' 
+                          ? 'bg-[#0088cc]/10 border border-[#0088cc]/30 text-[#000000]' 
                           : 'bg-[#eeeeee]/60 hover:bg-[#eeeeee] text-[#000000]'
                       }`}
                     >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onSelectFocus?.(f.id);
-                        }}
-                        className="flex items-center gap-2 flex-1 text-left min-w-0"
-                      >
-                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
-                          isSelected ? 'bg-white text-[#0088cc]' : 'bg-[#000000] text-white'
-                        }`}>
-                          {f.stepNumber || idx + 1}
-                        </span>
-                        <span className="truncate text-[11px] font-medium">
-                          {f.name || `Zone ${f.stepNumber || idx + 1}`}
-                        </span>
-                      </button>
-                      {onDeleteFocusWithId && (
+                      {/* Contrôle du chiffre d'étape (Stepper - / + et saisie) */}
+                      <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteFocusWithId(f.id);
+                          onClick={() => {
+                            if (onUpdateFocus) {
+                              onUpdateFocus(f.id, { stepNumber: Math.max(1, currentNum - 1) });
+                            }
                           }}
-                          className={`p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all ${
-                            isSelected 
-                              ? 'text-white hover:bg-white/20' 
-                              : 'text-[#979797] hover:text-rose-600 hover:bg-rose-50'
-                          }`}
-                          title="Supprimer cette zone"
+                          className="w-4 h-5 rounded bg-white hover:bg-[#e0e0e0] border border-[#d0d0d0] flex items-center justify-center text-[10px] font-bold text-[#333333] transition-colors"
+                          title="Diminuer le chiffre"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          -
                         </button>
-                      )}
+
+                        <input
+                          type="number"
+                          min="1"
+                          max="99"
+                          value={currentNum}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val) && val >= 1 && onUpdateFocus) {
+                              onUpdateFocus(f.id, { stepNumber: val });
+                            }
+                          }}
+                          className={`w-6 h-5 rounded text-center text-[10px] font-bold outline-none transition-all ${
+                            f.showStepBadge !== false
+                              ? 'bg-[#25465F] text-white shadow-2xs'
+                              : 'bg-[#cccccc] text-[#666666] line-through'
+                          }`}
+                          title="Chiffre d'étape (cliquer pour éditer)"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onUpdateFocus) {
+                              onUpdateFocus(f.id, { stepNumber: currentNum + 1 });
+                            }
+                          }}
+                          className="w-4 h-5 rounded bg-white hover:bg-[#e0e0e0] border border-[#d0d0d0] flex items-center justify-center text-[10px] font-bold text-[#333333] transition-colors"
+                          title="Augmenter le chiffre"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      {/* Titre / sélection de la zone */}
+                      <button
+                        type="button"
+                        onClick={() => onSelectFocus?.(f.id)}
+                        className="truncate text-[11px] font-medium mx-1.5 flex-1 text-left"
+                        title={f.name || `Zone ${currentNum}`}
+                      >
+                        {f.name || `Zone ${currentNum}`}
+                      </button>
+
+                      {/* Actions rapides : pastille active et corbeille */}
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        {/* Toggle Affichage Pastille */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onUpdateFocus) {
+                              onUpdateFocus(f.id, { showStepBadge: f.showStepBadge === false ? true : false });
+                            }
+                          }}
+                          className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold transition-all ${
+                            f.showStepBadge !== false
+                              ? 'text-[#0088cc] hover:bg-[#0088cc]/20'
+                              : 'text-[#979797] hover:bg-[#dddddd]'
+                          }`}
+                          title={f.showStepBadge !== false ? 'Pastille affichée (cliquer pour masquer)' : 'Pastille masquée (cliquer pour afficher)'}
+                        >
+                          {f.showStepBadge !== false ? '●' : '○'}
+                        </button>
+
+                        {/* Supprimer */}
+                        {onDeleteFocusWithId && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteFocusWithId(f.id)}
+                            className="w-5 h-5 rounded flex items-center justify-center text-[#979797] hover:text-rose-600 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100"
+                            title="Supprimer cette zone"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })

@@ -20,6 +20,7 @@ import {
 } from '../utils/canvasRenderer';
 import { TopSceneBar } from './TopSceneBar';
 import { VerticalToolPalette, ToolType } from './VerticalToolPalette';
+import { TopRuler, LeftRuler } from './ExternalRulers';
 import { Eye, X } from 'lucide-react';
 
 interface CanvasWorkspaceProps {
@@ -28,6 +29,7 @@ interface CanvasWorkspaceProps {
   selectedFocusId: string | null;
   onSelectFocus: (id: string | null) => void;
   onUpdateFocus: (updated: Partial<FocusZone>) => void;
+  onRenumberFocuses?: () => void;
   onAddFocus: () => void;
   onDeleteFocus?: (id: string) => void;
   onAddFocusAt: (x: number, y: number, w?: number, h?: number, label?: string) => void;
@@ -85,6 +87,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   selectedFocusId,
   onSelectFocus,
   onUpdateFocus,
+  onRenumberFocuses,
   onAddFocus,
   onDeleteFocus,
   onAddFocusAt,
@@ -180,6 +183,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
   // Dynamic Alignment Guides
   const [activeGuides, setActiveGuides] = useState<SmartGuide[]>([]);
+  const [canvasMousePos, setCanvasMousePos] = useState<{ x: number; y: number } | null>(null);
 
   // Key sequence buffer for "Z3" shortcut (User request: "lorsque j'appuie sur 'Z3' je veux que la petite fenêtre des zones s'ouvre")
   const keySequenceRef = useRef<string>('');
@@ -431,6 +435,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (activeTool === 'zoom') return;
 
     const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
+    setCanvasMousePos({ x: Math.round(cx), y: Math.round(cy) });
 
     // Dragging Triangle
     if (dragTriangleState && onUpdateTriangle) {
@@ -970,6 +975,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             onExportClick={onExportClick}
             onCenterWorkspace={handleCenterWorkspace}
             onSelectFocus={(id) => onSelectFocus(id)}
+            onUpdateFocus={(id, updated) => {
+              if (selectedFocusId === id) {
+                onUpdateFocus(updated);
+              } else {
+                onSelectFocus(id);
+                onUpdateFocus(updated);
+              }
+            }}
+            onRenumberFocuses={onRenumberFocuses}
             onHoverFocus={(id) => setHoveredFocusId(id)}
             onDeleteFocusWithId={(id) => onDeleteFocus?.(id)}
             isPreviewMode={isPreviewMode}
@@ -985,58 +999,122 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             transformOrigin: 'center center',
           }}
         >
-          {/* Canvas Wrapper: In preview mode, clean sheet without checkerboard to see exact export */}
-          <div 
-            className={`relative transition-all duration-200 ${
-              isPreviewMode 
-                ? 'bg-white shadow-2xl ring-1 ring-slate-900/10' 
-                : 'photoshop-checkerboard border border-slate-300 shadow-2xl ring-1 ring-slate-400/20'
-            }`}
-            style={{
-              width: `${bounds.canvasWidth}px`,
-              height: `${bounds.canvasHeight}px`,
-            }}
-          >
-            <canvas
-              ref={canvasRef}
-              width={bounds.canvasWidth}
-              height={bounds.canvasHeight}
-              onMouseMove={handleMouseMove}
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-              onDoubleClick={handleDoubleClick}
-              className="block select-none"
+          {/* Canvas Wrapper with external rulers outside the checkerboard */}
+          {!isPreviewMode && globalStyles.showRulers !== false ? (
+            <div className="flex flex-col shadow-2xl ring-1 ring-slate-400/20 select-none">
+              {/* Top Ruler Row */}
+              <div className="flex items-stretch">
+                <div 
+                  className="w-4 h-4 bg-[#f8fafc] border-t border-l border-r border-b border-[#e2e8f0] flex items-center justify-center text-[7px] font-mono text-[#94a3b8] font-bold select-none shrink-0"
+                  title="Règles (pixels)"
+                >
+                  px
+                </div>
+                <TopRuler
+                  width={bounds.canvasWidth}
+                  bgX={bounds.bgX}
+                  bgWidth={bounds.bgWidth}
+                  cursorX={canvasMousePos?.x}
+                  onAddGuideH={onAddGuideH}
+                />
+              </div>
+
+              {/* Canvas with Left Ruler */}
+              <div className="flex items-stretch">
+                <LeftRuler
+                  height={bounds.canvasHeight}
+                  bgY={bounds.bgY}
+                  bgHeight={bounds.bgHeight}
+                  cursorY={canvasMousePos?.y}
+                  onAddGuideV={onAddGuideV}
+                />
+                <div 
+                  className="relative photoshop-checkerboard border-b border-r border-slate-300"
+                  style={{
+                    width: `${bounds.canvasWidth}px`,
+                    height: `${bounds.canvasHeight}px`,
+                  }}
+                >
+                  <canvas
+                    ref={canvasRef}
+                    width={bounds.canvasWidth}
+                    height={bounds.canvasHeight}
+                    onMouseMove={handleMouseMove}
+                    onMouseDown={handleMouseDown}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={() => {
+                      setCanvasMousePos(null);
+                      handleMouseUp();
+                    }}
+                    onDoubleClick={handleDoubleClick}
+                    className="block select-none"
+                    style={{
+                      cursor: getCursor(),
+                      width: `${bounds.canvasWidth}px`,
+                      height: `${bounds.canvasHeight}px`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div 
+              className={`relative transition-all duration-200 ${
+                isPreviewMode 
+                  ? 'bg-white shadow-2xl ring-1 ring-slate-900/10' 
+                  : 'photoshop-checkerboard border border-slate-300 shadow-2xl ring-1 ring-slate-400/20'
+              }`}
               style={{
-                cursor: getCursor(),
                 width: `${bounds.canvasWidth}px`,
                 height: `${bounds.canvasHeight}px`,
               }}
-            />
-          </div>
+            >
+              <canvas
+                ref={canvasRef}
+                width={bounds.canvasWidth}
+                height={bounds.canvasHeight}
+                onMouseMove={handleMouseMove}
+                onMouseDown={handleMouseDown}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={() => {
+                  setCanvasMousePos(null);
+                  handleMouseUp();
+                }}
+                onDoubleClick={handleDoubleClick}
+                className="block select-none"
+                style={{
+                  cursor: getCursor(),
+                  width: `${bounds.canvasWidth}px`,
+                  height: `${bounds.canvasHeight}px`,
+                }}
+              />
+            </div>
+          )}
+        </div>
 
-          {/* Bottom Live Metrics Status Line */}
-          <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-[#666666] font-mono select-none bg-white/75 backdrop-blur-md px-3.5 py-1 rounded-full border border-white/80 shadow-2xs ring-1 ring-[#979797]/10">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#0088cc] inline-block" />
+        {/* Bottom Status Bar: discreet, outside the plan de travail (fixed at bottom of workspace viewport) */}
+        <div className="absolute bottom-3 z-30 pointer-events-none select-none flex items-center justify-center">
+          <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono bg-white/80 backdrop-blur-md px-3 py-1 rounded-full border border-slate-200/80 shadow-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#0088cc]/80 inline-block" />
             <span>
-              Plan : <strong className="text-[#000000] font-semibold">{bounds.canvasWidth} × {bounds.canvasHeight} px</strong>
+              Plan : <strong className="text-slate-700 font-medium">{bounds.canvasWidth} × {bounds.canvasHeight} px</strong>
             </span>
-            <span className="text-[#979797]">|</span>
+            <span className="text-slate-300">·</span>
             <span>
-              Screenshot : <strong className="text-[#000000] font-semibold">{bounds.bgWidth} × {bounds.bgHeight} px (Coins droits)</strong>
+              Screenshot : <strong className="text-slate-700 font-medium">{bounds.bgWidth} × {bounds.bgHeight} px</strong>
             </span>
             {selectedFocus && (
               <>
-                <span className="text-[#979797]">|</span>
+                <span className="text-slate-300">·</span>
                 <span>
-                  Focus ({selectedFocus.name}) :{' '}
-                  <strong className="text-[#0088cc] font-semibold">
-                    {Math.round(selectedFocus.width)} × {Math.round(selectedFocus.height)} px (r:{selectedFocus.borderRadius ?? 10}px)
+                  Focus :{' '}
+                  <strong className="text-[#0088cc] font-medium">
+                    {Math.round(selectedFocus.width)} × {Math.round(selectedFocus.height)} px
                   </strong>
                 </span>
               </>
             )}
-            <span className="text-[#979797]">|</span>
+            <span className="text-slate-300">·</span>
             <span>Zoom : {Math.round(zoomLevel * 100)}%</span>
           </div>
         </div>

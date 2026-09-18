@@ -29,10 +29,16 @@ export interface FocusZone {
   badgePosition: 'auto' | 'left' | 'right'; // 'auto': odd=left, even=right
   badgeColor?: string; // default: #25465F
   
-  // Depth / Shadow
+  // Depth / Shadow (Ombre portée: opacité 30%, angle 90°, distance 2px, taille 2px, #25465F)
   hasShadow?: boolean; // default true
-  shadowBlur?: number; // default 14
-  shadowOffsetY?: number; // default 5
+  shadowColor?: string; // default: #25465F
+  shadowOpacity?: number; // default: 0.30 (30%)
+  shadowAngle?: number; // default: 90 (90°)
+  shadowDistance?: number; // default: 2 (2px)
+  shadowSize?: number; // default: 2 (2px)
+  shadowBlur?: number; // default 2
+  shadowOffsetX?: number; // default 0
+  shadowOffsetY?: number; // default 2
   
   // Optional leader / callout line if displaced from original position
   showLeaderLine?: boolean;
