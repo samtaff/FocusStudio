@@ -8,7 +8,8 @@ import {
   UserGuide,
   BlurZone,
   MaskShape,
-  TriangleShape
+  TriangleShape,
+  CalloutVignette
 } from './types';
 import { Header } from './components/Header';
 import { CanvasWorkspace } from './components/CanvasWorkspace';
@@ -42,6 +43,10 @@ export default function App() {
   const [triangles, setTriangles] = useState<TriangleShape[]>([]);
   const [selectedTriangleId, setSelectedTriangleId] = useState<string | null>(null);
 
+  // Callout / Zoom Détaché (Vignette à 5px du screen, zoomée sur une zone ou icône)
+  const [calloutVignette, setCalloutVignette] = useState<CalloutVignette | null>(null);
+  const [selectedCalloutPart, setSelectedCalloutPart] = useState<'source' | 'vignette' | null>(null);
+
   // Mutually exclusive selection handlers so arrow keys and panels target the exact active object
   const handleSelectFocus = useCallback((id: string | null) => {
     setSelectedFocusId(id);
@@ -49,6 +54,7 @@ export default function App() {
       setSelectedBlurId(null);
       setSelectedMaskId(null);
       setSelectedTriangleId(null);
+      setSelectedCalloutPart(null);
     }
   }, []);
 
@@ -58,6 +64,7 @@ export default function App() {
       setSelectedFocusId(null);
       setSelectedMaskId(null);
       setSelectedTriangleId(null);
+      setSelectedCalloutPart(null);
     }
   }, []);
 
@@ -67,6 +74,7 @@ export default function App() {
       setSelectedFocusId(null);
       setSelectedBlurId(null);
       setSelectedTriangleId(null);
+      setSelectedCalloutPart(null);
     }
   }, []);
 
@@ -76,6 +84,17 @@ export default function App() {
       setSelectedFocusId(null);
       setSelectedBlurId(null);
       setSelectedMaskId(null);
+      setSelectedCalloutPart(null);
+    }
+  }, []);
+
+  const handleSelectCalloutPart = useCallback((part: 'source' | 'vignette' | null) => {
+    setSelectedCalloutPart(part);
+    if (part) {
+      setSelectedFocusId(null);
+      setSelectedBlurId(null);
+      setSelectedMaskId(null);
+      setSelectedTriangleId(null);
     }
   }, []);
 
@@ -534,6 +553,48 @@ export default function App() {
     if (selectedTriangleId === id) setSelectedTriangleId(null);
   };
 
+  // Callout / Vignette zoom détaché management
+  const handleToggleCallout = () => {
+    setCalloutVignette((prev) => {
+      if (prev?.enabled) {
+        return { ...prev, enabled: false };
+      }
+      const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
+      if (prev) {
+        return { ...prev, enabled: true };
+      }
+      // Initialize default Callout Vignette
+      return {
+        id: `callout-${Date.now()}`,
+        enabled: true,
+        sourceX: Math.round(bounds.bgX + bounds.bgWidth * 0.25),
+        sourceY: Math.round(bounds.bgY + bounds.bgHeight * 0.35),
+        sourceWidth: 40,
+        sourceHeight: 40,
+        width: 86,
+        height: 86,
+        shape: 'rounded',
+        borderRadius: 16,
+        gap: 5, // Strict requirement: exactly 5px gap from screen border
+        offsetY: Math.round(bounds.bgY + bounds.bgHeight * 0.3),
+        borderWidth: 1,
+        borderColor: '#ffffff',
+        showShadow: true,
+        shadowOffsetX: 0,
+        shadowOffsetY: 6,
+        shadowBlur: 14,
+        shadowOpacity: 0.35,
+      };
+    });
+  };
+
+  const handleUpdateCallout = (updated: Partial<CalloutVignette>) => {
+    setCalloutVignette((prev) => {
+      if (!prev) return null;
+      return { ...prev, ...updated };
+    });
+  };
+
   // Add Horizontal Guide
   const handleAddGuideH = () => {
     const selected = focuses.find((f) => f.id === selectedFocusId);
@@ -597,7 +658,8 @@ export default function App() {
           globalStyles.workspaceWidth,
           blurZones,
           maskShapes,
-          triangles
+          triangles,
+          calloutVignette
         );
         const scale = globalStyles.exportScale || 1;
 
@@ -625,6 +687,7 @@ export default function App() {
           blurZones,
           maskShapes,
           triangles,
+          calloutVignette,
           previewMode: true,
         });
         ctx.restore();
@@ -664,7 +727,8 @@ export default function App() {
         globalStyles.workspaceWidth,
         blurZones,
         maskShapes,
-        triangles
+        triangles,
+        calloutVignette
       );
       const scale = globalStyles.exportScale || 1;
 
@@ -691,6 +755,7 @@ export default function App() {
         blurZones,
         maskShapes,
         triangles,
+        calloutVignette,
         previewMode: true,
       });
       ctx.restore();
@@ -850,6 +915,21 @@ export default function App() {
             });
             handled = true;
           }
+        } else if (calloutVignette && calloutVignette.enabled) {
+          if (selectedCalloutPart === 'source') {
+            // Nudge source target loupe on the screenshot with arrow keys
+            handleUpdateCallout({
+              sourceX: calloutVignette.sourceX + dx,
+              sourceY: calloutVignette.sourceY + dy,
+            });
+            handled = true;
+          } else if (selectedCalloutPart === 'vignette') {
+            // Nudge vignette vertical position
+            handleUpdateCallout({
+              offsetY: calloutVignette.offsetY + dy,
+            });
+            handled = true;
+          }
         }
 
         if (handled) {
@@ -932,6 +1012,11 @@ export default function App() {
           onAddTriangleAt={handleAddTriangle}
           onUpdateTriangle={handleUpdateTriangle}
           onDeleteTriangle={handleDeleteTriangle}
+          calloutVignette={calloutVignette}
+          selectedCalloutPart={selectedCalloutPart}
+          onSelectCalloutPart={handleSelectCalloutPart}
+          onUpdateCallout={handleUpdateCallout}
+          onToggleCallout={handleToggleCallout}
           activeTool={activeTool}
           onSelectTool={setActiveTool}
           isPreviewMode={isPreviewMode}
@@ -990,6 +1075,9 @@ export default function App() {
           onAddTriangle={() => handleAddTriangle()}
           onUpdateTriangle={handleUpdateTriangle}
           onDeleteTriangle={handleDeleteTriangle}
+          calloutVignette={calloutVignette}
+          onUpdateCallout={handleUpdateCallout}
+          onToggleCallout={handleToggleCallout}
           onUndo={handleUndo}
           onRedo={handleRedo}
           canUndo={historyIndex > 0}

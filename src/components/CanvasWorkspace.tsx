@@ -11,7 +11,8 @@ import {
   UserGuide,
   BlurZone,
   MaskShape,
-  TriangleShape
+  TriangleShape,
+  CalloutVignette
 } from '../types';
 import { 
   drawComposition, 
@@ -57,6 +58,12 @@ interface CanvasWorkspaceProps {
   onAddTriangleAt?: (x: number, y: number) => void;
   onUpdateTriangle?: (id: string, updated: Partial<TriangleShape>) => void;
   onDeleteTriangle?: (id: string) => void;
+  // Callout Vignette
+  calloutVignette?: CalloutVignette | null;
+  selectedCalloutPart?: 'source' | 'vignette' | null;
+  onSelectCalloutPart?: (part: 'source' | 'vignette' | null) => void;
+  onUpdateCallout?: (updated: Partial<CalloutVignette>) => void;
+  onToggleCallout?: () => void;
   // Active Tool
   activeTool: ToolType;
   onSelectTool: (tool: ToolType) => void;
@@ -117,6 +124,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onAddTriangleAt,
   onUpdateTriangle,
   onDeleteTriangle,
+  calloutVignette,
+  selectedCalloutPart = null,
+  onSelectCalloutPart,
+  onUpdateCallout,
+  onToggleCallout,
   activeTool,
   onSelectTool,
   isPreviewMode,
@@ -179,6 +191,23 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     startY: number;
     initialX: number;
     initialY: number;
+  } | null>(null);
+
+  // Callout Vignette drag state (drag source target on screen or drag vignette offsetY)
+  const [internalSelectedCalloutPart, setInternalSelectedCalloutPart] = useState<'source' | 'vignette' | null>(null);
+  const activeSelectedCalloutPart = selectedCalloutPart !== undefined ? selectedCalloutPart : internalSelectedCalloutPart;
+  const updateSelectedCallout = (part: 'source' | 'vignette' | null) => {
+    setInternalSelectedCalloutPart(part);
+    onSelectCalloutPart?.(part);
+  };
+  const [hoveredCalloutPart, setHoveredCalloutPart] = useState<'source' | 'vignette' | null>(null);
+  const [dragCalloutState, setDragCalloutState] = useState<{
+    part: 'source' | 'vignette';
+    startX: number;
+    startY: number;
+    initialSourceX: number;
+    initialSourceY: number;
+    initialOffsetY: number;
   } | null>(null);
 
   // Hover states for fluid visual feedback
@@ -248,6 +277,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       setDragBlurState(null);
       setDragMaskState(null);
       setDragTriangleState(null);
+      setDragCalloutState(null);
       setActiveGuides([]);
     };
 
@@ -311,6 +341,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       triangles,
       selectedTriangleId: isPreviewMode ? null : selectedTriangleId,
       hoveredTriangleId: isPreviewMode ? null : hoveredTriangleId,
+      calloutVignette,
+      selectedCalloutPart: isPreviewMode ? null : activeSelectedCalloutPart,
+      hoveredCalloutPart: isPreviewMode ? null : hoveredCalloutPart,
       previewMode: isPreviewMode,
     });
   }, [
@@ -332,6 +365,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     triangles,
     selectedTriangleId,
     hoveredTriangleId,
+    calloutVignette,
+    activeSelectedCalloutPart,
+    hoveredCalloutPart,
     isPreviewMode
   ]);
 
@@ -384,8 +420,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     return null;
   };
 
-  // Hit-test focus bodies
+  // Hit-test focus bodies (disabled when Callout vignette is active, as vignette mode visually replaces base focus zones)
   const getFocusAtCoord = (cx: number, cy: number): FocusZone | null => {
+    if (calloutVignette && calloutVignette.enabled) return null;
     for (let i = focuses.length - 1; i >= 0; i--) {
       const f = focuses[i];
       if (cx >= f.x && cx <= f.x + f.width && cy >= f.y && cy <= f.y + f.height) {
@@ -431,6 +468,33 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     return null;
   };
 
+  // Hit-test Callout parts: source target on screen or vignette bubble on left
+  const getCalloutPartAtCoord = (cx: number, cy: number): 'source' | 'vignette' | null => {
+    if (!calloutVignette || !calloutVignette.enabled) return null;
+    const pad = 5;
+
+    // 1. Source target on screen
+    const srcX = calloutVignette.sourceX;
+    const srcY = calloutVignette.sourceY;
+    const srcW = calloutVignette.sourceWidth || 40;
+    const srcH = calloutVignette.sourceHeight || 40;
+    if (cx >= srcX - pad && cx <= srcX + srcW + pad && cy >= srcY - pad && cy <= srcY + srcH + pad) {
+      return 'source';
+    }
+
+    // 2. Vignette bubble placed at 5px gap on left of screen
+    const gap = calloutVignette.gap ?? 5;
+    const vigW = calloutVignette.width || 86;
+    const vigH = calloutVignette.height || vigW;
+    const vigX = bounds.bgX - gap - vigW;
+    const vigY = calloutVignette.offsetY;
+    if (cx >= vigX - pad && cx <= vigX + vigW + pad && cy >= vigY - pad && cy <= vigY + vigH + pad) {
+      return 'vignette';
+    }
+
+    return null;
+  };
+
   // Mouse Move
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isPanning) {
@@ -445,6 +509,24 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
     const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
     setCanvasMousePos({ x: Math.round(cx), y: Math.round(cy) });
+
+    // Dragging Callout Vignette (source target or vignette vertical position)
+    if (dragCalloutState && onUpdateCallout && calloutVignette) {
+      const dx = cx - dragCalloutState.startX;
+      const dy = cy - dragCalloutState.startY;
+
+      if (dragCalloutState.part === 'source') {
+        onUpdateCallout({
+          sourceX: Math.round(dragCalloutState.initialSourceX + dx),
+          sourceY: Math.round(dragCalloutState.initialSourceY + dy),
+        });
+      } else if (dragCalloutState.part === 'vignette') {
+        onUpdateCallout({
+          offsetY: Math.round(dragCalloutState.initialOffsetY + dy),
+        });
+      }
+      return;
+    }
 
     // Dragging Triangle
     if (dragTriangleState && onUpdateTriangle) {
@@ -614,7 +696,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     }
     setHoveredHandle(null);
 
-    // FLUID HOVER DETECTION OVER ALL ELEMENTS (Triangle -> Mask -> Blur -> Focus)
+    // FLUID HOVER DETECTION OVER ALL ELEMENTS (Callout -> Triangle -> Mask -> Blur -> Focus)
+    const hCallout = getCalloutPartAtCoord(cx, cy);
+    setHoveredCalloutPart(hCallout);
+
     const hTri = getTriangleAtCoord(cx, cy);
     setHoveredTriangleId(hTri ? hTri.id : null);
 
@@ -738,9 +823,29 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       }
     }
 
-    // 4. PRIORITY SELECTION: Check clicked Triangle FIRST
+    // 4. PRIORITY SELECTION: Check clicked Callout part (source target or vignette bubble)
+    const clickedCallout = getCalloutPartAtCoord(cx, cy);
+    if (clickedCallout && calloutVignette) {
+      updateSelectedCallout(clickedCallout);
+      onSelectFocus(null);
+      onSelectBlur(null);
+      onSelectMask(null);
+      onSelectTriangle?.(null);
+      setDragCalloutState({
+        part: clickedCallout,
+        startX: cx,
+        startY: cy,
+        initialSourceX: calloutVignette.sourceX,
+        initialSourceY: calloutVignette.sourceY,
+        initialOffsetY: calloutVignette.offsetY,
+      });
+      return;
+    }
+
+    // 5. PRIORITY SELECTION: Check clicked Triangle FIRST
     const clickedTriangle = getTriangleAtCoord(cx, cy);
     if (clickedTriangle) {
+      updateSelectedCallout(null);
       onSelectTriangle?.(clickedTriangle.id);
       onSelectFocus(null);
       onSelectBlur(null);
@@ -758,6 +863,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     // 5. PRIORITY SELECTION: Check clicked Mask Shape
     const clickedMask = getMaskAtCoord(cx, cy);
     if (clickedMask) {
+      updateSelectedCallout(null);
       onSelectMask(clickedMask.id);
       onSelectFocus(null);
       onSelectBlur(null);
@@ -778,6 +884,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     // 6. PRIORITY SELECTION: Check clicked Blur Zone (fluid selection without focus interference)
     const clickedBlur = getBlurAtCoord(cx, cy);
     if (clickedBlur) {
+      updateSelectedCallout(null);
       onSelectBlur(clickedBlur.id);
       onSelectFocus(null);
       onSelectMask(null);
@@ -798,6 +905,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     // 7. Check if clicking on any focus zone
     const clickedFocus = getFocusAtCoord(cx, cy);
     if (clickedFocus) {
+      updateSelectedCallout(null);
       onSelectFocus(clickedFocus.id);
       onSelectBlur(null);
       onSelectMask(null);
@@ -824,6 +932,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
+    updateSelectedCallout(null);
     onSelectFocus(null);
     onSelectBlur(null);
     onSelectMask(null);
@@ -978,6 +1087,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             onAddBlur={onAddBlur}
             onAddMask={onAddMask}
             onAddTriangle={onAddTriangle}
+            hasCallout={!!calloutVignette?.enabled}
+            onToggleCallout={onToggleCallout}
             isPanMode={isPanMode}
             onTogglePanMode={() => setIsPanMode(!isPanMode)}
             isDetecting={false}

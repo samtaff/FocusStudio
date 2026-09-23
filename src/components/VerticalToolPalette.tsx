@@ -11,11 +11,12 @@ import {
   Triangle,
   RotateCcw,
   Undo2,
-  Redo2
+  Redo2,
+  Search
 } from 'lucide-react';
 import { FocusZone } from '../types';
 
-export type ToolType = 'select' | 'focus' | 'blur' | 'mask' | 'triangle' | 'zoom' | 'pan';
+export type ToolType = 'select' | 'focus' | 'blur' | 'mask' | 'triangle' | 'callout' | 'zoom' | 'pan';
 
 interface VerticalToolPaletteProps {
   focuses: FocusZone[];
@@ -27,6 +28,8 @@ interface VerticalToolPaletteProps {
   onAddBlur: () => void;
   onAddMask: () => void;
   onAddTriangle?: () => void;
+  hasCallout?: boolean;
+  onToggleCallout?: () => void;
   isPanMode: boolean;
   onTogglePanMode: () => void;
   isDetecting: boolean;
@@ -61,6 +64,8 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
   onAddBlur,
   onAddMask,
   onAddTriangle,
+  hasCallout,
+  onToggleCallout,
   isPanMode,
   onTogglePanMode,
   showHandles,
@@ -135,18 +140,18 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
 
   return (
     <div 
-      className="absolute bg-white/75 backdrop-blur-xl border border-white/80 rounded-full p-2 flex flex-col items-center gap-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.12)] ring-1 ring-[#979797]/20 z-50 select-none"
+      className="absolute bg-white/75 backdrop-blur-xl border border-white/80 rounded-full px-1.5 py-1.5 flex flex-col items-center gap-1 shadow-[0_10px_30px_rgba(0,0,0,0.12)] ring-1 ring-[#979797]/20 z-50 select-none"
       style={{ left: `${position.x}px`, top: `${position.y}px` }}
     >
       {/* Drag handle */}
       <div 
-        className="w-8 h-4 flex items-center justify-center cursor-move text-[#979797] hover:text-[#000000] transition-colors"
+        className="w-7 h-3 flex items-center justify-center cursor-move text-[#979797] hover:text-[#000000] transition-colors"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         title="Glisser pour déplacer la barre d'outils"
       >
-        <GripVertical className="w-3.5 h-3.5" />
+        <GripVertical className="w-3 h-3" />
       </div>
 
       {/* Top Zone Indicator & Integrated Popover (Rangé dans Z1) */}
@@ -401,6 +406,25 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
           title="Ajouter un triangle (15×13 px)"
         >
           <Triangle className="w-3.5 h-3.5 fill-current" />
+        </button>
+      )}
+
+      {/* Outil Callout / Zoom Détaché (Vignette à 5px du screen) */}
+      {onToggleCallout && (
+        <button
+          id="tool-toggle-callout"
+          onClick={() => {
+            onToggleCallout();
+            onSelectTool('select');
+          }}
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+            hasCallout || activeTool === 'callout'
+              ? 'bg-[#0088cc] text-white shadow-xs'
+              : 'text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
+          }`}
+          title={hasCallout ? "Désactiver la vignette Callout (Zoom détaché)" : "Activer la vignette Callout (Zoom détaché à 5px du screen)"}
+        >
+          <Search className="w-3.5 h-3.5" />
         </button>
       )}
 
