@@ -71,7 +71,8 @@ interface CanvasWorkspaceProps {
   isPreviewMode: boolean;
   onTogglePreview: () => void;
   // Export trigger from toolbar
-  onExportClick: () => void;
+  onExportClick?: () => void;
+  isExporting?: boolean;
   // Drop & import
   onFileDrop: (file: File) => void;
   detectedElements: DetectedElement[];
@@ -136,7 +137,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onSelectTool,
   isPreviewMode,
   onTogglePreview,
-  onExportClick,
+  onExportClick = () => {},
+  isExporting = false,
   onFileDrop,
   detectedElements,
   showDetectedOverlay,
@@ -1163,6 +1165,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             showHandles={globalStyles.showHandles !== false}
             onToggleHandles={() => onUpdateGlobalStyles({ showHandles: !globalStyles.showHandles })}
             onExportClick={onExportClick}
+            isExporting={isExporting}
             onCenterWorkspace={handleCenterWorkspace}
             onSelectFocus={(id) => onSelectFocus(id)}
             onUpdateFocus={(id, updated) => {

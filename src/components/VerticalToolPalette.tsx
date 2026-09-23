@@ -38,6 +38,7 @@ interface VerticalToolPaletteProps {
   showHandles: boolean;
   onToggleHandles: () => void;
   onExportClick: () => void;
+  isExporting?: boolean;
   onCenterWorkspace?: () => void;
   onToggleMiniWidget?: () => void;
   onSelectFocus?: (id: string) => void;
@@ -71,6 +72,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
   showHandles,
   onToggleHandles,
   onExportClick,
+  isExporting = false,
   onCenterWorkspace,
   onToggleMiniWidget,
   onSelectFocus,
@@ -515,10 +517,15 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       <button
         id="tool-export-png"
         onClick={onExportClick}
-        className="w-8 h-8 rounded-full flex items-center justify-center text-[#666666] hover:text-[#0088cc] hover:bg-[#eeeeee] transition-all"
-        title="Exporter en PNG (Haute Définition)"
+        disabled={isExporting}
+        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+          isExporting
+            ? 'bg-[#0088cc] text-white cursor-wait animate-pulse'
+            : 'text-[#666666] hover:text-[#0088cc] hover:bg-[#eeeeee] cursor-pointer'
+        }`}
+        title={isExporting ? 'Exportation en cours...' : 'Exporter en PNG (Haute Définition)'}
       >
-        <Download className="w-4 h-4" />
+        <Download className={`w-4 h-4 ${isExporting ? 'animate-bounce' : ''}`} />
       </button>
     </div>
   );

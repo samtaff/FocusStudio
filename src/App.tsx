@@ -721,76 +721,121 @@ export default function App() {
     setIsPreviewMode(false);
   };
 
-  // Export visual strictly as PNG with genuine alpha transparency
-  const handleExportPng = () => {
+  // Export visual strictly as PNG with genuine alpha transparency, prompting the user for destination folder
+  const handleExportPng = async () => {
     if (!image) return;
     setIsExporting(true);
 
-    setTimeout(() => {
+    const cleanName = (image.name || 'procedure')
+      .replace(/\.[^/.]+$/, '')
+      .replace(/\s+/g, '-');
+    const filename = `focus-${cleanName}-${Date.now()}.png`;
+
+    let fileHandle: any = null;
+
+    // Direct user gesture: Open native file explorer dialog (Save As) if supported by the browser
+    if ('showSaveFilePicker' in window) {
       try {
-        const activeArrows = arrows.filter((a) => a.visible);
-        const { exportWidth, exportHeight, offsetX, offsetY } = calculateExportBounds(
-          image,
-          focuses,
-          activeArrows,
-          16,
-          globalStyles.workspaceWidth,
-          blurZones,
-          maskShapes,
-          triangles,
-          calloutVignette
-        );
-        const scale = globalStyles.exportScale || 1;
-
-        const exportCanvas = document.createElement('canvas');
-        exportCanvas.width = exportWidth * scale;
-        exportCanvas.height = exportHeight * scale;
-        const ctx = exportCanvas.getContext('2d');
-        if (!ctx) return;
-
-        if (scale !== 1) {
-          ctx.scale(scale, scale);
-        }
-
-        ctx.save();
-        ctx.translate(offsetX, offsetY);
-
-        // Render pure visual: NO interactive handles, NO guides, NO rulers
-        drawComposition(ctx, image, focuses, { 
-          interactive: false,
-          globalStyles,
-          arrows: activeArrows,
-          showGuides: false,
-          showRulers: false,
-          skipClear: true,
-          blurZones,
-          maskShapes,
-          triangles,
-          calloutVignette,
-          previewMode: true,
+        fileHandle = await (window as any).showSaveFilePicker({
+          suggestedName: filename,
+          types: [
+            {
+              description: 'Image PNG (*.png)',
+              accept: {
+                'image/png': ['.png'],
+              },
+            },
+          ],
         });
-        ctx.restore();
-
-        exportCanvas.toBlob((blob) => {
-          if (!blob) return;
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          const cleanName = (image.name || 'procedure')
-            .replace(/\.[^/.]+$/, '')
-            .replace(/\s+/g, '-');
-          link.download = `focus-${cleanName}-${Date.now()}.png`;
-          link.href = url;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          // User clicked Cancel in the file explorer dialog
           setIsExporting(false);
-        }, 'image/png');
-      } catch (err) {
-        console.error('Export failed:', err);
-        setIsExporting(false);
+          return;
+        }
+        console.warn('showSaveFilePicker not permitted or unsupported, falling back to download:', err);
       }
-    }, 50);
+    }
+
+    try {
+      const activeArrows = arrows.filter((a) => a.visible);
+      const { exportWidth, exportHeight, offsetX, offsetY } = calculateExportBounds(
+        image,
+        focuses,
+        activeArrows,
+        16,
+        globalStyles.workspaceWidth,
+        blurZones,
+        maskShapes,
+        triangles,
+        calloutVignette
+      );
+      const scale = globalStyles.exportScale || 1;
+
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = exportWidth * scale;
+      exportCanvas.height = exportHeight * scale;
+      const ctx = exportCanvas.getContext('2d');
+      if (!ctx) {
+        setIsExporting(false);
+        return;
+      }
+
+      if (scale !== 1) {
+        ctx.scale(scale, scale);
+      }
+
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+
+      // Render pure visual: NO interactive handles, NO guides, NO rulers
+      drawComposition(ctx, image, focuses, { 
+        interactive: false,
+        globalStyles,
+        arrows: activeArrows,
+        showGuides: false,
+        showRulers: false,
+        skipClear: true,
+        blurZones,
+        maskShapes,
+        triangles,
+        calloutVignette,
+        previewMode: true,
+      });
+      ctx.restore();
+
+      const blob = await new Promise<Blob | null>((resolve) => {
+        exportCanvas.toBlob(resolve, 'image/png');
+      });
+
+      if (!blob) {
+        setIsExporting(false);
+        return;
+      }
+
+      // If user selected a location in the file explorer, write directly to that file
+      if (fileHandle) {
+        const writable = await fileHandle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        setIsExporting(false);
+        return;
+      }
+
+      // Fallback: standard automatic download trigger
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setIsExporting(false);
+    } catch (err) {
+      console.error('Export failed:', err);
+      setIsExporting(false);
+    }
   };
 
   // Copy PNG to Clipboard
@@ -1151,6 +1196,8 @@ export default function App() {
           canRedo={historyIndex < history.length - 1}
           resetWorkspaceTrigger={resetWorkspaceTrigger}
           onCenterWorkspace={handleCenterWorkspace}
+          onExportClick={handleExportPng}
+          isExporting={isExporting}
           onImportClick={() => {
             const el = document.getElementById('header-import-button');
             el?.click();
