@@ -144,6 +144,11 @@ export default function App() {
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
+  const [resetWorkspaceTrigger, setResetWorkspaceTrigger] = useState<number>(0);
+
+  const handleCenterWorkspace = useCallback(() => {
+    setResetWorkspaceTrigger((prev) => prev + 1);
+  }, []);
 
   // Push new state to history stack
   const recordHistory = useCallback((newFocuses: FocusZone[]) => {
@@ -556,14 +561,57 @@ export default function App() {
   // Callout / Vignette zoom détaché management
   const handleToggleCallout = () => {
     setCalloutVignette((prev) => {
-      if (prev?.enabled) {
-        return { ...prev, enabled: false };
+      const willEnable = !prev?.enabled;
+      if (!willEnable) {
+        // Leaving Callout mode: return to select tool and restore focus selection
+        setActiveTool('select');
+        setSelectedCalloutPart(null);
+        if (focuses.length > 0) {
+          handleSelectFocus(focuses[0].id);
+        }
+        return { ...prev!, enabled: false };
       }
-      const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
+
+      // Entering Callout mode:
+      // Zone focus disappears, background tint disappears,
+      // width encompasses vignette + screenshot + 15px margin on each side,
+      // vignette aligned to bottom of screenshot with 50% shadow, 5px distance, 2px size.
+      handleSelectFocus(null);
+      setSelectedCalloutPart('source');
+      setActiveTool('callout');
+
+      const vigW = prev?.width || 100;
+      const vigH = prev?.height || vigW;
+      const gap = prev?.gap ?? 5;
+      const shadowDist = 5; // distance ombre portée 5px
+
+      const bounds = calculateCompositionBounds(
+        image,
+        focuses,
+        globalStyles.workspaceWidth,
+        { enabled: true, width: vigW, height: vigH, gap } as CalloutVignette
+      );
+
+      // Alignement au bas du screenshot en référence à l'ombre portée (vigY + vigH + shadowDist = bgY + bgHeight)
+      const alignedBottomY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
+
       if (prev) {
-        return { ...prev, enabled: true };
+        return {
+          ...prev,
+          enabled: true,
+          alignBottom: true,
+          offsetY: alignedBottomY,
+          width: prev.width || 100,
+          height: prev.height || prev.width || 100,
+          shadowDistance: 5,
+          shadowSize: 2,
+          shadowBlur: 2,
+          shadowOffsetY: 5,
+          shadowOpacity: 0.50,
+        };
       }
-      // Initialize default Callout Vignette
+
+      // Initialize default Callout Vignette (default 100px)
       return {
         id: `callout-${Date.now()}`,
         enabled: true,
@@ -571,19 +619,22 @@ export default function App() {
         sourceY: Math.round(bounds.bgY + bounds.bgHeight * 0.35),
         sourceWidth: 40,
         sourceHeight: 40,
-        width: 86,
-        height: 86,
+        width: 100,
+        height: 100,
         shape: 'rounded',
         borderRadius: 16,
         gap: 5, // Strict requirement: exactly 5px gap from screen border
-        offsetY: Math.round(bounds.bgY + bounds.bgHeight * 0.3),
-        borderWidth: 1,
-        borderColor: '#ffffff',
+        offsetY: alignedBottomY, // Aligned to bottom of screenshot
+        alignBottom: true,
+        borderWidth: 0,
+        borderColor: 'transparent',
         showShadow: true,
+        shadowDistance: 5,
+        shadowSize: 2,
+        shadowBlur: 2,
         shadowOffsetX: 0,
-        shadowOffsetY: 6,
-        shadowBlur: 14,
-        shadowOpacity: 0.35,
+        shadowOffsetY: 5,
+        shadowOpacity: 0.50,
       };
     });
   };
@@ -591,7 +642,35 @@ export default function App() {
   const handleUpdateCallout = (updated: Partial<CalloutVignette>) => {
     setCalloutVignette((prev) => {
       if (!prev) return null;
-      return { ...prev, ...updated };
+      const next = { ...prev, ...updated };
+
+      // Lorsque je zoom je veux que le zoom s'effectue par le centre exact de la cible loupe
+      if (
+        updated.sourceWidth !== undefined &&
+        updated.sourceX === undefined &&
+        prev.sourceWidth &&
+        prev.sourceWidth !== updated.sourceWidth
+      ) {
+        const oldW = prev.sourceWidth;
+        const oldH = prev.sourceHeight || oldW;
+        const centerX = prev.sourceCenterX ?? ((prev.sourceX ?? 0) + oldW / 2);
+        const centerY = prev.sourceCenterY ?? ((prev.sourceY ?? 0) + oldH / 2);
+        const newW = updated.sourceWidth;
+        const newH = updated.sourceHeight ?? newW;
+
+        next.sourceCenterX = centerX;
+        next.sourceCenterY = centerY;
+        next.sourceX = Math.round((centerX - newW / 2) * 10) / 10;
+        next.sourceY = Math.round((centerY - newH / 2) * 10) / 10;
+        next.sourceHeight = newH;
+      } else if (updated.sourceX !== undefined || updated.sourceY !== undefined) {
+        const curW = next.sourceWidth || prev.sourceWidth || 40;
+        const curH = next.sourceHeight || prev.sourceHeight || curW;
+        next.sourceCenterX = (next.sourceX ?? prev.sourceX ?? 0) + curW / 2;
+        next.sourceCenterY = (next.sourceY ?? prev.sourceY ?? 0) + curH / 2;
+      }
+
+      return next;
     });
   };
 
@@ -782,7 +861,16 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
-        return;
+        if (
+          target.tagName === 'INPUT' &&
+          (target as HTMLInputElement).type === 'range' &&
+          ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) &&
+          calloutVignette?.enabled
+        ) {
+          target.blur();
+        } else {
+          return;
+        }
       }
 
       // Undo: Ctrl+Z / Cmd+Z
@@ -879,7 +967,32 @@ export default function App() {
 
         let handled = false;
 
-        if (selectedFocusId) {
+        // En mode Callout, les flèches permettent de déplacer autant qu'on veut la "Cible loupe"
+        if (calloutVignette && calloutVignette.enabled) {
+          // Déplacement au demi-pixel près (0.5px par appui, 5px avec Shift)
+          const calloutStep = e.shiftKey ? 5 : 0.5;
+          let cdx = 0;
+          let cdy = 0;
+          if (e.key === 'ArrowUp') cdy = -calloutStep;
+          if (e.key === 'ArrowDown') cdy = calloutStep;
+          if (e.key === 'ArrowLeft') cdx = -calloutStep;
+          if (e.key === 'ArrowRight') cdx = calloutStep;
+
+          if (selectedCalloutPart === 'vignette') {
+            handleUpdateCallout({
+              offsetY: Math.round(((calloutVignette.offsetY ?? 0) + cdy) * 10) / 10,
+              alignBottom: false,
+            });
+            handled = true;
+          } else {
+            // Déplacement libre au demi-pixel près de la Cible loupe
+            handleUpdateCallout({
+              sourceX: Math.round(((calloutVignette.sourceX ?? 0) + cdx) * 10) / 10,
+              sourceY: Math.round(((calloutVignette.sourceY ?? 0) + cdy) * 10) / 10,
+            });
+            handled = true;
+          }
+        } else if (selectedFocusId) {
           const current = focuses.find((f) => f.id === selectedFocusId);
           if (current) {
             handleUpdateFocus({
@@ -915,21 +1028,6 @@ export default function App() {
             });
             handled = true;
           }
-        } else if (calloutVignette && calloutVignette.enabled) {
-          if (selectedCalloutPart === 'source') {
-            // Nudge source target loupe on the screenshot with arrow keys
-            handleUpdateCallout({
-              sourceX: calloutVignette.sourceX + dx,
-              sourceY: calloutVignette.sourceY + dy,
-            });
-            handled = true;
-          } else if (selectedCalloutPart === 'vignette') {
-            // Nudge vignette vertical position
-            handleUpdateCallout({
-              offsetY: calloutVignette.offsetY + dy,
-            });
-            handled = true;
-          }
         }
 
         if (handled) {
@@ -961,7 +1059,21 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('paste', handlePaste);
     };
-  }, [focuses, blurZones, maskShapes, triangles, selectedFocusId, selectedBlurId, selectedMaskId, selectedTriangleId, isPreviewMode, historyIndex, history]);
+  }, [
+    focuses,
+    blurZones,
+    maskShapes,
+    triangles,
+    selectedFocusId,
+    selectedBlurId,
+    selectedMaskId,
+    selectedTriangleId,
+    isPreviewMode,
+    historyIndex,
+    history,
+    calloutVignette,
+    selectedCalloutPart,
+  ]);
 
   const selectedFocus = focuses.find((f) => f.id === selectedFocusId) || null;
 
@@ -1037,6 +1149,8 @@ export default function App() {
           onRedo={handleRedo}
           canUndo={historyIndex > 0}
           canRedo={historyIndex < history.length - 1}
+          resetWorkspaceTrigger={resetWorkspaceTrigger}
+          onCenterWorkspace={handleCenterWorkspace}
           onImportClick={() => {
             const el = document.getElementById('header-import-button');
             el?.click();
@@ -1082,6 +1196,7 @@ export default function App() {
           onRedo={handleRedo}
           canUndo={historyIndex > 0}
           canRedo={historyIndex < history.length - 1}
+          onCenterWorkspace={handleCenterWorkspace}
           onResetToDefaults={handleResetToDefaults}
           onExportPng={handleExportPng}
           onCopyClipboard={handleCopyClipboard}

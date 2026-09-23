@@ -123,17 +123,20 @@ export interface TriangleShape {
 export interface CalloutVignette {
   enabled: boolean;
   // Source sampling on the screen
-  sourceX: number; // position on screen in composition coords
-  sourceY: number;
+  sourceX: number; // position on screen in composition coords (left)
+  sourceY: number; // top
+  sourceCenterX?: number; // persistent absolute sub-pixel center anchor X
+  sourceCenterY?: number; // persistent absolute sub-pixel center anchor Y
   sourceWidth: number; // sampling diameter/size (default 40px)
   sourceHeight: number;
   sourceZoom?: number; // default 1.0 (fine-tuning crop zoom)
 
   // Vignette geometry (placed 5px from left edge of screen: x = bgX - 5 - width)
-  width: number; // diameter / size (default 86px)
+  width: number; // diameter / size (default 100px)
   height: number;
-  offsetY: number; // vertical position in composition coords (default aligned towards bottom-left)
+  offsetY: number; // vertical position in composition coords
   gap: number; // distance in px from screen border (default 5px)
+  alignBottom?: boolean; // strictly aligned to the bottom of the screenshot (default true)
   
   // Styling
   shape: 'circle' | 'rounded'; // circle or custom rounded rectangle
@@ -141,12 +144,14 @@ export interface CalloutVignette {
   borderWidth: number; // default 0 or 2
   borderColor: string; // default '#ffffff' or '#25465F'
   
-  // Drop shadow behind vignette (ombre portée derrière la vignette)
+  // Drop shadow behind vignette (ombre portée: opacité 50%, distance 5px, taille 2px)
   showShadow: boolean; // default true
-  shadowBlur: number; // default 14
-  shadowOpacity: number; // default 0.35
+  shadowDistance?: number; // default 5 (5px)
+  shadowSize?: number; // default 2 (2px)
+  shadowBlur: number; // default 2
+  shadowOpacity: number; // default 0.50 (50%)
   shadowOffsetX?: number; // default 0
-  shadowOffsetY?: number; // default 8
+  shadowOffsetY?: number; // default 5
   
   // Floor shadow (legacy compatibility)
   showFloorShadow?: boolean;

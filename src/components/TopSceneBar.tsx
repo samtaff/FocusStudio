@@ -33,6 +33,8 @@ interface TopSceneBarProps {
   // Preview Mode
   isPreviewMode: boolean;
   onTogglePreview: () => void;
+  isCalloutMode?: boolean;
+  onCenterWorkspace?: () => void;
   // Undo / Redo
   onUndo?: () => void;
   onRedo?: () => void;
@@ -56,6 +58,8 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
   hasSelectedFocus,
   isPreviewMode,
   onTogglePreview,
+  isCalloutMode = false,
+  onCenterWorkspace,
   onUndo,
   onRedo,
   canUndo = false,
@@ -70,9 +74,30 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
         <span className="font-semibold text-[#000000] tracking-tight text-xs">
           Scène Studio
         </span>
-        <span className="px-2.5 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono text-[11px] font-medium">
-          {screenWidth} × {screenHeight} px
-        </span>
+
+        {/* Bouton Recentrer le plan de travail dans la div Scène Studio */}
+        {onCenterWorkspace && (
+          <button
+            id="btn-scene-center"
+            onClick={onCenterWorkspace}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000] text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
+            title="Recentrer le plan de travail (vue 100%, centrée)"
+          >
+            <Maximize2 className="w-3.5 h-3.5 text-[#666666]" />
+            <span>Recentrer</span>
+          </button>
+        )}
+
+        {isCalloutMode ? (
+          <span className="px-2.5 py-0.5 rounded-full bg-[#0088cc]/10 text-[#0088cc] border border-[#0088cc]/20 font-medium text-[11px] flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#0088cc] animate-pulse" />
+            Mode Callout ({screenWidth} × {screenHeight} px)
+          </span>
+        ) : (
+          <span className="px-2.5 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono text-[11px] font-medium">
+            {screenWidth} × {screenHeight} px
+          </span>
+        )}
 
         {/* Undo / Redo Pills */}
         {(onUndo || onRedo) && (

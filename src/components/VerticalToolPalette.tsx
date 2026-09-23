@@ -339,6 +339,28 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
         <Plus className="w-4 h-4 stroke-[2.5]" />
       </button>
 
+      {/* 2ème position : Outil Vignette Callout (icône "V" dans un cercle) */}
+      {onToggleCallout && (
+        <button
+          id="tool-toggle-callout"
+          onClick={() => {
+            onToggleCallout();
+            onSelectTool('select');
+          }}
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+            hasCallout || activeTool === 'callout'
+              ? 'bg-[#0088cc] text-white shadow-xs'
+              : 'text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
+          }`}
+          title={hasCallout ? "Désactiver la vignette (Zoom détaché)" : "Activer la vignette (Zoom détaché)"}
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9.5" />
+            <path d="m8.5 9 3.5 6 3.5-6" />
+          </svg>
+        </button>
+      )}
+
       {/* Bouton - Supprimer le focus actif */}
       <button
         id="tool-delete-focus"
@@ -406,25 +428,6 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
           title="Ajouter un triangle (15×13 px)"
         >
           <Triangle className="w-3.5 h-3.5 fill-current" />
-        </button>
-      )}
-
-      {/* Outil Callout / Zoom Détaché (Vignette à 5px du screen) */}
-      {onToggleCallout && (
-        <button
-          id="tool-toggle-callout"
-          onClick={() => {
-            onToggleCallout();
-            onSelectTool('select');
-          }}
-          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-            hasCallout || activeTool === 'callout'
-              ? 'bg-[#0088cc] text-white shadow-xs'
-              : 'text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
-          }`}
-          title={hasCallout ? "Désactiver la vignette Callout (Zoom détaché)" : "Activer la vignette Callout (Zoom détaché à 5px du screen)"}
-        >
-          <Search className="w-3.5 h-3.5" />
         </button>
       )}
 

@@ -68,7 +68,8 @@ export interface RenderOptions {
 export function calculateCompositionBounds(
   image: LoadedImage | null,
   _focuses?: FocusZone[],
-  workspaceWidth = DEFAULT_WORKSPACE_WIDTH
+  workspaceWidth = DEFAULT_WORKSPACE_WIDTH,
+  calloutVignette?: CalloutVignette | null
 ): {
   canvasWidth: number;
   canvasHeight: number;
@@ -78,25 +79,8 @@ export function calculateCompositionBounds(
   bgHeight: number;
   scale: number;
 } {
-  const canvasWidth = Math.min(MAX_WORKSPACE_WIDTH, Math.max(MIN_WORKSPACE_WIDTH, Math.round(workspaceWidth || DEFAULT_WORKSPACE_WIDTH)));
-
-  if (!image) {
-    const bgWidth = 180;
-    const bgHeight = 390;
-    const canvasHeight = 440;
-    return {
-      canvasWidth,
-      canvasHeight,
-      bgX: Math.round((canvasWidth - bgWidth) / 2),
-      bgY: Math.round((canvasHeight - bgHeight) / 2),
-      bgWidth,
-      bgHeight,
-      scale: 1,
-    };
-  }
-
-  const origW = image.originalWidth;
-  const origH = image.originalHeight;
+  const origW = image ? image.originalWidth : 180;
+  const origH = image ? image.originalHeight : 390;
 
   // Screenshot resizes to 180px max width and 390px max height, homothetically
   const maxW = 180;
@@ -106,8 +90,30 @@ export function calculateCompositionBounds(
   const bgHeight = Math.round(origH * bgScale);
 
   const canvasHeight = Math.min(500, Math.max(420, bgHeight + 40));
-  const bgX = Math.round((canvasWidth - bgWidth) / 2);
   const bgY = Math.round((canvasHeight - bgHeight) / 2);
+
+  // When Callout mode is chosen:
+  // "la largeur doit comprendre la vignette et le screenshot ensemble avec une marge de sécurité de 15px à gauche et à droite."
+  if (calloutVignette && calloutVignette.enabled) {
+    const margin = 15; // 15px safety margin on left and right
+    const vigW = calloutVignette.width || 100;
+    const gap = calloutVignette.gap ?? 5; // 5px gap between vignette and screenshot
+    const canvasWidth = margin + vigW + gap + bgWidth + margin;
+    const bgX = margin + vigW + gap;
+
+    return {
+      canvasWidth,
+      canvasHeight,
+      bgX,
+      bgY,
+      bgWidth,
+      bgHeight,
+      scale: bgScale,
+    };
+  }
+
+  const canvasWidth = Math.min(MAX_WORKSPACE_WIDTH, Math.max(MIN_WORKSPACE_WIDTH, Math.round(workspaceWidth || DEFAULT_WORKSPACE_WIDTH)));
+  const bgX = Math.round((canvasWidth - bgWidth) / 2);
 
   return {
     canvasWidth,
@@ -139,7 +145,37 @@ export function calculateExportBounds(
   offsetX: number;
   offsetY: number;
 } {
-  const { bgX, bgY, bgWidth, bgHeight } = calculateCompositionBounds(image, focuses, workspaceWidth);
+  const isCalloutMode = Boolean(calloutVignette && calloutVignette.enabled);
+
+  // In Callout mode: width strictly encompasses vignette and screenshot with 15px safety margins
+  if (isCalloutMode && calloutVignette) {
+    const { canvasWidth, bgX, bgY, bgWidth, bgHeight } = calculateCompositionBounds(
+      image,
+      focuses,
+      workspaceWidth,
+      calloutVignette
+    );
+
+    const vigW = calloutVignette.width || 100;
+    const vigH = calloutVignette.height || vigW;
+    const shadowDist = (calloutVignette.showShadow !== false)
+      ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
+      : 0;
+    const alignedBottomY = bgY + bgHeight - vigH - shadowDist;
+    const vigY = calloutVignette.alignBottom !== false ? alignedBottomY : (calloutVignette.offsetY ?? alignedBottomY);
+
+    const minY = Math.min(vigY, bgY) - 15;
+    const maxY = Math.max(vigY + vigH + shadowDist, bgY + bgHeight) + 15;
+
+    return {
+      exportWidth: canvasWidth,
+      exportHeight: Math.max(60, Math.round(maxY - minY)),
+      offsetX: 0,
+      offsetY: Math.round(-minY),
+    };
+  }
+
+  const { bgX, bgY, bgWidth, bgHeight } = calculateCompositionBounds(image, focuses, workspaceWidth, calloutVignette);
 
   let minX = bgX;
   let maxX = bgX + bgWidth;
@@ -149,7 +185,7 @@ export function calculateExportBounds(
   // Account for Callout Vignette placed at gap (default 5px) to the left of the screen
   if (calloutVignette && calloutVignette.enabled) {
     const gap = calloutVignette.gap ?? 5;
-    const vigW = calloutVignette.width || 86;
+    const vigW = calloutVignette.width || 100;
     const vigH = calloutVignette.height || vigW;
     const vigX = bgX - gap - vigW;
     const vigY = calloutVignette.offsetY;
@@ -261,7 +297,8 @@ export function drawComposition(
   if (!image) return;
 
   const workspaceWidth = globalStyles.workspaceWidth || DEFAULT_WORKSPACE_WIDTH;
-  const { bgX, bgY, bgWidth, bgHeight, scale } = calculateCompositionBounds(image, focuses, workspaceWidth);
+  const isCalloutMode = Boolean(calloutVignette && calloutVignette.enabled);
+  const { bgX, bgY, bgWidth, bgHeight, scale } = calculateCompositionBounds(image, focuses, workspaceWidth, calloutVignette);
 
   // 1. Draw base screenshot non-destructively with STRAIGHT SQUARE CORNERS (no rounded corners, no shadow)
   ctx.save();
@@ -271,10 +308,15 @@ export function drawComposition(
   drawImageHighQualityDownscale(ctx, image.element, bgX, bgY, bgWidth, bgHeight);
 
   // 2. Apply blue tint (#25465F at 50% opacity by default)
-  const tintColor = globalStyles.bgTintColor || BASE_COLOR;
-  const tintOpacity = globalStyles.bgTintOpacity ?? 0.50;
-  ctx.fillStyle = hexToRgba(tintColor, tintOpacity);
-  ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+  // When Callout option is chosen, the background tint disappears!
+  if (!isCalloutMode) {
+    const tintColor = globalStyles.bgTintColor || BASE_COLOR;
+    const tintOpacity = globalStyles.bgTintOpacity ?? 0.50;
+    if (tintOpacity > 0) {
+      ctx.fillStyle = hexToRgba(tintColor, tintOpacity);
+      ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+    }
+  }
   ctx.restore();
 
   // 3. Screenshot border: MUST ALWAYS HAVE A 1px BORDER IN #25465F (straight square corners)
@@ -285,9 +327,12 @@ export function drawComposition(
   ctx.restore();
 
   // 4. Draw Focus zones content & borders (WITHOUT the badge, so the badge stays strictly on top)
-  focuses.forEach((focus) => {
-    drawSingleFocusContentAndBorder(ctx, image, focus, { bgX, bgY, bgWidth, bgHeight, scale });
-  });
+  // When Callout option is chosen, the focus zone disappears!
+  if (!isCalloutMode) {
+    focuses.forEach((focus) => {
+      drawSingleFocusContentAndBorder(ctx, image, focus, { bgX, bgY, bgWidth, bgHeight, scale });
+    });
+  }
 
   // 5. Draw High-Efficiency Blur zones: calculated on the chosen zone (screenshot or focus)
   if (blurZones.length > 0) {
@@ -312,12 +357,14 @@ export function drawComposition(
 
   // 8. STEP BADGE: MUST BE A 20x20px SQUARE WITH 5px ROUNDED CORNERS,
   // NOT CUT BY THE RECTANGLE, STRICTLY NO BORDER, DRAWN AT THE VERY FOREGROUND (premier plan)
-  // Positionné comme sur l'image : badgeY = focus.y - 14 (dépasse au-dessus du rectangle, à cheval sur le bord supérieur)
-  focuses.forEach((focus) => {
-    if (focus.showStepBadge !== false && focus.stepNumber !== undefined) {
-      drawStepBadge(ctx, focus, { bgX, bgY, bgWidth, bgHeight });
-    }
-  });
+  // When Callout option is chosen, step badge disappears with focus zone!
+  if (!isCalloutMode) {
+    focuses.forEach((focus) => {
+      if (focus.showStepBadge !== false && focus.stepNumber !== undefined) {
+        drawStepBadge(ctx, focus, { bgX, bgY, bgWidth, bgHeight });
+      }
+    });
+  }
 
   // 9. Callout Vignette (Detached magnified bubble at 5px gap with floor shadow)
   if (calloutVignette && calloutVignette.enabled) {
@@ -352,17 +399,19 @@ export function drawComposition(
 
   // 11. If interactive, draw hover highlight & selection handles
   if (interactive && globalStyles.showHandles !== false) {
-    // Focus hover & selection
-    focuses.forEach((focus) => {
-      const isSelected = focus.id === selectedFocusId;
-      const isHovered = focus.id === hoveredFocusId && !isSelected;
+    // Focus hover & selection (hidden when in Callout mode)
+    if (!isCalloutMode) {
+      focuses.forEach((focus) => {
+        const isSelected = focus.id === selectedFocusId;
+        const isHovered = focus.id === hoveredFocusId && !isSelected;
 
-      if (isHovered) {
-        drawFocusHoverHighlight(ctx, focus);
-      } else if (isSelected) {
-        drawFocusSelectionHandles(ctx, focus);
-      }
-    });
+        if (isHovered) {
+          drawFocusHoverHighlight(ctx, focus);
+        } else if (isSelected) {
+          drawFocusSelectionHandles(ctx, focus);
+        }
+      });
+    }
 
     // Blur hover & selection
     blurZones.forEach((blur) => {
@@ -1237,12 +1286,22 @@ export function drawCalloutVignette(
 ) {
   if (!callout.enabled) return;
 
-  const { bgX, bgY, scale } = bounds;
+  const { bgX, bgY, bgHeight, scale } = bounds;
   const gap = callout.gap ?? 5; // 5px gap from screen border
-  const vigW = callout.width || 86;
+  const vigW = callout.width || 100;
   const vigH = callout.height || vigW;
   const vigX = bgX - gap - vigW; // Placed at 5px gap to the left of the screen border
-  const vigY = callout.offsetY;
+
+  // La vignette doit être alignée au bas du screenshot en référence à son ombre portée
+  const showShadow = callout.showShadow !== false;
+  const shadowDistance = callout.shadowDistance ?? callout.shadowOffsetY ?? 5; // distance 5px
+  const shadowSize = callout.shadowSize ?? callout.shadowBlur ?? 2; // taille 2px
+  const shadowOpacity = callout.shadowOpacity ?? 0.50; // opacité 50%
+  const shadowDist = showShadow ? shadowDistance : 0;
+
+  // L'alignement bas en référence à l'ombre portée : vigY + vigH + shadowDist = bgY + bgHeight
+  const alignedBottomY = bgY + bgHeight - vigH - shadowDist;
+  const vigY = callout.alignBottom !== false ? alignedBottomY : (callout.offsetY ?? alignedBottomY);
 
   // Compute border radius
   const maxR = Math.min(vigW, vigH) / 2;
@@ -1250,24 +1309,23 @@ export function drawCalloutVignette(
     ? maxR
     : Math.min(maxR, Math.max(0, callout.borderRadius ?? 16));
 
-  // 1. Draw drop shadow behind vignette (ombre portée directement derrière la vignette)
-  const showShadow = callout.showShadow ?? callout.showFloorShadow ?? true;
+  // 1. Draw drop shadow behind vignette
+  // Exigences strictes : ombre portée de 50% d'opacité, distance de 5px, taille de 2px
   if (showShadow) {
     ctx.save();
     const shadowOffsetX = callout.shadowOffsetX ?? 0;
-    const shadowOffsetY = callout.shadowOffsetY ?? (callout.floorShadowOffsetY !== undefined ? 6 : 6);
-    const shadowBlur = callout.shadowBlur ?? callout.floorShadowBlur ?? 14;
-    const shadowOpacity = callout.shadowOpacity ?? callout.floorShadowOpacity ?? 0.35;
+    const shadowOffsetY = shadowDistance;
+    const shadowBlur = shadowSize;
 
     ctx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity})`;
     ctx.shadowBlur = shadowBlur;
     ctx.shadowOffsetX = shadowOffsetX;
     ctx.shadowOffsetY = shadowOffsetY;
 
-    // Fill the exact silhouette of the vignette behind it so the shadow wraps it naturally
+    // Fill silhouette with shadow color so no white fringe or liseré can ever bleed into antialiasing
     ctx.beginPath();
     ctx.roundRect(vigX, vigY, vigW, vigH, borderRadius);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = `rgba(0, 0, 0, ${shadowOpacity})`;
     ctx.fill();
 
     ctx.restore();
@@ -1278,10 +1336,6 @@ export function drawCalloutVignette(
   ctx.beginPath();
   ctx.roundRect(vigX, vigY, vigW, vigH, borderRadius);
   ctx.clip();
-
-  // White base background
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(vigX, vigY, vigW, vigH);
 
   // Content: either custom uploaded HD icon or cropped screen section
   if (callout.customImage?.element && callout.customImage.element.complete) {
@@ -1305,13 +1359,19 @@ export function drawCalloutVignette(
     const origImgW = image.originalWidth || image.element.naturalWidth || image.element.width;
     const origImgH = image.originalHeight || image.element.naturalHeight || image.element.height;
 
+    // Ensure sample is within image boundaries so the vignette is fully covered with no edge gaps
+    const safeOrigW = Math.min(origSrcW, origImgW);
+    const safeOrigH = Math.min(origSrcH, origImgH);
+    const safeOrigX = Math.max(0, Math.min(origImgW - safeOrigW, origSrcX));
+    const safeOrigY = Math.max(0, Math.min(origImgH - safeOrigH, origSrcY));
+
     drawImageSafeClipped(
       ctx,
       image.element,
-      origSrcX,
-      origSrcY,
-      origSrcW,
-      origSrcH,
+      safeOrigX,
+      safeOrigY,
+      safeOrigW,
+      safeOrigH,
       vigX,
       vigY,
       vigW,
@@ -1321,18 +1381,58 @@ export function drawCalloutVignette(
     );
   }
 
-  ctx.restore();
+  // Repères discrets dans la vignette pour un centrage parfait
+  if (options.interactive !== false) {
+    const vcx = Math.round(vigX + vigW / 2);
+    const vcy = Math.round(vigY + vigH / 2);
 
-  // 3. Vignette border
-  if (callout.borderWidth && callout.borderWidth > 0) {
     ctx.save();
-    ctx.strokeStyle = callout.borderColor || '#ffffff';
-    ctx.lineWidth = callout.borderWidth;
+    // Lignes axiales subtiles en pointillés
+    ctx.strokeStyle = 'rgba(0, 136, 204, 0.22)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 4]);
     ctx.beginPath();
-    ctx.roundRect(vigX, vigY, vigW, vigH, borderRadius);
+    ctx.moveTo(vigX, vcy);
+    ctx.lineTo(vigX + vigW, vcy);
+    ctx.moveTo(vcx, vigY);
+    ctx.lineTo(vcx, vigY + vigH);
+    ctx.stroke();
+
+    // Réticule central discret (micro-croix avec halo blanc de contraste)
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(vcx - 6, vcy);
+    ctx.lineTo(vcx + 6, vcy);
+    ctx.moveTo(vcx, vcy - 6);
+    ctx.lineTo(vcx, vcy + 6);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#0088cc';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(vcx - 5, vcy);
+    ctx.lineTo(vcx + 5, vcy);
+    ctx.moveTo(vcx, vcy - 5);
+    ctx.lineTo(vcx, vcy + 5);
+    ctx.stroke();
+
+    // Petits crans repères sur les 4 bords (5px)
+    ctx.strokeStyle = 'rgba(0, 136, 204, 0.5)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(vcx, vigY); ctx.lineTo(vcx, vigY + 6);
+    ctx.moveTo(vcx, vigY + vigH - 6); ctx.lineTo(vcx, vigY + vigH);
+    ctx.moveTo(vigX, vcy); ctx.lineTo(vigX + 6, vcy);
+    ctx.moveTo(vigX + vigW - 6, vcy); ctx.lineTo(vigX + vigW, vcy);
     ctx.stroke();
     ctx.restore();
   }
+
+  ctx.restore();
+
+  // Note: Il ne doit jamais y avoir de bordure pour la vignette (exigence stricte)
 
   // 4. Interactive guides (Source target on screen + Vignette selection)
   if (options.interactive) {
@@ -1341,26 +1441,35 @@ export function drawCalloutVignette(
     const isVignetteSelected = options.selectedPart === 'vignette';
     const isVignetteHovered = options.hoveredPart === 'vignette' && !isVignetteSelected;
 
-    // Draw Source Target on screen (cyan/blue circular viewfinder)
+    // Draw Source Target on screen (viewfinder matching vignette shape and corner radius)
     const srcW = callout.sourceWidth || 40;
     const srcH = callout.sourceHeight || 40;
     const srcX = callout.sourceX;
     const srcY = callout.sourceY;
-    const srcRadius = callout.shape === 'circle' ? Math.min(srcW, srcH) / 2 : Math.min(Math.min(srcW, srcH) / 2, callout.borderRadius || 8);
+    
+    // Exact same shape as vignette:
+    // If circle: perfect circle (radius = min(srcW, srcH) / 2)
+    // If rounded: corner radius proportional to vignette borderRadius or exact borderRadius clamped
+    const maxSrcR = Math.min(srcW, srcH) / 2;
+    const vigBaseW = callout.width || 100;
+    const shapeRatio = srcW / (vigBaseW > 0 ? vigBaseW : 100);
+    const srcRadius = callout.shape === 'circle'
+      ? maxSrcR
+      : Math.min(maxSrcR, Math.max(0, Math.round((callout.borderRadius ?? 16) * shapeRatio)));
 
     ctx.save();
-    // Soft outer ring
+    // Soft outer ring with refined, thin dashed line (no heavy thickness)
     ctx.strokeStyle = isSourceSelected ? '#0088cc' : (isSourceHovered ? '#38bdf8' : 'rgba(0, 136, 204, 0.7)');
-    ctx.lineWidth = isSourceSelected ? 2 : 1.5;
-    ctx.setLineDash([3, 2]);
+    ctx.lineWidth = isSourceSelected ? 1 : 0.85;
+    ctx.setLineDash([2, 2]);
     ctx.beginPath();
     ctx.roundRect(srcX, srcY, srcW, srcH, srcRadius);
     ctx.stroke();
 
-    // Center crosshair mark
+    // Center crosshair mark (discrete fine hair)
     ctx.setLineDash([]);
-    ctx.strokeStyle = isSourceSelected ? '#0088cc' : 'rgba(0, 136, 204, 0.5)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = isSourceSelected ? '#0088cc' : 'rgba(0, 136, 204, 0.6)';
+    ctx.lineWidth = 0.85;
     const cX = srcX + srcW / 2;
     const cY = srcY + srcH / 2;
     ctx.beginPath();
@@ -1369,12 +1478,6 @@ export function drawCalloutVignette(
     ctx.moveTo(cX, cY - 4);
     ctx.lineTo(cX, cY + 4);
     ctx.stroke();
-
-    // Small label tag
-    ctx.fillStyle = '#0088cc';
-    ctx.font = 'bold 8.5px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Cible Loupe', cX, srcY - 4);
     ctx.restore();
 
     // Draw Vignette selection frame

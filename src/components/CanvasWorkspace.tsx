@@ -86,6 +86,9 @@ interface CanvasWorkspaceProps {
   onAddGuideH: () => void;
   onAddGuideV: () => void;
   onImportClick: () => void;
+  // Workspace centering & reset
+  resetWorkspaceTrigger?: number;
+  onCenterWorkspace?: () => void;
   // History
   onUndo?: () => void;
   onRedo?: () => void;
@@ -147,6 +150,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onAddGuideH,
   onAddGuideV,
   onImportClick,
+  resetWorkspaceTrigger,
+  onCenterWorkspace: externalCenterWorkspace,
   onUndo,
   onRedo,
   canUndo = false,
@@ -304,10 +309,19 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const handleCenterWorkspace = useCallback(() => {
     setPanOffset({ x: 0, y: 0 });
     setZoomLevel(1);
-  }, []);
+    externalCenterWorkspace?.();
+  }, [externalCenterWorkspace]);
 
-  // Calculate composition bounds with adjustable workspace width up to 500px
-  const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
+  // Effect to handle external trigger for workspace recentering
+  useEffect(() => {
+    if (resetWorkspaceTrigger) {
+      setPanOffset({ x: 0, y: 0 });
+      setZoomLevel(1);
+    }
+  }, [resetWorkspaceTrigger]);
+
+  // Calculate composition bounds with adjustable workspace width up to 500px, or dynamic Callout mode bounds
+  const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, calloutVignette);
 
   // Synchronize and draw on canvas
   useEffect(() => {
@@ -381,8 +395,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     return { x, y };
   }, []);
 
-  // Hit-test handles of the selected focus
+  // Hit-test handles of the selected focus (disabled when in Callout mode)
   const getHandleAtCoord = (cx: number, cy: number, focus: FocusZone): ResizeHandle | null => {
+    if (calloutVignette && calloutVignette.enabled) return null;
     const handles = getFocusHandles(focus);
     const tolerance = 9;
     for (const key of Object.keys(handles) as ResizeHandle[]) {
@@ -484,10 +499,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
     // 2. Vignette bubble placed at 5px gap on left of screen
     const gap = calloutVignette.gap ?? 5;
-    const vigW = calloutVignette.width || 86;
+    const vigW = calloutVignette.width || 100;
     const vigH = calloutVignette.height || vigW;
     const vigX = bounds.bgX - gap - vigW;
-    const vigY = calloutVignette.offsetY;
+    const shadowDist = (calloutVignette.showShadow !== false)
+      ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
+      : 0;
+    const alignedBottomY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
+    const vigY = calloutVignette.alignBottom !== false ? alignedBottomY : (calloutVignette.offsetY ?? alignedBottomY);
     if (cx >= vigX - pad && cx <= vigX + vigW + pad && cy >= vigY - pad && cy <= vigY + vigH + pad) {
       return 'vignette';
     }
@@ -523,6 +542,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       } else if (dragCalloutState.part === 'vignette') {
         onUpdateCallout({
           offsetY: Math.round(dragCalloutState.initialOffsetY + dy),
+          alignBottom: false,
         });
       }
       return;
@@ -765,6 +785,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
     if (e.button !== 0) return;
 
+    (document.activeElement as HTMLElement)?.blur?.();
+
     const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
 
     // 1. Check if clicking handles on selected Blur Zone
@@ -826,6 +848,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     // 4. PRIORITY SELECTION: Check clicked Callout part (source target or vignette bubble)
     const clickedCallout = getCalloutPartAtCoord(cx, cy);
     if (clickedCallout && calloutVignette) {
+      const vigH = calloutVignette.height || calloutVignette.width || 100;
+      const shadowDist = (calloutVignette.showShadow !== false)
+        ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
+        : 0;
+      const currentVigY = calloutVignette.alignBottom !== false 
+        ? (bounds.bgY + bounds.bgHeight - vigH - shadowDist) 
+        : calloutVignette.offsetY;
+
       updateSelectedCallout(clickedCallout);
       onSelectFocus(null);
       onSelectBlur(null);
@@ -837,7 +867,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         startY: cy,
         initialSourceX: calloutVignette.sourceX,
         initialSourceY: calloutVignette.sourceY,
-        initialOffsetY: calloutVignette.offsetY,
+        initialOffsetY: currentVigY,
       });
       return;
     }
@@ -925,7 +955,20 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 8. Clicked empty background
+    // 8. Main active sur le screenshot : se déplacer librement comme souhaité
+    const isInsideScreenshot =
+      cx >= bounds.bgX &&
+      cx <= bounds.bgX + bounds.bgWidth &&
+      cy >= bounds.bgY &&
+      cy <= bounds.bgY + bounds.bgHeight;
+
+    if (isInsideScreenshot && (!clickedFocus || calloutVignette?.enabled)) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+      return;
+    }
+
+    // 9. Clicked empty background
     if (isPanMode) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
@@ -941,6 +984,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
   const handleMouseUp = () => {
     if (isPanning) setIsPanning(false);
+    if (dragCalloutState) setDragCalloutState(null);
     if (dragState) {
       setDragState(null);
       setActiveGuides([]);
@@ -1001,6 +1045,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (activeTool === 'zoom') return isAltPressed ? 'zoom-out' : 'zoom-in';
     if (activeTool === 'blur' || activeTool === 'mask' || activeTool === 'triangle') return 'crosshair';
     if (isPanMode) return 'grab';
+    if (dragCalloutState) return 'grabbing';
     if (dragState?.isDragging || dragBlurState || dragMaskState || dragTriangleState) return 'move';
     if (dragState?.isResizing && dragState.handle) {
       const h = dragState.handle;
@@ -1018,9 +1063,28 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (hoveredTriangleId || hoveredMaskId || hoveredBlurId) {
       return 'pointer';
     }
-    if (hoveredFocusId) {
+    if (hoveredCalloutPart === 'vignette') {
+      return 'grab';
+    }
+    if (hoveredCalloutPart === 'source') {
+      return 'grab';
+    }
+    if (hoveredFocusId && !calloutVignette?.enabled) {
       return hoveredFocusId === selectedFocusId ? 'move' : 'pointer';
     }
+
+    // Lorsque je survole le screenshot la main doit être active pour que je puisse me déplacer comme je le souhaite
+    const isOverScreenshot = Boolean(
+      canvasMousePos &&
+      canvasMousePos.x >= bounds.bgX &&
+      canvasMousePos.x <= bounds.bgX + bounds.bgWidth &&
+      canvasMousePos.y >= bounds.bgY &&
+      canvasMousePos.y <= bounds.bgY + bounds.bgHeight
+    );
+    if (isOverScreenshot) {
+      return isPanning ? 'grabbing' : 'grab';
+    }
+
     return 'default';
   };
 
@@ -1037,8 +1101,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     >
       {/* Top Scene Bar */}
       <TopSceneBar
-        screenWidth={image?.displayWidth ?? 180}
-        screenHeight={image?.displayHeight ?? 390}
+        screenWidth={calloutVignette?.enabled ? bounds.canvasWidth : (image?.displayWidth ?? 180)}
+        screenHeight={calloutVignette?.enabled ? bounds.canvasHeight : (image?.displayHeight ?? 390)}
         globalStyles={globalStyles}
         onUpdateGlobalStyles={onUpdateGlobalStyles}
         onAddGuideH={onAddGuideH}
@@ -1052,6 +1116,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         hasSelectedFocus={!!selectedFocusId}
         isPreviewMode={isPreviewMode}
         onTogglePreview={onTogglePreview}
+        isCalloutMode={!!calloutVignette?.enabled}
+        onCenterWorkspace={handleCenterWorkspace}
         onUndo={onUndo}
         onRedo={onRedo}
         canUndo={canUndo}

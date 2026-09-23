@@ -18,7 +18,8 @@ import {
   Image as ImageIcon,
   Triangle,
   Layers,
-  Search
+  Search,
+  Maximize2
 } from 'lucide-react';
 import { 
   FocusZone, 
@@ -76,6 +77,7 @@ interface StudioSettingsPanelProps {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  onCenterWorkspace?: () => void;
   onResetToDefaults: () => void;
   onExportPng: () => void;
   onCopyClipboard: () => void;
@@ -127,6 +129,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   onRedo,
   canUndo = false,
   canRedo = false,
+  onCenterWorkspace,
   onResetToDefaults,
   onExportPng,
   onCopyClipboard,
@@ -150,6 +153,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
     callout: false,
     export: false,
   });
+
+  // Requirement: La div "ombre portée" doit être repliée par défaut et dépliable au clic
+  const [isShadowExpanded, setIsShadowExpanded] = useState<boolean>(false);
 
   const isResizingRef = React.useRef(false);
   const startXRef = React.useRef(0);
@@ -295,7 +301,14 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
               {/* Teinte d'arrière-plan du screenshot */}
               <div className="flex flex-col gap-1.5 pt-2 border-t border-[#eeeeee]">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#666666] font-medium">Teinte de l'arrière-plan</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[#666666] font-medium">Teinte de l'arrière-plan</span>
+                    {calloutVignette?.enabled && (
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 font-medium">
+                        Masquée en Callout
+                      </span>
+                    )}
+                  </div>
                   <span className="font-mono text-[#000000] font-semibold">
                     {Math.round((globalStyles.bgTintOpacity ?? 0.5) * 100)}%
                   </span>
@@ -1698,24 +1711,6 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
           {openSections.callout && (
             <div className="px-4 pb-4 pt-1 flex flex-col gap-3">
-              {/* Activation toggle */}
-              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#eeeeee]/60 border border-[#eeeeee]">
-                <div>
-                  <span className="text-xs font-semibold text-[#000000] block">Vignette détachée</span>
-                  <span className="text-[10px] text-[#666666]">Placée sur le côté gauche à 5px du screen</span>
-                </div>
-                <button
-                  onClick={onToggleCallout}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                    calloutVignette?.enabled
-                      ? 'bg-[#000000] text-white'
-                      : 'bg-[#eeeeee] text-[#666666] hover:text-[#000000]'
-                  }`}
-                >
-                  {calloutVignette?.enabled ? 'Activée' : 'Désactivée'}
-                </button>
-              </div>
-
               {calloutVignette?.enabled && onUpdateCallout && (
                 <div className="flex flex-col gap-3 pt-1">
                   {/* Forme de la vignette (arrondis / cercle) */}
@@ -1749,18 +1744,19 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
                   {/* Rayon des arrondis (si rectangle arrondi) */}
                   {calloutVignette.shape !== 'circle' && (
-                    <div>
-                      <div className="flex justify-between items-center text-[10px] mb-1">
-                        <span className="text-[#666666]">Rayon des arrondis</span>
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex justify-between items-center text-[10px]">
+                        <span className="text-[#666666] font-medium">Rayon des arrondis</span>
                         <div className="flex gap-1">
                           {[8, 12, 16, 20, 24].map((r) => (
                             <button
                               key={r}
+                              type="button"
                               onClick={() => onUpdateCallout({ borderRadius: r })}
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-medium transition-all ${
                                 (calloutVignette.borderRadius ?? 16) === r
                                   ? 'bg-[#0088cc] text-white'
-                                  : 'bg-[#eeeeee] text-[#666666]'
+                                  : 'bg-[#eeeeee] text-[#666666] hover:text-[#000000]'
                               }`}
                             >
                               {r}px
@@ -1768,16 +1764,57 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           ))}
                         </div>
                       </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="40"
-                        value={calloutVignette.borderRadius ?? 16}
-                        onChange={(e) => onUpdateCallout({ borderRadius: parseInt(e.target.value, 10) })}
-                        className="accent-[#0088cc] w-full"
-                      />
+                      <div className="flex items-center gap-2">
+                        <div className="w-20">
+                          <NumericInput
+                            value={calloutVignette.borderRadius ?? 16}
+                            onChange={(r) => onUpdateCallout({ borderRadius: Math.max(0, Math.min(80, r)) })}
+                            min={0}
+                            max={80}
+                            unit="px"
+                          />
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="40"
+                          value={calloutVignette.borderRadius ?? 16}
+                          onChange={(e) => onUpdateCallout({ borderRadius: parseInt(e.target.value, 10) || 0 })}
+                          onPointerUp={(e) => (e.target as HTMLElement).blur()}
+                          className="accent-[#0088cc] flex-1 cursor-pointer"
+                        />
+                      </div>
                     </div>
                   )}
+
+                  {/* Alignement au bas du screenshot (simplifié et placé après la forme) */}
+                  <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#eeeeee]/40 border border-[#eeeeee]">
+                    <div>
+                      <span className="text-[10px] font-semibold text-[#000000] block">Alignement au bas du screenshot</span>
+                      <span className="text-[9px] text-[#666666]">Calé sur l'ombre au bas du screenshot</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, calloutVignette);
+                        const vigH = calloutVignette.height || calloutVignette.width || 100;
+                        const shadowDist = (calloutVignette.showShadow !== false)
+                          ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
+                          : 0;
+                        const targetY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
+                        onUpdateCallout({
+                          alignBottom: calloutVignette.alignBottom === false ? true : false,
+                          offsetY: targetY,
+                        });
+                      }}
+                      className={`px-3 py-1 rounded-full text-[10px] font-semibold transition-all ${
+                        calloutVignette.alignBottom !== false
+                          ? 'bg-[#0088cc] text-white shadow-2xs'
+                          : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
+                      }`}
+                    >
+                      {calloutVignette.alignBottom !== false ? '✓ Aligné au bas' : 'Manuel'}
+                    </button>
+                  </div>
 
                   {/* Taille de la vignette */}
                   <div className="grid grid-cols-2 gap-2">
@@ -1785,14 +1822,14 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       <div className="flex justify-between items-center text-[10px]">
                         <span className="text-[#666666]">Taille (L x H)</span>
                         <button
-                          onClick={() => onUpdateCallout({ width: 86, height: 86 })}
-                          className="text-[9px] text-[#0088cc] hover:underline"
+                          onClick={() => onUpdateCallout({ width: 100, height: 100 })}
+                          className="text-[9px] text-[#0088cc] hover:underline font-medium"
                         >
-                          86px
+                          100px
                         </button>
                       </div>
                       <NumericInput
-                        value={calloutVignette.width || 86}
+                        value={calloutVignette.width || 100}
                         onChange={(w) => onUpdateCallout({ width: Math.max(30, w), height: Math.max(30, w) })}
                         min={30}
                         max={160}
@@ -1820,139 +1857,189 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Position verticale (offsetY) */}
-                  <div>
-                    <div className="flex justify-between items-center text-[10px] mb-1">
-                      <span className="text-[#666666]">Position verticale</span>
-                      <span className="font-mono text-[9px] text-[#0088cc]">{calloutVignette.offsetY}px</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="20"
-                      max="350"
-                      value={calloutVignette.offsetY}
-                      onChange={(e) => onUpdateCallout({ offsetY: parseInt(e.target.value, 10) })}
-                      className="accent-[#0088cc] w-full"
-                    />
+                  {/* Zoom de la cible loupe (Saisie numérique directe + curseur de grossissement 1.0x à 5.0x) */}
+                  <div className="p-2.5 rounded-2xl bg-[#eeeeee]/40 border border-[#eeeeee] flex flex-col gap-2">
+                    {(() => {
+                      const vigW = calloutVignette.width || 100;
+                      const currentSrcW = calloutVignette.sourceWidth || 40;
+                      const currentZoom = Math.round((vigW / currentSrcW) * 10) / 10;
+                      const clampedZoom = Math.min(5, Math.max(1, currentZoom));
+
+                      return (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-[#000000]">Niveau de zoom</span>
+                            <div className="flex items-center gap-1.5">
+                              {/* Saisie directe du niveau de zoom */}
+                              <div className="flex items-center bg-white border border-[#eeeeee] rounded-lg px-2 py-0.5 shadow-2xs">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="5"
+                                  step="0.1"
+                                  value={clampedZoom}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    if (!isNaN(val) && val >= 0.5) {
+                                      const safeVal = Math.min(5, Math.max(1, val));
+                                      const newSrcW = Math.round((vigW / safeVal) * 10) / 10;
+                                      onUpdateCallout({ sourceWidth: newSrcW, sourceHeight: newSrcW });
+                                    }
+                                  }}
+                                  className="w-10 text-right text-[11px] font-mono font-bold text-[#0088cc] outline-none"
+                                  title="Entrez la valeur exacte du grossissement (ex: 2.5)"
+                                />
+                                <span className="text-[10px] text-[#666666] font-bold ml-0.5">×</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between items-center text-[9px] text-[#666666] mb-1">
+                              <span>Zone ciblée sur l'image</span>
+                              <span className="font-mono text-[#0088cc] font-semibold">{currentSrcW} px</span>
+                            </div>
+                            <div className="relative flex items-center">
+                              <input
+                                type="range"
+                                min="1"
+                                max="5"
+                                step="0.05"
+                                value={clampedZoom}
+                                onChange={(e) => {
+                                  const newZoom = parseFloat(e.target.value);
+                                  const newSrcW = Math.round((vigW / newZoom) * 10) / 10;
+                                  onUpdateCallout({ sourceWidth: newSrcW, sourceHeight: newSrcW });
+                                }}
+                                onPointerUp={(e) => (e.target as HTMLElement).blur()}
+                                className="accent-[#0088cc] w-full cursor-pointer"
+                                title={`Zoom loupe : ${clampedZoom.toFixed(1)}×`}
+                              />
+                            </div>
+                            <div className="flex justify-between text-[8px] text-[#979797] mt-0.5 font-mono">
+                              <span>1.0× (large)</span>
+                              <span>2.5×</span>
+                              <span>3.5×</span>
+                              <span>5.0× (serré)</span>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
 
-                  {/* Zone source ciblée sur le screenshot (Taille de la loupe) */}
-                  <div className="p-2.5 rounded-2xl bg-[#eeeeee]/40 border border-[#eeeeee]">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-semibold text-[#000000]">Zone ciblée sur le screen</span>
-                      <span className="text-[9px] text-[#0088cc] font-medium">Déplaçable directement sur le canvas</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-[9px] text-[#666666] block mb-0.5">Taille de sélection</span>
-                        <NumericInput
-                          value={calloutVignette.sourceWidth || 40}
-                          onChange={(sw) => onUpdateCallout({ sourceWidth: Math.max(15, sw), sourceHeight: Math.max(15, sw) })}
-                          min={15}
-                          max={120}
-                          unit="px"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] text-[#666666] block mb-0.5">Niveau de zoom</span>
-                        <div className="text-[10px] font-semibold text-[#000000] py-1.5 px-2 bg-white rounded-xl border border-[#eeeeee] text-center">
-                          {Math.round(((calloutVignette.width || 86) / (calloutVignette.sourceWidth || 40)) * 10) / 10}x
+                  {/* Ombre portée derrière la vignette (Repliée par défaut, dépliable au clic) */}
+                  <div className="rounded-2xl bg-[#eeeeee]/40 border border-[#eeeeee] overflow-hidden transition-all">
+                    <button
+                      type="button"
+                      onClick={() => setIsShadowExpanded(!isShadowExpanded)}
+                      className="w-full p-2.5 flex items-center justify-between text-left hover:bg-[#eeeeee]/70 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        {isShadowExpanded ? (
+                          <ChevronDown className="w-3.5 h-3.5 text-[#666666]" />
+                        ) : (
+                          <ChevronRight className="w-3.5 h-3.5 text-[#666666]" />
+                        )}
+                        <div>
+                          <span className="text-[10px] font-semibold text-[#000000] block">Ombre portée</span>
+                          <span className="text-[9px] text-[#666666]">
+                            {calloutVignette.showShadow !== false ? 'Active (50%, 5px, 2px)' : 'Désactivée'}
+                          </span>
                         </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Ombre portée derrière la vignette */}
-                  <div className="p-2.5 rounded-2xl bg-[#eeeeee]/40 border border-[#eeeeee] flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] font-semibold text-[#000000] block">Ombre portée (derrière)</span>
-                        <span className="text-[9px] text-[#666666]">Ombre diffuse projetée derrière la vignette</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const currentVal = calloutVignette.showShadow ?? calloutVignette.showFloorShadow ?? true;
-                          onUpdateCallout({ showShadow: !currentVal, showFloorShadow: !currentVal });
-                        }}
-                        className={`w-7 h-4 rounded-full relative transition-colors p-0.5 ${
-                          (calloutVignette.showShadow ?? calloutVignette.showFloorShadow ?? true) ? 'bg-[#0088cc]' : 'bg-[#cccccc]'
-                        }`}
-                      >
-                        <div
-                          className={`w-3 h-3 rounded-full bg-white transition-transform ${
-                            (calloutVignette.showShadow ?? calloutVignette.showFloorShadow ?? true) ? 'translate-x-3' : 'translate-x-0'
+                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentVal = calloutVignette.showShadow ?? true;
+                            onUpdateCallout({ showShadow: !currentVal });
+                          }}
+                          className={`w-7 h-4 rounded-full relative transition-colors p-0.5 ${
+                            (calloutVignette.showShadow ?? true) ? 'bg-[#0088cc]' : 'bg-[#cccccc]'
                           }`}
-                        />
-                      </button>
-                    </div>
+                          title={(calloutVignette.showShadow ?? true) ? 'Désactiver l\'ombre' : 'Activer l\'ombre'}
+                        >
+                          <div
+                            className={`w-3 h-3 rounded-full bg-white transition-transform ${
+                              (calloutVignette.showShadow ?? true) ? 'translate-x-3' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </button>
 
-                    {(calloutVignette.showShadow ?? calloutVignette.showFloorShadow ?? true) && (
-                      <div className="flex flex-col gap-2 pt-1">
+                    {isShadowExpanded && (calloutVignette.showShadow ?? true) && (
+                      <div className="p-2.5 pt-1 border-t border-[#eeeeee] flex flex-col gap-2 bg-white/40">
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => onUpdateCallout({
+                              shadowOpacity: 0.50,
+                              shadowDistance: 5,
+                              shadowOffsetY: 5,
+                              shadowSize: 2,
+                              shadowBlur: 2,
+                              showShadow: true,
+                            })}
+                            className="text-[9px] px-2 py-0.5 rounded-full bg-white border border-[#eeeeee] text-[#666666] hover:text-[#000000]"
+                            title="Réinitialiser (50% / 5px / 2px)"
+                          >
+                            Défaut
+                          </button>
+                        </div>
                         <div>
                           <div className="flex justify-between items-center text-[9px] text-[#666666] mb-0.5">
-                            <span>Flou de l'ombre</span>
-                            <span>{calloutVignette.shadowBlur ?? calloutVignette.floorShadowBlur ?? 14}px</span>
+                            <span>Opacité de l'ombre</span>
+                            <span className="font-mono text-[#0088cc]">{Math.round((calloutVignette.shadowOpacity ?? 0.50) * 100)}%</span>
                           </div>
                           <input
                             type="range"
-                            min="2"
-                            max="35"
-                            value={calloutVignette.shadowBlur ?? calloutVignette.floorShadowBlur ?? 14}
-                            onChange={(e) => onUpdateCallout({ shadowBlur: parseInt(e.target.value, 10), floorShadowBlur: parseInt(e.target.value, 10) })}
-                            className="accent-[#0088cc] w-full"
+                            min="0.05"
+                            max="1.0"
+                            step="0.05"
+                            value={calloutVignette.shadowOpacity ?? 0.50}
+                            onChange={(e) => onUpdateCallout({ shadowOpacity: parseFloat(e.target.value) })}
+                            className="accent-[#0088cc] w-full cursor-pointer"
                           />
                         </div>
                         <div>
                           <div className="flex justify-between items-center text-[9px] text-[#666666] mb-0.5">
-                            <span>Décalage vertical (Y)</span>
-                            <span>{calloutVignette.shadowOffsetY ?? 6}px</span>
+                            <span>Distance de l'ombre</span>
+                            <span className="font-mono text-[#0088cc]">{calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="25"
+                            value={calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              onUpdateCallout({ shadowDistance: val, shadowOffsetY: val });
+                            }}
+                            className="accent-[#0088cc] w-full cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex justify-between items-center text-[9px] text-[#666666] mb-0.5">
+                            <span>Taille de l'ombre</span>
+                            <span className="font-mono text-[#0088cc]">{calloutVignette.shadowSize ?? calloutVignette.shadowBlur ?? 2}px</span>
                           </div>
                           <input
                             type="range"
                             min="0"
                             max="20"
-                            value={calloutVignette.shadowOffsetY ?? 6}
-                            onChange={(e) => onUpdateCallout({ shadowOffsetY: parseInt(e.target.value, 10) })}
-                            className="accent-[#0088cc] w-full"
-                          />
-                        </div>
-                        <div>
-                          <div className="flex justify-between items-center text-[9px] text-[#666666] mb-0.5">
-                            <span>Opacité de l'ombre</span>
-                            <span>{Math.round((calloutVignette.shadowOpacity ?? calloutVignette.floorShadowOpacity ?? 0.35) * 100)}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0.1"
-                            max="0.8"
-                            step="0.05"
-                            value={calloutVignette.shadowOpacity ?? calloutVignette.floorShadowOpacity ?? 0.35}
-                            onChange={(e) => onUpdateCallout({ shadowOpacity: parseFloat(e.target.value), floorShadowOpacity: parseFloat(e.target.value) })}
-                            className="accent-[#0088cc] w-full"
+                            value={calloutVignette.shadowSize ?? calloutVignette.shadowBlur ?? 2}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              onUpdateCallout({ shadowSize: val, shadowBlur: val });
+                            }}
+                            className="accent-[#0088cc] w-full cursor-pointer"
                           />
                         </div>
                       </div>
                     )}
-                  </div>
-
-                  {/* Bordure de la vignette */}
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-[#666666]">Épaisseur de bordure</span>
-                    <div className="flex gap-1">
-                      {[0, 1, 2, 3].map((bw) => (
-                        <button
-                          key={bw}
-                          onClick={() => onUpdateCallout({ borderWidth: bw })}
-                          className={`px-2 py-0.5 rounded text-[9px] font-medium ${
-                            (calloutVignette.borderWidth ?? 1) === bw
-                              ? 'bg-[#000000] text-white'
-                              : 'bg-[#eeeeee] text-[#666666]'
-                          }`}
-                        >
-                          {bw === 0 ? 'Aucune' : `${bw}px`}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
               )}
