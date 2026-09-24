@@ -226,29 +226,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
       <div className={`p-4 border-b flex items-center justify-between transition-colors ${
         isDarkMode ? 'border-[#333333]' : 'border-[#eeeeee]'
       }`}>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full inline-block ${isDarkMode ? 'bg-[#0088cc]' : 'bg-[#000000]'}`} />
-            <h2 className={`font-semibold text-xs tracking-tight ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
-              Paramètres du Studio
-            </h2>
-          </div>
-          <div className="flex items-center gap-1.5 mt-0.5 ml-4">
-            <span className={`text-[11px] ${isDarkMode ? 'text-[#999999]' : 'text-[#666666]'}`}>Largeur :</span>
-            {[300, 340, 420].map((w) => (
-              <button
-                key={w}
-                onClick={() => onUpdatePanelWidth?.(w)}
-                className={`text-[9px] px-1.5 py-0.5 rounded-full transition-all cursor-pointer ${
-                  panelWidth === w
-                    ? isDarkMode ? 'bg-white text-black font-semibold' : 'bg-[#000000] text-white font-semibold'
-                    : isDarkMode ? 'bg-[#333333] text-[#aaaaaa] hover:text-white' : 'bg-[#eeeeee] text-[#666666] hover:text-[#000000]'
-                }`}
-              >
-                {w}px
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full inline-block ${isDarkMode ? 'bg-[#0088cc]' : 'bg-[#000000]'}`} />
+          <h2 className={`font-semibold text-xs tracking-tight ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
+            Paramètres du Studio
+          </h2>
         </div>
 
         <button
@@ -364,7 +346,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
             <div className="flex items-center gap-2">
               <span className="text-[11px] tracking-wide uppercase">2. Zone de travail & Screenshot</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono font-medium">
-                {globalStyles.workspaceWidth || 440}px
+                {globalStyles.workspaceWidth || 260}px
               </span>
             </div>
             {openSections.workspace ? <ChevronDown className="w-4 h-4 text-[#979797]" /> : <ChevronRight className="w-4 h-4 text-[#979797]" />}
@@ -592,7 +574,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       type="text"
                       value={selectedFocus.name}
                       onChange={(e) => onUpdateFocus({ name: e.target.value })}
-                      className="font-semibold text-[#000000] bg-transparent border-b border-dashed border-[#979797]/40 hover:border-[#979797] focus:border-[#0088cc] outline-none pb-0.5 text-xs flex-1 mr-2"
+                      className="font-semibold text-[#000000] dark:text-white bg-white dark:bg-[#333333] border border-[#d6d6d6] dark:border-[#4d4d4d] rounded-full px-3 py-1 hover:border-[#979797] focus:border-[#0088cc] focus:ring-1 focus:ring-[#0088cc] outline-none text-xs flex-1 mr-2 transition-colors shadow-2xs"
                       placeholder="Nom de l'élément..."
                     />
                     <div className="flex items-center gap-1">
@@ -1206,7 +1188,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       type="text"
                       value={activeMask.name}
                       onChange={(e) => onUpdateMask(activeMask.id, { name: e.target.value })}
-                      className="font-semibold text-[#000000] bg-transparent border-b border-dashed border-[#979797]/40 hover:border-[#979797] focus:border-[#0088cc] outline-none pb-0.5 text-xs flex-1 mr-2"
+                      className="font-semibold text-[#000000] dark:text-white bg-white dark:bg-[#333333] border border-[#d6d6d6] dark:border-[#4d4d4d] rounded-full px-3 py-1 hover:border-[#979797] focus:border-[#0088cc] focus:ring-1 focus:ring-[#0088cc] outline-none text-xs flex-1 mr-2 transition-colors shadow-2xs"
                       placeholder="Nom de la forme..."
                     />
                     <button
@@ -2069,32 +2051,45 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
         {/* 8. OPTIONS D'EXPORTATION (PNG AVEC TRANSPARENCE) */}
         <div className="flex flex-col">
-          <div className="w-full px-4 py-3.5 flex items-center justify-between font-semibold text-[#000000] hover:bg-[#eeeeee]/40 transition-colors">
-            <button
-              onClick={() => toggleSection('export')}
-              className="text-[11px] tracking-wide uppercase text-left"
-            >
-              8. Options d'Exportation
-            </button>
-            <div className="flex items-center gap-1">
-              {[1, 2, 3].map((scale) => (
-                <button
-                  key={scale}
-                  onClick={() => onUpdateGlobalStyles({ exportScale: scale as 1 | 2 | 3 })}
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
-                    globalStyles.exportScale === scale
-                      ? 'bg-[#000000] text-white shadow-2xs'
-                      : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
-                  }`}
-                >
-                  {scale === 1 ? '1x' : scale === 2 ? '2x (HD)' : '3x (4K)'}
-                </button>
-              ))}
+          <button
+            onClick={() => toggleSection('export')}
+            className={`w-full px-4 py-3.5 flex items-center justify-between font-semibold transition-colors text-left ${
+              isDarkMode ? 'text-white hover:bg-white/5' : 'text-[#000000] hover:bg-[#eeeeee]/40'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] tracking-wide uppercase">8. Options d'Exportation</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                isDarkMode ? 'bg-[#333333] text-[#aaaaaa]' : 'bg-[#eeeeee] text-[#666666]'
+              }`}>
+                {globalStyles.exportScale}×
+              </span>
             </div>
-          </div>
+            {openSections.export ? <ChevronDown className="w-4 h-4 text-[#979797]" /> : <ChevronRight className="w-4 h-4 text-[#979797]" />}
+          </button>
 
           {openSections.export && (
             <div className="px-4 pb-4 pt-1 flex flex-col gap-2.5">
+              {/* Choix de résolution d'export */}
+              <div className="flex items-center justify-between text-[11px] pb-1 border-b border-[#eeeeee] dark:border-[#333333]">
+                <span className={`font-medium ${isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]'}`}>Résolution d'exportation :</span>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3].map((scale) => (
+                    <button
+                      key={scale}
+                      onClick={() => onUpdateGlobalStyles({ exportScale: scale as 1 | 2 | 3 })}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all cursor-pointer ${
+                        globalStyles.exportScale === scale
+                          ? isDarkMode ? 'bg-white text-black font-bold shadow-2xs' : 'bg-[#000000] text-white shadow-2xs'
+                          : isDarkMode ? 'bg-[#333333] text-[#aaaaaa] hover:bg-[#404040] hover:text-white' : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                      }`}
+                    >
+                      {scale === 1 ? '1x' : scale === 2 ? '2x (HD)' : '3x (4K)'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Badge PNG avec transparence garantie */}
               <div className="flex items-center gap-2 p-2.5 rounded-2xl bg-white/70 border border-white text-[#000000] text-[11px]">
                 <Check className="w-4 h-4 text-[#0088cc] shrink-0" />

@@ -69,11 +69,11 @@ export const NumericInput: React.FC<NumericInputProps> = ({
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500 font-mono"
+        className="w-full bg-white dark:bg-[#333333] border border-[#d6d6d6] dark:border-[#4d4d4d] rounded-full px-3 py-1 text-xs text-[#111111] dark:text-[#f0f0f0] focus:outline-none focus:border-[#0088cc] focus:ring-1 focus:ring-[#0088cc] font-mono shadow-2xs transition-colors"
         style={{ MozAppearance: 'textfield' }}
       />
       {unit && (
-        <span className="absolute right-2.5 text-[11px] text-slate-400 pointer-events-none select-none">
+        <span className="absolute right-3 text-[10px] text-[#888888] dark:text-[#aaaaaa] pointer-events-none select-none font-mono">
           {unit}
         </span>
       )}

@@ -775,7 +775,7 @@ export default function App() {
       bgTintColor: BASE_COLOR,
       bgTintOpacity: 0.50,
       exportScale: 1,
-      workspaceWidth: 440,
+      workspaceWidth: 260,
       container: {
         borderRadius: 0,
         showShadow: false,

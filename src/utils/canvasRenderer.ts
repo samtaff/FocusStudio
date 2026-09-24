@@ -28,7 +28,7 @@ import {
 } from '../types';
 
 export const BASE_COLOR = '#25465F'; // Corporate navy cyan #25465F
-export const DEFAULT_WORKSPACE_WIDTH = 440; // Default workspace width in px
+export const DEFAULT_WORKSPACE_WIDTH = 260; // Default workspace width in px (260px)
 export const MIN_WORKSPACE_WIDTH = 240;
 export const MAX_WORKSPACE_WIDTH = 500; // Cap at 500px max per requirement
 

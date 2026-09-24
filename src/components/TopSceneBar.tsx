@@ -10,8 +10,7 @@ import {
   Droplet,
   Square,
   Undo2,
-  Redo2,
-  Mouse
+  Redo2
 } from 'lucide-react';
 import { GlobalStyleSettings } from '../types';
 import { NumericInput } from './NumericInput';
@@ -27,8 +26,6 @@ interface TopSceneBarProps {
   onTogglePanMode: () => void;
   zoomLevel: number;
   onSetZoom: (level: number) => void;
-  wheelMode?: 'pan' | 'zoom';
-  onToggleWheelMode?: () => void;
   // Focus Zone options
   onAddFocus?: () => void;
   onDeleteFocus?: () => void;
@@ -57,8 +54,6 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
   onTogglePanMode,
   zoomLevel,
   onSetZoom,
-  wheelMode = 'pan',
-  onToggleWheelMode,
   onAddFocus,
   onDeleteFocus,
   hasSelectedFocus,
@@ -199,32 +194,8 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
         </button>
       </div>
 
-      {/* Right: Wheel mode & Zoom controls */}
+      {/* Right: Zoom controls */}
       <div className="flex items-center gap-1.5">
-        {onToggleWheelMode && (
-          <button
-            id="btn-toggle-wheel-mode"
-            type="button"
-            onClick={onToggleWheelMode}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
-              wheelMode === 'zoom'
-                ? 'bg-[#0088cc] text-white shadow-2xs'
-                : isDarkMode
-                  ? 'bg-[#353535] text-[#aaaaaa] hover:text-white hover:bg-[#404040] border border-[#444444]'
-                  : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
-            }`}
-            title={
-              wheelMode === 'zoom'
-                ? "Mode Molette : ZOOM DIRECT (cliquez pour basculer en mode Déplacement)"
-                : "Mode Molette : DÉPLACER LE PLAN (cliquez pour basculer en mode Zoom direct)"
-            }
-          >
-            <Mouse className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Molette :</span>
-            <span className="font-semibold">{wheelMode === 'zoom' ? 'Zoom' : 'Déplacer'}</span>
-          </button>
-        )}
-
         <div className={`flex items-center rounded-full p-0.5 text-[11px] ${
           isDarkMode ? 'bg-[#353535] border border-[#444444]' : 'bg-[#eeeeee]/80'
         }`}>

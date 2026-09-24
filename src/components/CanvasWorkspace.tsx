@@ -179,17 +179,6 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isAltPressed, setIsAltPressed] = useState<boolean>(false);
-  const [wheelMode, setWheelMode] = useState<'pan' | 'zoom'>(() => {
-    return (localStorage.getItem('canvas_wheel_mode') as 'pan' | 'zoom') || 'pan';
-  });
-
-  const handleToggleWheelMode = () => {
-    setWheelMode((prev) => {
-      const next = prev === 'pan' ? 'zoom' : 'pan';
-      localStorage.setItem('canvas_wheel_mode', next);
-      return next;
-    });
-  };
 
   // Drag & Resize State
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -1042,10 +1031,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       e.preventDefault();
 
       const isZoomModifier = e.ctrlKey || e.metaKey || e.altKey;
-      const shouldZoom = wheelMode === 'zoom' ? !e.shiftKey : isZoomModifier;
 
-      if (shouldZoom) {
-        // Zoom progressif fluide (pincement trackpad, Ctrl / Cmd / Alt + molette, ou mode Zoom)
+      if (isZoomModifier) {
+        // Zoom progressif fluide (pincement trackpad, Ctrl / Cmd / Alt + molette)
         const zoomDelta = e.deltaY < 0 ? 0.08 : -0.08;
         setZoomLevel((prev) => Math.min(5, Math.max(0.25, Math.round((prev + zoomDelta) * 100) / 100)));
       } else if (e.shiftKey) {
@@ -1067,7 +1055,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     return () => {
       container.removeEventListener('wheel', handleNativeWheel);
     };
-  }, [wheelMode]);
+  }, []);
 
   // Drag & drop local files
   const handleDragOver = (e: React.DragEvent) => {
@@ -1164,8 +1152,6 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         onTogglePanMode={() => setIsPanMode(!isPanMode)}
         zoomLevel={zoomLevel}
         onSetZoom={setZoomLevel}
-        wheelMode={wheelMode}
-        onToggleWheelMode={handleToggleWheelMode}
         onAddFocus={onAddFocus}
         onDeleteFocus={() => selectedFocusId && onDeleteFocus?.(selectedFocusId)}
         hasSelectedFocus={!!selectedFocusId}
