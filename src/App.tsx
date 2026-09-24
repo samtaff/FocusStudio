@@ -47,6 +47,37 @@ export default function App() {
   const [calloutVignette, setCalloutVignette] = useState<CalloutVignette | null>(null);
   const [selectedCalloutPart, setSelectedCalloutPart] = useState<'source' | 'vignette' | null>(null);
 
+  // Dark Mode State (#212121)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('focus_studio_dark_mode');
+      if (saved !== null) return JSON.parse(saved);
+      return false;
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleDarkMode = useCallback(() => {
+    setIsDarkMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('focus_studio_dark_mode', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark-mode');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark-mode');
+    }
+  }, [isDarkMode]);
+
   // Mutually exclusive selection handlers so arrow keys and panels target the exact active object
   const handleSelectFocus = useCallback((id: string | null) => {
     setSelectedFocusId(id);
@@ -1165,7 +1196,11 @@ export default function App() {
   const selectedFocus = focuses.find((f) => f.id === selectedFocusId) || null;
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-gradient-to-br from-[#fdfbfb] to-[#ebedee] font-sans antialiased text-[#000000]">
+    <div className={`h-screen w-screen flex flex-col overflow-hidden font-sans antialiased transition-colors duration-200 ${
+      isDarkMode 
+        ? 'bg-[#212121] text-white' 
+        : 'bg-gradient-to-br from-[#fdfbfb] to-[#ebedee] text-[#000000]'
+    }`}>
       {/* Top Header */}
       <Header
         onImportFile={handleImportFile}
@@ -1175,6 +1210,8 @@ export default function App() {
         copied={copied}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         hasImage={!!image}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={handleToggleDarkMode}
       />
 
       {/* Main Workspace Area */}
@@ -1248,6 +1285,7 @@ export default function App() {
             const el = document.getElementById('header-file-input') || document.getElementById('header-import-button');
             el?.click();
           }}
+          isDarkMode={isDarkMode}
         />
 
         {/* Right Studio Settings Accordion Panel */}
@@ -1301,6 +1339,8 @@ export default function App() {
           onTogglePreview={() => setIsPreviewMode((prev) => !prev)}
           panelWidth={panelWidth}
           onUpdatePanelWidth={setPanelWidth}
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={handleToggleDarkMode}
         />
       </div>
 

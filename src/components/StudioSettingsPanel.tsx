@@ -19,7 +19,9 @@ import {
   Triangle,
   Layers,
   Search,
-  Maximize2
+  Maximize2,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { 
   FocusZone, 
@@ -89,6 +91,8 @@ interface StudioSettingsPanelProps {
   onTogglePreview?: () => void;
   panelWidth?: number;
   onUpdatePanelWidth?: (width: number) => void;
+  isDarkMode?: boolean;
+  onToggleDarkMode?: () => void;
 }
 
 export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
@@ -141,6 +145,8 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   onTogglePreview,
   panelWidth = 340,
   onUpdatePanelWidth,
+  isDarkMode = false,
+  onToggleDarkMode,
 }) => {
   // Requirement: Toutes les sections doivent être fermées par défaut et se déplier SEULEMENT au clic !
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -196,7 +202,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
   return (
     <aside
-      className="relative bg-white/70 backdrop-blur-xl border border-white/80 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-[#979797]/15 flex flex-col h-fit max-h-[calc(100vh-7rem)] overflow-y-auto select-none shrink-0 z-20 text-[#000000] text-xs self-start max-w-[calc(100vw-2rem)]"
+      className={`relative backdrop-blur-xl rounded-3xl flex flex-col h-fit max-h-[calc(100vh-7rem)] overflow-y-auto select-none shrink-0 z-20 text-xs self-start max-w-[calc(100vw-2rem)] transition-colors duration-200 ${
+        isDarkMode
+          ? 'bg-[#212121]/95 border border-[#333333] shadow-[0_8px_30px_rgba(0,0,0,0.4)] ring-1 ring-white/10 text-white'
+          : 'bg-white/70 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-[#979797]/15 text-[#000000]'
+      }`}
       style={{ width: `${panelWidth}px` }}
     >
       {/* Draggable resize splitter on the left edge */}
@@ -207,28 +217,32 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
         onPointerMove={handleResizePointerMove}
         onPointerUp={handleResizePointerUp}
       >
-        <div className="w-1 h-8 rounded-full bg-[#979797]/30 group-hover:bg-[#0088cc] transition-colors" />
+        <div className={`w-1 h-8 rounded-full transition-colors ${
+          isDarkMode ? 'bg-white/20 group-hover:bg-[#0088cc]' : 'bg-[#979797]/30 group-hover:bg-[#0088cc]'
+        }`} />
       </div>
 
       {/* Panel Header */}
-      <div className="p-4 border-b border-[#eeeeee] flex items-center justify-between">
+      <div className={`p-4 border-b flex items-center justify-between transition-colors ${
+        isDarkMode ? 'border-[#333333]' : 'border-[#eeeeee]'
+      }`}>
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#000000] inline-block" />
-            <h2 className="font-semibold text-[#000000] text-xs tracking-tight">
+            <span className={`w-2 h-2 rounded-full inline-block ${isDarkMode ? 'bg-[#0088cc]' : 'bg-[#000000]'}`} />
+            <h2 className={`font-semibold text-xs tracking-tight ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
               Paramètres du Studio
             </h2>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5 ml-4">
-            <span className="text-[11px] text-[#666666]">Largeur :</span>
+            <span className={`text-[11px] ${isDarkMode ? 'text-[#999999]' : 'text-[#666666]'}`}>Largeur :</span>
             {[300, 340, 420].map((w) => (
               <button
                 key={w}
                 onClick={() => onUpdatePanelWidth?.(w)}
-                className={`text-[9px] px-1.5 py-0.5 rounded-full transition-all ${
+                className={`text-[9px] px-1.5 py-0.5 rounded-full transition-all cursor-pointer ${
                   panelWidth === w
-                    ? 'bg-[#000000] text-white font-semibold'
-                    : 'bg-[#eeeeee] text-[#666666] hover:text-[#000000]'
+                    ? isDarkMode ? 'bg-white text-black font-semibold' : 'bg-[#000000] text-white font-semibold'
+                    : isDarkMode ? 'bg-[#333333] text-[#aaaaaa] hover:text-white' : 'bg-[#eeeeee] text-[#666666] hover:text-[#000000]'
                 }`}
               >
                 {w}px
@@ -240,16 +254,22 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
         <button
           id="btn-studio-reset"
           onClick={onResetToDefaults}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000] text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
+            isDarkMode
+              ? 'bg-[#333333] hover:bg-[#3e3e3e] text-white border border-[#444444]'
+              : 'bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000]'
+          }`}
           title="Réinitialiser tous les réglages par défaut"
         >
-          <RotateCcw className="w-3 h-3 text-[#666666]" />
+          <RotateCcw className={`w-3 h-3 ${isDarkMode ? 'text-[#bbbbbb]' : 'text-[#666666]'}`} />
           <span>Réinitialiser</span>
         </button>
       </div>
 
       {/* Accordion Sections - All folded by default */}
-      <div className="flex-1 divide-y divide-[#eeeeee]">
+      <div className={`flex-1 divide-y transition-colors ${
+        isDarkMode ? 'divide-[#303030]' : 'divide-[#eeeeee]'
+      }`}>
         
         {/* 1. CAPTURE SOURCE */}
         <div className="flex flex-col">

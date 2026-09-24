@@ -1322,10 +1322,14 @@ export function drawCalloutVignette(
     ctx.shadowOffsetX = shadowOffsetX;
     ctx.shadowOffsetY = shadowOffsetY;
 
-    // Fill silhouette with shadow color so no white fringe or liseré can ever bleed into antialiasing
+    // Déport géométrique hors champ : projette uniquement le flou d'ombre portée
+    // sans déposer de silhouette sombre directement sous le tracé de découpe.
+    // Cela supprime définitivement le liseré sombre de crénelage (anti-aliasing bleed).
+    const SHADOW_OFFSET_HACK = 20000;
+    ctx.shadowOffsetX = shadowOffsetX + SHADOW_OFFSET_HACK;
     ctx.beginPath();
-    ctx.roundRect(vigX, vigY, vigW, vigH, borderRadius);
-    ctx.fillStyle = `rgba(0, 0, 0, ${shadowOpacity})`;
+    ctx.roundRect(vigX - SHADOW_OFFSET_HACK, vigY, vigW, vigH, borderRadius);
+    ctx.fillStyle = '#000000';
     ctx.fill();
 
     ctx.restore();

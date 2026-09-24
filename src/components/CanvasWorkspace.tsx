@@ -99,6 +99,7 @@ interface CanvasWorkspaceProps {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  isDarkMode?: boolean;
 }
 
 export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
@@ -166,6 +167,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onRedo,
   canUndo = false,
   canRedo = false,
+  isDarkMode = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -177,6 +179,17 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isAltPressed, setIsAltPressed] = useState<boolean>(false);
+  const [wheelMode, setWheelMode] = useState<'pan' | 'zoom'>(() => {
+    return (localStorage.getItem('canvas_wheel_mode') as 'pan' | 'zoom') || 'pan';
+  });
+
+  const handleToggleWheelMode = () => {
+    setWheelMode((prev) => {
+      const next = prev === 'pan' ? 'zoom' : 'pan';
+      localStorage.setItem('canvas_wheel_mode', next);
+      return next;
+    });
+  };
 
   // Drag & Resize State
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -1019,15 +1032,42 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     onSelectTool('select');
   };
 
-  // Photoshop-style wheel zoom
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (e.ctrlKey || e.metaKey || e.altKey) {
+  // Photoshop & Figma style navigation : Pan & Zoom sur la zone de travail
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleNativeWheel = (e: WheelEvent) => {
+      // Bloquer le scroll natif de la page parente
       e.preventDefault();
-      const delta = e.deltaY < 0 ? 0.1 : -0.1;
-      const nextZoom = Math.min(5, Math.max(0.25, Math.round((zoomLevel + delta) * 100) / 100));
-      setZoomLevel(nextZoom);
-    }
-  };
+
+      const isZoomModifier = e.ctrlKey || e.metaKey || e.altKey;
+      const shouldZoom = wheelMode === 'zoom' ? !e.shiftKey : isZoomModifier;
+
+      if (shouldZoom) {
+        // Zoom progressif fluide (pincement trackpad, Ctrl / Cmd / Alt + molette, ou mode Zoom)
+        const zoomDelta = e.deltaY < 0 ? 0.08 : -0.08;
+        setZoomLevel((prev) => Math.min(5, Math.max(0.25, Math.round((prev + zoomDelta) * 100) / 100)));
+      } else if (e.shiftKey) {
+        // Shift + Molette -> Défilement horizontal (Pan X)
+        setPanOffset((prev) => ({
+          x: Math.round(prev.x - (e.deltaY || e.deltaX)),
+          y: prev.y,
+        }));
+      } else {
+        // Molette souris standard ou défilement 2 doigts au trackpad -> Déplacement naturel (Pan)
+        setPanOffset((prev) => ({
+          x: Math.round(prev.x - e.deltaX),
+          y: Math.round(prev.y - e.deltaY),
+        }));
+      }
+    };
+
+    container.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', handleNativeWheel);
+    };
+  }, [wheelMode]);
 
   // Drag & drop local files
   const handleDragOver = (e: React.DragEvent) => {
@@ -1103,11 +1143,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="flex-1 max-w-3xl xl:max-w-4xl flex flex-col h-full max-h-[calc(100vh-7rem)] bg-white/70 backdrop-blur-xl border border-white/80 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-[#979797]/15 relative overflow-hidden select-none p-3.5 gap-3"
+      className={`flex-1 max-w-3xl xl:max-w-4xl flex flex-col h-full max-h-[calc(100vh-7rem)] backdrop-blur-xl rounded-3xl relative overflow-hidden select-none p-3.5 gap-3 transition-colors duration-200 ${
+        isDarkMode
+          ? 'bg-[#212121]/90 border border-[#333333] shadow-[0_8px_30px_rgba(0,0,0,0.4)] ring-1 ring-white/10 text-white'
+          : 'bg-white/70 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-[#979797]/15 text-[#000000]'
+      }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onWheel={handleWheel}
     >
       {/* Top Scene Bar */}
       <TopSceneBar
@@ -1121,6 +1164,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         onTogglePanMode={() => setIsPanMode(!isPanMode)}
         zoomLevel={zoomLevel}
         onSetZoom={setZoomLevel}
+        wheelMode={wheelMode}
+        onToggleWheelMode={handleToggleWheelMode}
         onAddFocus={onAddFocus}
         onDeleteFocus={() => selectedFocusId && onDeleteFocus?.(selectedFocusId)}
         hasSelectedFocus={!!selectedFocusId}
@@ -1132,10 +1177,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         onRedo={onRedo}
         canUndo={canUndo}
         canRedo={canRedo}
+        isDarkMode={isDarkMode}
       />
 
       {/* Main Canvas Viewport Area */}
-      <div className="flex-1 relative flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-[#eeeeee]/40 border border-white/60 shadow-inner">
+      <div className={`flex-1 relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border transition-colors duration-200 ${
+        isDarkMode
+          ? 'bg-[#181818] border-[#2c2c2c] shadow-inner'
+          : 'bg-[#eeeeee]/40 border-white/60 shadow-inner'
+      }`}>
         {/* Banner indicator if Preview Mode is ON */}
         {isPreviewMode && (
           <div className="absolute top-4 z-40 bg-[#0088cc]/90 text-white backdrop-blur-xl px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2.5 text-xs font-medium animate-in fade-in">
@@ -1214,6 +1264,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             onRedo={onRedo}
             canUndo={canUndo}
             canRedo={canRedo}
+            isDarkMode={isDarkMode}
           />
         )}
 
