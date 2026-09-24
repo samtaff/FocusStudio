@@ -93,6 +93,12 @@ interface StudioSettingsPanelProps {
   onUpdatePanelWidth?: (width: number) => void;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
+  // Sequential numbering across screenshot imports
+  sequentialImportNumbering?: boolean;
+  onToggleSequentialImportNumbering?: () => void;
+  nextSequentialStep?: number;
+  onChangeNextSequentialStep?: (step: number) => void;
+  onResetSequentialCounter?: () => void;
 }
 
 export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
@@ -147,6 +153,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   onUpdatePanelWidth,
   isDarkMode = false,
   onToggleDarkMode,
+  sequentialImportNumbering = true,
+  onToggleSequentialImportNumbering,
+  nextSequentialStep = 1,
+  onChangeNextSequentialStep,
+  onResetSequentialCounter,
 }) => {
   // Requirement: Toutes les sections doivent être fermées par défaut et se déplier SEULEMENT au clic !
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -291,6 +302,77 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                 <UploadCloud className="w-4 h-4 text-[#0088cc]" />
                 <span>Importer mon screenshot</span>
               </button>
+
+              {/* Suite logique des pastilles à l'import */}
+              <div className={`p-3 rounded-2xl border transition-colors flex flex-col gap-2 ${
+                isDarkMode ? 'bg-[#2a2a2a] border-[#383838]' : 'bg-[#eeeeee]/60 border-white'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-xs font-semibold ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
+                      Suite logique à l'import
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                      sequentialImportNumbering
+                        ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
+                        : isDarkMode ? 'bg-[#383838] text-[#888888]' : 'bg-[#e0e0e0] text-[#777777]'
+                    }`}>
+                      {sequentialImportNumbering ? 'Activée' : 'Désactivée'}
+                    </span>
+                  </div>
+
+                  {/* Toggle Switch */}
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sequentialImportNumbering}
+                      onChange={onToggleSequentialImportNumbering}
+                      className="sr-only peer"
+                    />
+                    <div className={`w-8 h-4 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#979797]/30 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#0088cc] ${
+                      isDarkMode ? 'bg-[#444444]' : 'bg-[#d0d0d0]'
+                    }`} />
+                  </label>
+                </div>
+
+                <p className={`text-[10px] leading-relaxed ${isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]'}`}>
+                  Incrémente automatiquement le numéro de la première pastille à chaque nouvel import dans la session (Étape 1, 2, 3...).
+                </p>
+
+                {sequentialImportNumbering && (
+                  <div className={`pt-2 border-t flex items-center justify-between text-[11px] ${
+                    isDarkMode ? 'border-[#383838]' : 'border-white/80'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <span className={isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]'}>Prochaine pastille :</span>
+                      <div className="w-16">
+                        <NumericInput
+                          value={nextSequentialStep}
+                          onChange={(val) => onChangeNextSequentialStep?.(Math.max(1, Math.round(val)))}
+                          min={1}
+                          max={99}
+                        />
+                      </div>
+                    </div>
+
+                    {onResetSequentialCounter && (
+                      <button
+                        type="button"
+                        onClick={onResetSequentialCounter}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer ${
+                          isDarkMode
+                            ? 'bg-[#383838] hover:bg-[#444444] text-[#cccccc] hover:text-white'
+                            : 'bg-white hover:bg-white/80 text-[#555555] hover:text-black border border-[#d6d6d6]'
+                        }`}
+                        title="Réinitialiser la suite à l'étape 1"
+                      >
+                        <RotateCcw className="w-2.5 h-2.5" />
+                        <span>Recommencer à 1</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Redimensionnement automatique explicite */}
               <div className="p-3 rounded-2xl bg-[#eeeeee]/50 border border-white text-[11px] text-[#000000] flex flex-col gap-0.5">
@@ -515,6 +597,13 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             </button>
                           )}
                         </div>
+
+                        {sequentialImportNumbering && (
+                          <div className="flex items-center justify-between text-[10px] text-[#666666] dark:text-[#aaaaaa] pt-0.5">
+                            <span>Suite logique active</span>
+                            <span className="font-semibold text-[#0088cc]">Prochain import débutera à #{nextSequentialStep}</span>
+                          </div>
+                        )}
 
                         {/* Règle automatique Pair / Impair */}
                         <div className="flex flex-col gap-1.5 pt-1">

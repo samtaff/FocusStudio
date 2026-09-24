@@ -194,8 +194,35 @@ export default function App() {
     setHistoryIndex((prev) => Math.min(prev + 1, 29));
   }, [historyIndex]);
 
+  // Option : Suite logique des pastilles lors de l'import de screenshots
+  const [sequentialImportNumbering, setSequentialImportNumbering] = useState<boolean>(() => {
+    const saved = localStorage.getItem('sequential_import_numbering');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [sessionImportCount, setSessionImportCount] = useState<number>(0);
+  const [nextSequentialStep, setNextSequentialStep] = useState<number>(1);
+
+  const sequentialImportNumberingRef = useRef(sequentialImportNumbering);
+  sequentialImportNumberingRef.current = sequentialImportNumbering;
+
+  const nextSequentialStepRef = useRef(nextSequentialStep);
+  nextSequentialStepRef.current = nextSequentialStep;
+
+  const handleToggleSequentialImportNumbering = () => {
+    setSequentialImportNumbering((prev) => {
+      const next = !prev;
+      localStorage.setItem('sequential_import_numbering', String(next));
+      return next;
+    });
+  };
+
+  const handleResetSequentialCounter = () => {
+    setNextSequentialStep(1);
+    setSessionImportCount(0);
+  };
+
   // Load an image from a Data URL
-  const loadImageFromDataUrl = useCallback(async (dataUrl: string, name: string) => {
+  const loadImageFromDataUrl = useCallback(async (dataUrl: string, name: string, isUserImport: boolean = false) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
 
@@ -237,9 +264,16 @@ export default function App() {
     const defaultY = Math.round(bounds.bgY + bounds.bgHeight * 0.42);
     const defaultZoom = bounds.bgWidth > 0 ? Number((defaultFocusW / bounds.bgWidth).toFixed(3)) : 1.0;
 
+    let initialStepNumber = 1;
+    if (isUserImport && sequentialImportNumberingRef.current) {
+      initialStepNumber = nextSequentialStepRef.current;
+      setNextSequentialStep(initialStepNumber + 1);
+      setSessionImportCount((c) => c + 1);
+    }
+
     const initialFocus: FocusZone = {
       id: `focus-${Date.now()}`,
-      name: 'Zone 1',
+      name: `Zone ${initialStepNumber}`,
       x: defaultX,
       y: defaultY,
       width: defaultFocusW,
@@ -250,7 +284,7 @@ export default function App() {
       borderWidth: 2,
       borderColor: BASE_COLOR,
       borderRadius: 10,
-      stepNumber: 1,
+      stepNumber: initialStepNumber,
       showStepBadge: true,
       badgePosition: 'auto',
       badgeColor: BASE_COLOR,
@@ -289,14 +323,14 @@ export default function App() {
   const handleImportFile = async (file: File) => {
     try {
       const { dataUrl, name } = await processImportedImageFile(file);
-      await loadImageFromDataUrl(dataUrl, name);
+      await loadImageFromDataUrl(dataUrl, name, true);
     } catch (err) {
       console.warn('Advanced image processing fallback:', err);
       const reader = new FileReader();
       reader.onload = (e) => {
         const dataUrl = e.target?.result as string;
         if (dataUrl) {
-          loadImageFromDataUrl(dataUrl, file.name);
+          loadImageFromDataUrl(dataUrl, file.name, true);
         }
       };
       reader.readAsDataURL(file);
@@ -308,7 +342,7 @@ export default function App() {
     const preset = SAMPLE_PRESETS.find((p) => p.id === id);
     if (preset) {
       const dataUrl = await preset.generate();
-      loadImageFromDataUrl(dataUrl, preset.name);
+      loadImageFromDataUrl(dataUrl, preset.name, true);
     }
   };
 
@@ -342,7 +376,8 @@ export default function App() {
   // Add Focus Zone: default width = 240px, default zoom = screenshot width in focus zone (240px)
   const handleAddFocus = () => {
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
-    const nextStep = focuses.length + 1;
+    const maxExisting = focuses.reduce((max, f) => Math.max(max, f.stepNumber || 0), 0);
+    const nextStep = maxExisting > 0 ? maxExisting + 1 : focuses.length + 1;
     const defaultFocusW = 240;
     const defaultFocusH = 50;
     const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
@@ -381,11 +416,16 @@ export default function App() {
     setFocuses(updated);
     handleSelectFocus(newFocus.id);
     recordHistory(updated);
+
+    if (sequentialImportNumberingRef.current) {
+      setNextSequentialStep((prev) => Math.max(prev, nextStep + 1));
+    }
   };
 
   const handleAddFocusAt = (x: number, y: number, w?: number, h = 50, label?: string) => {
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
-    const nextStep = focuses.length + 1;
+    const maxExisting = focuses.reduce((max, f) => Math.max(max, f.stepNumber || 0), 0);
+    const nextStep = maxExisting > 0 ? maxExisting + 1 : focuses.length + 1;
     const defaultFocusW = 240;
     const focusW = w !== undefined ? w : defaultFocusW;
     const defaultZoom = bounds.bgWidth > 0 ? Number((focusW / bounds.bgWidth).toFixed(3)) : 1.0;
@@ -420,6 +460,10 @@ export default function App() {
     setFocuses(updated);
     handleSelectFocus(newFocus.id);
     recordHistory(updated);
+
+    if (sequentialImportNumberingRef.current) {
+      setNextSequentialStep((prev) => Math.max(prev, nextStep + 1));
+    }
   };
 
   // Center Focus Horizontally on the screenshot (symmetrical overflow)
@@ -1341,6 +1385,11 @@ export default function App() {
           onUpdatePanelWidth={setPanelWidth}
           isDarkMode={isDarkMode}
           onToggleDarkMode={handleToggleDarkMode}
+          sequentialImportNumbering={sequentialImportNumbering}
+          onToggleSequentialImportNumbering={handleToggleSequentialImportNumbering}
+          nextSequentialStep={nextSequentialStep}
+          onChangeNextSequentialStep={setNextSequentialStep}
+          onResetSequentialCounter={handleResetSequentialCounter}
         />
       </div>
 
