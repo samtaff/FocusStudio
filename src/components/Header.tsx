@@ -1,20 +1,16 @@
 import React, { useRef } from 'react';
 import { 
-  Download, 
-  Upload, 
   Copy, 
   HelpCircle, 
   Check,
-  Layers,
-  Sparkles,
   ArrowRight
 } from 'lucide-react';
 
 interface HeaderProps {
-  onImportFile: (file: File) => void;
-  onExportPng: () => void;
+  onImportFile?: (file: File) => void;
+  onExportPng?: () => void;
   onCopyClipboard: () => void;
-  isExporting: boolean;
+  isExporting?: boolean;
   copied: boolean;
   onOpenShortcuts: () => void;
   hasImage: boolean;
@@ -79,27 +75,17 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="h-4 w-px bg-[#eeeeee] mx-1 hidden md:block" />
       </div>
 
-      {/* Right Controls: Import, Copy, Export */}
+      {/* Right Controls: Copy, Shortcuts */}
       <div className="flex items-center gap-2">
         {/* Hidden File Input */}
         <input
+          id="header-file-input"
           type="file"
           ref={fileInputRef}
           onChange={handleFileInputChange}
           accept="image/*,.heic,.heif"
           className="hidden"
         />
-
-        {/* Import Image */}
-        <button
-          id="header-import-button"
-          onClick={() => fileInputRef.current?.click()}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000] text-xs font-medium transition-all hover:scale-[1.02] active:scale-[0.98]"
-          title="Importer votre capture d'écran"
-        >
-          <Upload className="w-3.5 h-3.5 text-[#0088cc]" />
-          <span className="hidden sm:inline">Importer</span>
-        </button>
 
         {/* Copy to Clipboard */}
         <button
@@ -120,18 +106,6 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="hidden md:inline">Copier</span>
             </>
           )}
-        </button>
-
-        {/* Primary Export Button */}
-        <button
-          id="header-export-button"
-          onClick={onExportPng}
-          disabled={!hasImage || isExporting}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#0088cc] hover:bg-[#0077b3] text-white text-xs font-semibold shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40"
-          title="Télécharger le fichier PNG transparent"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span>{isExporting ? 'Exportation...' : 'Télécharger PNG'}</span>
         </button>
 
         {/* Shortcuts / Help */}

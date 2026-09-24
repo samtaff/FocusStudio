@@ -16,8 +16,8 @@ import { GlobalStyleSettings } from '../types';
 import { NumericInput } from './NumericInput';
 
 interface TopSceneBarProps {
-  screenWidth: number;
-  screenHeight: number;
+  screenWidth?: number;
+  screenHeight?: number;
   globalStyles: GlobalStyleSettings;
   onUpdateGlobalStyles: (updated: Partial<GlobalStyleSettings>) => void;
   onAddGuideH: () => void;
@@ -69,7 +69,7 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
 
   return (
     <div className="w-full bg-white/70 backdrop-blur-xl border border-[#eeeeee] rounded-2xl px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 shadow-xs text-xs select-none">
-      {/* Left: Title + Dimensions Badge + Undo/Redo Pills */}
+      {/* Left: Title + Undo/Redo Pills */}
       <div className="flex items-center gap-2">
         <span className="font-semibold text-[#000000] tracking-tight text-xs">
           Scène Studio
@@ -86,17 +86,6 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
             <Maximize2 className="w-3.5 h-3.5 text-[#666666]" />
             <span>Recentrer</span>
           </button>
-        )}
-
-        {isCalloutMode ? (
-          <span className="px-2.5 py-0.5 rounded-full bg-[#0088cc]/10 text-[#0088cc] border border-[#0088cc]/20 font-medium text-[11px] flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#0088cc] animate-pulse" />
-            Mode Callout ({screenWidth} × {screenHeight} px)
-          </span>
-        ) : (
-          <span className="px-2.5 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono text-[11px] font-medium">
-            {screenWidth} × {screenHeight} px
-          </span>
         )}
 
         {/* Undo / Redo Pills */}
@@ -179,20 +168,6 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           <Ruler className="w-3.5 h-3.5" />
           <span>Règles {showRulers ? 'ON' : 'OFF'}</span>
         </button>
-
-        {/* Réglage Zone de travail */}
-        <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#eeeeee]/80 text-[11px]">
-          <span className="text-[#666666] font-medium">Zone :</span>
-          <div className="w-18">
-            <NumericInput
-              value={globalStyles.workspaceWidth || 260}
-              onChange={(w) => onUpdateGlobalStyles({ workspaceWidth: Math.min(500, Math.max(200, w)) })}
-              min={200}
-              max={500}
-              unit="px"
-            />
-          </div>
-        </div>
       </div>
 
       {/* Right: Zoom controls */}

@@ -500,6 +500,20 @@ export default function App() {
     if (selectedBlurId === id) setSelectedBlurId(null);
   };
 
+  const handleDuplicateBlurZone = (id: string) => {
+    const target = blurZones.find((b) => b.id === id);
+    if (!target) return;
+    const duplicated: BlurZone = {
+      ...target,
+      id: `blur-${Date.now()}`,
+      name: `${target.name} (copie)`,
+      x: target.x + 15,
+      y: target.y + 15,
+    };
+    setBlurZones((prev) => [...prev, duplicated]);
+    handleSelectBlur(duplicated.id);
+  };
+
   // Mask Shape Management (Blue forms)
   const handleAddMaskShape = (x?: number, y?: number) => {
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
@@ -529,6 +543,20 @@ export default function App() {
     if (selectedMaskId === id) setSelectedMaskId(null);
   };
 
+  const handleDuplicateMaskShape = (id: string) => {
+    const target = maskShapes.find((m) => m.id === id);
+    if (!target) return;
+    const duplicated: MaskShape = {
+      ...target,
+      id: `mask-${Date.now()}`,
+      name: `${target.name} (copie)`,
+      x: target.x + 15,
+      y: target.y + 15,
+    };
+    setMaskShapes((prev) => [...prev, duplicated]);
+    handleSelectMask(duplicated.id);
+  };
+
   // Triangle Shape Management (15x13px, #25465F ou blanc)
   const handleAddTriangle = (x?: number, y?: number) => {
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
@@ -556,6 +584,20 @@ export default function App() {
   const handleDeleteTriangle = (id: string) => {
     setTriangles((prev) => prev.filter((t) => t.id !== id));
     if (selectedTriangleId === id) setSelectedTriangleId(null);
+  };
+
+  const handleDuplicateTriangle = (id: string) => {
+    const target = triangles.find((t) => t.id === id);
+    if (!target) return;
+    const duplicated: TriangleShape = {
+      ...target,
+      id: `triangle-${Date.now()}`,
+      name: `${target.name} (copie)`,
+      x: target.x + 15,
+      y: target.y + 15,
+    };
+    setTriangles((prev) => [...prev, duplicated]);
+    handleSelectTriangle(duplicated.id);
   };
 
   // Callout / Vignette zoom détaché management
@@ -1147,6 +1189,7 @@ export default function App() {
           onRenumberFocuses={handleAutoRenumberFocuses}
           onAddFocus={handleAddFocus}
           onDeleteFocus={handleDeleteFocus}
+          onDuplicateFocus={handleDuplicateFocus}
           onAddFocusAt={handleAddFocusAt}
           blurZones={blurZones}
           selectedBlurId={selectedBlurId}
@@ -1155,6 +1198,7 @@ export default function App() {
           onAddBlurAt={handleAddBlurZone}
           onUpdateBlur={handleUpdateBlurZone}
           onDeleteBlur={handleDeleteBlurZone}
+          onDuplicateBlur={handleDuplicateBlurZone}
           maskShapes={maskShapes}
           selectedMaskId={selectedMaskId}
           onSelectMask={handleSelectMask}
@@ -1162,6 +1206,7 @@ export default function App() {
           onAddMaskAt={handleAddMaskShape}
           onUpdateMask={handleUpdateMaskShape}
           onDeleteMask={handleDeleteMaskShape}
+          onDuplicateMask={handleDuplicateMaskShape}
           triangles={triangles}
           selectedTriangleId={selectedTriangleId}
           onSelectTriangle={handleSelectTriangle}
@@ -1169,6 +1214,7 @@ export default function App() {
           onAddTriangleAt={handleAddTriangle}
           onUpdateTriangle={handleUpdateTriangle}
           onDeleteTriangle={handleDeleteTriangle}
+          onDuplicateTriangle={handleDuplicateTriangle}
           calloutVignette={calloutVignette}
           selectedCalloutPart={selectedCalloutPart}
           onSelectCalloutPart={handleSelectCalloutPart}
@@ -1199,7 +1245,7 @@ export default function App() {
           onExportClick={handleExportPng}
           isExporting={isExporting}
           onImportClick={() => {
-            const el = document.getElementById('header-import-button');
+            const el = document.getElementById('header-file-input') || document.getElementById('header-import-button');
             el?.click();
           }}
         />

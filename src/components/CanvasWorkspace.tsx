@@ -33,6 +33,7 @@ interface CanvasWorkspaceProps {
   onRenumberFocuses?: () => void;
   onAddFocus: () => void;
   onDeleteFocus?: (id: string) => void;
+  onDuplicateFocus?: (id: string) => void;
   onAddFocusAt: (x: number, y: number, w?: number, h?: number, label?: string) => void;
   // Blur Zones
   blurZones: BlurZone[];
@@ -42,6 +43,7 @@ interface CanvasWorkspaceProps {
   onAddBlurAt: (x: number, y: number) => void;
   onUpdateBlur: (id: string, updated: Partial<BlurZone>) => void;
   onDeleteBlur: (id: string) => void;
+  onDuplicateBlur?: (id: string) => void;
   // Mask Shapes
   maskShapes: MaskShape[];
   selectedMaskId: string | null;
@@ -50,6 +52,7 @@ interface CanvasWorkspaceProps {
   onAddMaskAt: (x: number, y: number) => void;
   onUpdateMask: (id: string, updated: Partial<MaskShape>) => void;
   onDeleteMask: (id: string) => void;
+  onDuplicateMask?: (id: string) => void;
   // Triangle Shapes (15x13px)
   triangles?: TriangleShape[];
   selectedTriangleId?: string | null;
@@ -58,6 +61,7 @@ interface CanvasWorkspaceProps {
   onAddTriangleAt?: (x: number, y: number) => void;
   onUpdateTriangle?: (id: string, updated: Partial<TriangleShape>) => void;
   onDeleteTriangle?: (id: string) => void;
+  onDuplicateTriangle?: (id: string) => void;
   // Callout Vignette
   calloutVignette?: CalloutVignette | null;
   selectedCalloutPart?: 'source' | 'vignette' | null;
@@ -106,6 +110,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onRenumberFocuses,
   onAddFocus,
   onDeleteFocus,
+  onDuplicateFocus,
   onAddFocusAt,
   blurZones,
   selectedBlurId,
@@ -114,6 +119,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onAddBlurAt,
   onUpdateBlur,
   onDeleteBlur,
+  onDuplicateBlur,
   maskShapes,
   selectedMaskId,
   onSelectMask,
@@ -121,6 +127,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onAddMaskAt,
   onUpdateMask,
   onDeleteMask,
+  onDuplicateMask,
   triangles = [],
   selectedTriangleId = null,
   onSelectTriangle,
@@ -128,6 +135,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onAddTriangleAt,
   onUpdateTriangle,
   onDeleteTriangle,
+  onDuplicateTriangle,
   calloutVignette,
   selectedCalloutPart = null,
   onSelectCalloutPart,
@@ -1152,11 +1160,33 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             onSelectTool={onSelectTool}
             onAddFocus={onAddFocus}
             onDeleteFocus={() => selectedFocusId && onDeleteFocus?.(selectedFocusId)}
+            onDeleteFocusWithId={(id) => onDeleteFocus?.(id)}
+            onDuplicateFocus={onDuplicateFocus}
             onAddBlur={onAddBlur}
+            blurZones={blurZones}
+            selectedBlurId={selectedBlurId}
+            onSelectBlur={onSelectBlur}
+            onDeleteBlur={onDeleteBlur}
+            onDuplicateBlur={onDuplicateBlur}
+            onUpdateBlur={onUpdateBlur}
             onAddMask={onAddMask}
+            maskShapes={maskShapes}
+            selectedMaskId={selectedMaskId}
+            onSelectMask={onSelectMask}
+            onDeleteMask={onDeleteMask}
+            onDuplicateMask={onDuplicateMask}
+            onUpdateMask={onUpdateMask}
             onAddTriangle={onAddTriangle}
+            triangles={triangles}
+            selectedTriangleId={selectedTriangleId}
+            onSelectTriangle={onSelectTriangle}
+            onDeleteTriangle={onDeleteTriangle}
+            onDuplicateTriangle={onDuplicateTriangle}
+            onUpdateTriangle={onUpdateTriangle}
+            calloutVignette={calloutVignette}
             hasCallout={!!calloutVignette?.enabled}
             onToggleCallout={onToggleCallout}
+            onUpdateCallout={onUpdateCallout}
             isPanMode={isPanMode}
             onTogglePanMode={() => setIsPanMode(!isPanMode)}
             isDetecting={false}
@@ -1178,7 +1208,6 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             }}
             onRenumberFocuses={onRenumberFocuses}
             onHoverFocus={(id) => setHoveredFocusId(id)}
-            onDeleteFocusWithId={(id) => onDeleteFocus?.(id)}
             isPreviewMode={isPreviewMode}
             onTogglePreview={onTogglePreview}
             onUndo={onUndo}
