@@ -73,6 +73,8 @@ export interface AnnotationArrow {
   label?: string;
 }
 
+export type BlurType = 'gaussian' | 'frosted' | 'pixelate' | 'smoked';
+
 export interface BlurZone {
   id: string;
   name: string;
@@ -80,8 +82,11 @@ export interface BlurZone {
   y: number;
   width: number;
   height: number;
-  blurRadius: number; // in pixels, e.g. 10
+  blurRadius: number; // in pixels (intensity), e.g. 12
   borderRadius?: number; // e.g. 4
+  blurType?: BlurType; // 'gaussian' | 'frosted' | 'pixelate' | 'smoked' (default 'frosted')
+  opacity?: number; // 0 to 1, default 1.0 (100%)
+  pixelSize?: number; // for pixelate mode
 }
 
 export interface MaskShape {

@@ -818,7 +818,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     }
     setHoveredHandle(null);
 
-    // FLUID HOVER DETECTION OVER ALL ELEMENTS (Callout -> Triangle -> Mask -> Blur -> Focus)
+    // FLUID HOVER DETECTION OVER ALL ELEMENTS (Strict layering: Callout -> Triangle -> Mask -> Focus -> Blur)
     const hCallout = getCalloutPartAtCoord(cx, cy);
     setHoveredCalloutPart(hCallout);
 
@@ -828,11 +828,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const hMask = getMaskAtCoord(cx, cy);
     setHoveredMaskId(hMask ? hMask.id : null);
 
-    const hBlur = getBlurAtCoord(cx, cy);
-    setHoveredBlurId(hBlur ? hBlur.id : null);
-
     const hFocus = getFocusAtCoord(cx, cy);
     setHoveredFocusId(hFocus ? hFocus.id : null);
+
+    // Blur is strictly underneath all other elements (Callout, Triangle, Mask, Focus)
+    const hasElementAbove = Boolean(hCallout || hTri || hMask || hFocus);
+    const hBlur = hasElementAbove ? null : getBlurAtCoord(cx, cy);
+    setHoveredBlurId(hBlur ? hBlur.id : null);
   };
 
   // Mouse Down
@@ -1013,28 +1015,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 6. PRIORITY SELECTION: Check clicked Blur Zone (fluid selection without focus interference)
-    const clickedBlur = getBlurAtCoord(cx, cy);
-    if (clickedBlur) {
-      updateSelectedCallout(null);
-      onSelectBlur(clickedBlur.id);
-      onSelectFocus(null);
-      onSelectMask(null);
-      onSelectTriangle?.(null);
-      setDragBlurState({
-        id: clickedBlur.id,
-        startX: cx,
-        startY: cy,
-        initialX: clickedBlur.x,
-        initialY: clickedBlur.y,
-        initialW: clickedBlur.width,
-        initialH: clickedBlur.height,
-        handle: null,
-      });
-      return;
-    }
-
-    // 7. Check if clicking on any focus zone
+    // 6. PRIORITY SELECTION: Check clicked Focus Zone (Focus is strictly above blur zones)
     const clickedFocus = getFocusAtCoord(cx, cy);
     if (clickedFocus) {
       updateSelectedCallout(null);
@@ -1067,6 +1048,27 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         startY: cy,
         initialFocus: { ...clickedFocus },
         initialArrow: attachedArrow ? { ...attachedArrow } : undefined,
+      });
+      return;
+    }
+
+    // 7. PRIORITY SELECTION: Check clicked Blur Zone (Underneath all objects)
+    const clickedBlur = getBlurAtCoord(cx, cy);
+    if (clickedBlur) {
+      updateSelectedCallout(null);
+      onSelectBlur(clickedBlur.id);
+      onSelectFocus(null);
+      onSelectMask(null);
+      onSelectTriangle?.(null);
+      setDragBlurState({
+        id: clickedBlur.id,
+        startX: cx,
+        startY: cy,
+        initialX: clickedBlur.x,
+        initialY: clickedBlur.y,
+        initialW: clickedBlur.width,
+        initialH: clickedBlur.height,
+        handle: null,
       });
       return;
     }
@@ -1293,21 +1295,6 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           ? 'bg-[#181818] border-[#2c2c2c] shadow-inner'
           : 'bg-[#eeeeee]/40 border-white/60 shadow-inner'
       }`}>
-        {/* Banner indicator if Preview Mode is ON */}
-        {isPreviewMode && (
-          <div className="absolute top-4 z-40 bg-[#0088cc]/90 text-white backdrop-blur-xl px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2.5 text-xs font-medium animate-in fade-in">
-            <Eye className="w-3.5 h-3.5" />
-            <span>Mode Prévisualisation (rendu final net sans repères)</span>
-            <button
-              onClick={onTogglePreview}
-              className="ml-2 hover:bg-white/20 p-0.5 rounded-full transition-colors"
-              title="Quitter la prévisualisation"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
         {/* Banner indicator if Internal Framing Mode is ON */}
         {!isPreviewMode && internalFramingFocusId && selectedFocus && (
           <div className="absolute top-4 z-40 bg-[#25465F]/95 text-white backdrop-blur-xl px-4 py-2 rounded-2xl shadow-xl border border-sky-400/40 flex items-center gap-3 text-xs font-medium animate-in fade-in slide-in-from-top-2 select-none">

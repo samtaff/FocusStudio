@@ -23,7 +23,9 @@ import {
   Sun,
   Moon,
   Move,
-  Crosshair
+  Crosshair,
+  Grid,
+  Shield
 } from 'lucide-react';
 import { 
   FocusZone, 
@@ -1307,7 +1309,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
           )}
         </div>
 
-        {/* 4. FLOU GAUSSIEN (Pour n'importe quelle zone) */}
+        {/* 4. ZONES DE FLOU & CONFIDENTIALITÉ (Toujours sous toutes les autres formes) */}
         <div className="flex flex-col">
           <div className="w-full px-4 py-3.5 flex items-center justify-between font-semibold text-[#000000] hover:bg-[#eeeeee]/40 transition-colors">
             <button
@@ -1315,7 +1317,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
               className="flex items-center gap-2 text-left"
             >
               <Droplet className="w-3.5 h-3.5 text-[#0088cc]" />
-              <span className="text-[11px] tracking-wide uppercase">4. Flou Gaussien</span>
+              <span className="text-[11px] tracking-wide uppercase">4. Flou & Confidentialité</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono font-medium">
                 {blurZones.length}
               </span>
@@ -1375,9 +1377,12 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
               )}
 
               {activeBlur ? (
-                <div className="flex flex-col gap-2.5 p-3 rounded-2xl bg-[#eeeeee]/50 border border-white">
+                <div className="flex flex-col gap-3 p-3.5 rounded-2xl bg-[#eeeeee]/50 border border-white">
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold text-[#000000] text-xs">{activeBlur.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-[#0088cc]" />
+                      <span className="font-semibold text-[#000000] text-xs">{activeBlur.name}</span>
+                    </div>
                     <button
                       onClick={() => onDeleteBlur(activeBlur.id)}
                       className="text-[#666666] hover:text-rose-600 text-[10px] font-medium transition-colors"
@@ -1386,16 +1391,74 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </button>
                   </div>
 
-                  {/* Rayon de flou gaussien */}
-                  <div className="flex flex-col gap-1">
+                  {/* 1. Sélecteur de Type de Flou (Dépoli, Gaussien, Mosaïque, Fumé) */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] uppercase font-semibold text-[#666666] tracking-wider">
+                      Style de rendu
+                    </span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {[
+                        { 
+                          id: 'frosted', 
+                          label: 'Dépoli', 
+                          desc: 'Verre givré laiteux', 
+                          icon: <Sparkles className="w-3.5 h-3.5" /> 
+                        },
+                        { 
+                          id: 'gaussian', 
+                          label: 'Gaussien', 
+                          desc: 'Optique doux', 
+                          icon: <Droplet className="w-3.5 h-3.5" /> 
+                        },
+                        { 
+                          id: 'pixelate', 
+                          label: 'Mosaïque', 
+                          desc: 'Pixellisé net', 
+                          icon: <Grid className="w-3.5 h-3.5" /> 
+                        },
+                        { 
+                          id: 'smoked', 
+                          label: 'Fumé', 
+                          desc: 'Sombre discret', 
+                          icon: <Layers className="w-3.5 h-3.5" /> 
+                        },
+                      ].map((style) => {
+                        const isCurrent = (activeBlur.blurType || 'frosted') === style.id;
+                        return (
+                          <button
+                            key={style.id}
+                            onClick={() => onUpdateBlur(activeBlur.id, { blurType: style.id as any })}
+                            className={`flex flex-col items-start p-2 rounded-xl border text-left transition-all ${
+                              isCurrent
+                                ? 'bg-[#0088cc] border-[#0088cc] text-white shadow-2xs'
+                                : 'bg-white border-[#e5e5e5] text-[#333333] hover:border-[#cccccc]'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 font-semibold text-xs">
+                              {style.icon}
+                              <span>{style.label}</span>
+                            </div>
+                            <span className={`text-[10px] mt-0.5 ${isCurrent ? 'text-white/80' : 'text-[#888888]'}`}>
+                              {style.desc}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 2. Intensité du flou / Taille mosaïque */}
+                  <div className="flex flex-col gap-1 pt-1">
                     <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-[#666666]">Rayon de flou</span>
+                      <span className="text-[#666666] font-medium">
+                        {(activeBlur.blurType || 'frosted') === 'pixelate' ? 'Taille des pavés (pixels)' : 'Intensité du flou'}
+                      </span>
                       <div className="w-16">
                         <NumericInput
                           value={activeBlur.blurRadius}
                           onChange={(r) => onUpdateBlur(activeBlur.id, { blurRadius: Math.max(2, r) })}
                           min={2}
-                          max={40}
+                          max={50}
                           unit="px"
                         />
                       </div>
@@ -1403,38 +1466,84 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     <input
                       type="range"
                       min="2"
-                      max="30"
+                      max="45"
                       value={activeBlur.blurRadius}
                       onChange={(e) => onUpdateBlur(activeBlur.id, { blurRadius: parseInt(e.target.value) })}
                       className="accent-[#0088cc]"
                     />
                   </div>
 
-                  {/* Dimensions du flou */}
-                  <div className="grid grid-cols-2 gap-2 pt-1">
+                  {/* 3. Opacité du flou (10% à 100%) */}
+                  <div className="flex flex-col gap-1.5 pt-2 border-t border-[#eeeeee]">
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-[#666666] font-medium">Opacité du flou</span>
+                      <div className="w-16">
+                        <NumericInput
+                          value={Math.round((activeBlur.opacity ?? 1.0) * 100)}
+                          onChange={(val) => onUpdateBlur(activeBlur.id, { opacity: Math.max(0.1, Math.min(1, val / 100)) })}
+                          min={10}
+                          max={100}
+                          unit="%"
+                        />
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min="10"
+                      max="100"
+                      step="5"
+                      value={Math.round((activeBlur.opacity ?? 1.0) * 100)}
+                      onChange={(e) => onUpdateBlur(activeBlur.id, { opacity: parseInt(e.target.value) / 100 })}
+                      className="accent-[#0088cc]"
+                    />
+                    {/* Presets rapides d'opacité */}
+                    <div className="flex gap-1.5">
+                      {[
+                        { label: '30%', val: 0.3 },
+                        { label: '50%', val: 0.5 },
+                        { label: '80%', val: 0.8 },
+                        { label: '100%', val: 1.0 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          onClick={() => onUpdateBlur(activeBlur.id, { opacity: preset.val })}
+                          className={`flex-1 py-1 rounded-full text-[10px] font-medium transition-all ${
+                            Math.abs((activeBlur.opacity ?? 1.0) - preset.val) < 0.05
+                              ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
+                              : 'bg-white border border-[#e5e5e5] text-[#666666] hover:text-[#000000]'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 4. Dimensions du flou */}
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#eeeeee]">
                     <div>
-                      <label className="text-[10px] text-[#666666]">Largeur</label>
+                      <label className="text-[10px] text-[#666666] font-medium">Largeur</label>
                       <NumericInput
                         value={Math.round(activeBlur.width)}
-                        onChange={(w) => onUpdateBlur(activeBlur.id, { width: Math.max(20, w) })}
-                        min={20}
-                        max={500}
+                        onChange={(w) => onUpdateBlur(activeBlur.id, { width: Math.max(15, w) })}
+                        min={15}
+                        max={800}
                         unit="px"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-[#666666]">Hauteur</label>
+                      <label className="text-[10px] text-[#666666] font-medium">Hauteur</label>
                       <NumericInput
                         value={Math.round(activeBlur.height)}
                         onChange={(h) => onUpdateBlur(activeBlur.id, { height: Math.max(10, h) })}
                         min={10}
-                        max={400}
+                        max={600}
                         unit="px"
                       />
                     </div>
                   </div>
 
-                  {/* Arrondis des angles de la forme (Flou) */}
+                  {/* 5. Arrondis des angles de la forme (Flou) */}
                   <div className="flex flex-col gap-1.5 pt-2 border-t border-[#eeeeee]">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-[#666666] font-medium">Angles de la forme (arrondi)</span>
@@ -1448,16 +1557,14 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         />
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min="0"
-                        max="30"
-                        value={activeBlur.borderRadius ?? 4}
-                        onChange={(e) => onUpdateBlur(activeBlur.id, { borderRadius: parseInt(e.target.value) })}
-                        className="flex-1 accent-[#0088cc]"
-                      />
-                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="30"
+                      value={activeBlur.borderRadius ?? 4}
+                      onChange={(e) => onUpdateBlur(activeBlur.id, { borderRadius: parseInt(e.target.value) })}
+                      className="accent-[#0088cc]"
+                    />
                     {/* Presets rapides d'angles */}
                     <div className="flex gap-1.5 mt-0.5">
                       {[
@@ -1472,13 +1579,19 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           className={`flex-1 py-1 px-1.5 rounded-full text-[10px] font-medium transition-all ${
                             (activeBlur.borderRadius ?? 4) === preset.val
                               ? 'bg-[#000000] text-white shadow-2xs font-semibold'
-                              : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                              : 'bg-white border border-[#e5e5e5] text-[#666666] hover:text-[#000000]'
                           }`}
                         >
                           {preset.label}
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Note d'information de superposition */}
+                  <div className="p-2 rounded-xl bg-sky-50/80 border border-sky-100 flex items-center gap-1.5 text-[10px] text-sky-800">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0088cc] shrink-0" />
+                    <span>Les flous restent toujours situés <b>en dessous</b> des zones de focus, formes et vignettes.</span>
                   </div>
                 </div>
               ) : (
@@ -2246,7 +2359,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       return (
                         <>
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-semibold text-[#000000]">Niveau de zoom</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-[#ff007f] shadow-[0_0_6px_#ff007f] inline-block shrink-0" title="Cible loupe rose fluo sur la capture" />
+                              <span className="text-[10px] font-semibold text-[#000000] dark:text-white">Cible loupe & zoom</span>
+                            </div>
                             <div className="flex items-center gap-1.5">
                               {/* Saisie directe du niveau de zoom */}
                               <div className="flex items-center bg-white border border-[#eeeeee] rounded-lg px-2 py-0.5 shadow-2xs">
@@ -2482,11 +2598,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-full text-xs font-semibold transition-all ${
                     isPreviewMode
                       ? 'bg-[#0088cc] text-white shadow-2xs'
-                      : 'bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000]'
+                      : 'bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000] dark:bg-[#333333] dark:hover:bg-[#3e3e3e] dark:text-white'
                   }`}
                 >
                   <Eye className="w-4 h-4" />
-                  <span>{isPreviewMode ? 'Quitter la prévisualisation' : 'Mode Prévisualisation (Aperçu net)'}</span>
+                  <span>{isPreviewMode ? 'Fermer l\'aperçu' : 'Prévisualisation & Zoom (Aperçu net)'}</span>
                 </button>
               )}
 

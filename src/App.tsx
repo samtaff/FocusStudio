@@ -15,6 +15,7 @@ import { Header } from './components/Header';
 import { CanvasWorkspace } from './components/CanvasWorkspace';
 import { StudioSettingsPanel } from './components/StudioSettingsPanel';
 import { ShortcutsModal } from './components/ShortcutsModal';
+import { PreviewModal } from './components/PreviewModal';
 import { ToolType } from './components/VerticalToolPalette';
 import { SAMPLE_PRESETS } from './utils/sampleImages';
 import { detectInterfaceElements } from './utils/detection';
@@ -623,7 +624,10 @@ export default function App() {
       y: posY,
       width: 100,
       height: 40,
-      blurRadius: 10,
+      blurRadius: 12,
+      blurType: 'frosted',
+      opacity: 1,
+      borderRadius: 4,
     };
     setBlurZones((prev) => [...prev, newBlur]);
     handleSelectBlur(newBlur.id);
@@ -1507,6 +1511,24 @@ export default function App() {
           onResetSequentialCounter={handleResetSequentialCounter}
         />
       </div>
+
+      {/* Visual Preview Modal with Zoom & Pan */}
+      <PreviewModal
+        isOpen={isPreviewMode}
+        onClose={() => setIsPreviewMode(false)}
+        image={image}
+        focuses={focuses}
+        arrows={arrows}
+        globalStyles={globalStyles}
+        blurZones={blurZones}
+        maskShapes={maskShapes}
+        triangles={triangles}
+        calloutVignette={calloutVignette}
+        onCopyClipboard={handleCopyClipboard}
+        onExportPng={handleExportPng}
+        copied={copied}
+        isDarkMode={isDarkMode}
+      />
 
       {/* Keyboard Shortcuts Modal */}
       <ShortcutsModal

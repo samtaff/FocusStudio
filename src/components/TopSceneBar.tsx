@@ -136,7 +136,7 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           title="Prévisualiser le résultat final sans repères ni poignées"
         >
           <Eye className="w-3.5 h-3.5" />
-          <span>{isPreviewMode ? 'Quitter Prévisualisation' : 'Prévisualisation'}</span>
+          <span>{isPreviewMode ? 'Fermer Aperçu' : 'Prévisualisation'}</span>
         </button>
       </div>
 

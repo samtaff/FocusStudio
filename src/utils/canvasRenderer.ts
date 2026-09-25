@@ -328,7 +328,14 @@ export function drawComposition(
   ctx.strokeRect(bgX + 0.5, bgY + 0.5, bgWidth - 1, bgHeight - 1);
   ctx.restore();
 
-  // 4. Draw Focus zones content & borders (WITHOUT the badge, so the badge stays strictly on top)
+  // 4. Draw Blur zones: MUST ALWAYS BE UNDERNEATH ALL OTHER OBJECTS (Focus zones, Masks, Triangles, Vignette, Badges)
+  if (blurZones.length > 0) {
+    blurZones.forEach((blur) => {
+      drawSingleBlurZone(ctx, blur, interactive && !options.previewMode && blur.id === selectedBlurId);
+    });
+  }
+
+  // 5. Draw Focus zones content & borders (renders on top of blur zones)
   // When Callout option is chosen, the focus zone disappears!
   if (!isCalloutMode) {
     focuses.forEach((focus) => {
@@ -336,21 +343,14 @@ export function drawComposition(
     });
   }
 
-  // 5. Draw High-Efficiency Blur zones: calculated on the chosen zone (screenshot or focus)
-  if (blurZones.length > 0) {
-    blurZones.forEach((blur) => {
-      drawSingleBlurZone(ctx, blur, interactive && !options.previewMode && blur.id === selectedBlurId);
-    });
-  }
-
-  // 6. Draw Mask shapes
+  // 6. Draw Mask shapes (renders on top of blur zones)
   if (maskShapes.length > 0) {
     maskShapes.forEach((mask) => {
       drawSingleMaskShape(ctx, mask);
     });
   }
 
-  // 7. Draw Triangles (15x13px en #25465F ou blanc)
+  // 7. Draw Triangles (15x13px en #25465F ou blanc, renders on top of blur zones)
   if (triangles.length > 0) {
     triangles.forEach((triangle) => {
       drawSingleTriangle(ctx, triangle);
@@ -631,9 +631,16 @@ function drawStepBadge(
 }
 
 /**
- * Draws high-efficiency blur:
- * Uses a multi-stage blur (downsampling + bicubic upscale + Gaussian filter + frosted veil)
- * to guarantee complete anonymization of text, numbers, and UI elements.
+ * Draws an advanced anonymization blur zone directly on the canvas.
+ * Guaranteed to be rendered strictly UNDERNEATH all other objects (focus, masks, triangles, vignettes).
+ * Supports:
+ * - 'gaussian': Pure optical Gaussian blur
+ * - 'frosted': Milky frosted glass with top subtle highlight
+ * - 'pixelate': High-definition mosaic pixelation
+ * - 'smoked': Smoked dark glass blur
+ * - Customizable intensity (blurRadius / pixel size)
+ * - Customizable opacity (0.05 to 1.0)
+ * - Corner rounding (borderRadius)
  */
 function drawSingleBlurZone(
   ctx: CanvasRenderingContext2D,
@@ -644,10 +651,12 @@ function drawSingleBlurZone(
   if (w <= 0 || h <= 0) return;
 
   const radius = blur.borderRadius ?? 4;
-  const userRadius = Math.max(4, blur.blurRadius || 12);
+  const userRadius = Math.max(2, Math.min(50, blur.blurRadius || 12));
+  const opacity = Math.max(0.05, Math.min(1.0, blur.opacity ?? 1.0));
+  const blurType = blur.blurType || 'frosted';
 
-  // Pad slightly to sample surrounding pixels without edge clamping
-  const pad = Math.ceil(userRadius * 0.75);
+  // For pixelate, we sample exactly the bounding area; for blurs, we add a padding
+  const pad = blurType === 'pixelate' ? 0 : Math.ceil(userRadius * 0.75);
   const srcX = Math.max(0, Math.floor(x - pad));
   const srcY = Math.max(0, Math.floor(y - pad));
   const srcW = Math.min(ctx.canvas.width - srcX, Math.ceil(w + pad * 2));
@@ -656,7 +665,7 @@ function drawSingleBlurZone(
   if (srcW <= 0 || srcH <= 0) return;
 
   try {
-    // 1. Snapshot the existing pixels on the canvas (screenshot + focus zones)
+    // 1. Snapshot the existing pixels on the canvas (underneath all other objects)
     const offscreen = document.createElement('canvas');
     offscreen.width = srcW;
     offscreen.height = srcH;
@@ -664,37 +673,72 @@ function drawSingleBlurZone(
     if (!offCtx) return;
     offCtx.drawImage(ctx.canvas, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
 
-    // 2. High-Efficiency Downsampling:
-    // Shrinking the zone completely pulverizes high-frequency glyphs and text
-    const scaleDivisor = Math.max(4, Math.min(10, Math.round(userRadius / 2)));
-    const downW = Math.max(4, Math.floor(srcW / scaleDivisor));
-    const downH = Math.max(4, Math.floor(srcH / scaleDivisor));
-
-    const downCanvas = document.createElement('canvas');
-    downCanvas.width = downW;
-    downCanvas.height = downH;
-    const downCtx = downCanvas.getContext('2d');
-    if (!downCtx) return;
-
-    downCtx.imageSmoothingEnabled = true;
-    downCtx.imageSmoothingQuality = 'medium';
-    downCtx.drawImage(offscreen, 0, 0, srcW, srcH, 0, 0, downW, downH);
-
-    // 3. Render back onto target zone with clip and smooth Gaussian blur
     ctx.save();
+    ctx.globalAlpha = opacity;
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, radius);
     ctx.clip();
 
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.filter = `blur(${Math.max(6, Math.round(userRadius / 2))}px)`;
-    ctx.drawImage(downCanvas, 0, 0, downW, downH, srcX, srcY, srcW, srcH);
+    if (blurType === 'pixelate') {
+      // 2. PIXELATE / MOSAIC REDACTION
+      // Block size scaled from intensity (between 4px and 32px)
+      const blockSize = blur.pixelSize || Math.max(4, Math.min(32, Math.round(userRadius * 0.85)));
+      const tinyW = Math.max(1, Math.floor(w / blockSize));
+      const tinyH = Math.max(1, Math.floor(h / blockSize));
 
-    // 4. Subtle frosted glass veil for premium finish and 100% confidentiality
-    ctx.filter = 'none';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-    ctx.fillRect(x, y, w, h);
+      const pixelCanvas = document.createElement('canvas');
+      pixelCanvas.width = tinyW;
+      pixelCanvas.height = tinyH;
+      const pixelCtx = pixelCanvas.getContext('2d');
+      if (pixelCtx) {
+        pixelCtx.imageSmoothingEnabled = false;
+        // Sample exact area from offscreen
+        pixelCtx.drawImage(offscreen, x - srcX, y - srcY, w, h, 0, 0, tinyW, tinyH);
+
+        // Render back with nearest-neighbor mosaic magnification
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(pixelCanvas, 0, 0, tinyW, tinyH, x, y, w, h);
+      }
+    } else {
+      // 3. OPTICAL BLURS: GAUSSIAN, FROSTED, SMOKED
+      // Downsample stage to eliminate high-frequency details
+      const scaleDivisor = Math.max(2, Math.min(10, Math.round(userRadius / 2.5)));
+      const downW = Math.max(4, Math.floor(srcW / scaleDivisor));
+      const downH = Math.max(4, Math.floor(srcH / scaleDivisor));
+
+      const downCanvas = document.createElement('canvas');
+      downCanvas.width = downW;
+      downCanvas.height = downH;
+      const downCtx = downCanvas.getContext('2d');
+      if (downCtx) {
+        downCtx.imageSmoothingEnabled = true;
+        downCtx.imageSmoothingQuality = 'medium';
+        downCtx.drawImage(offscreen, 0, 0, srcW, srcH, 0, 0, downW, downH);
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.filter = `blur(${Math.max(3, Math.round(userRadius / 2))}px)`;
+        ctx.drawImage(downCanvas, 0, 0, downW, downH, srcX, srcY, srcW, srcH);
+        ctx.filter = 'none';
+
+        if (blurType === 'frosted') {
+          // Dépoli : Voile translucide blanc laiteux + reflet givré en haut
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+          ctx.fillRect(x, y, w, h);
+
+          const grad = ctx.createLinearGradient(x, y, x, y + Math.min(h, 24));
+          grad.addColorStop(0, 'rgba(255, 255, 255, 0.30)');
+          grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(x, y, w, Math.min(h, 24));
+        } else if (blurType === 'smoked') {
+          // Fumé : Voile sombre élégant pour assombrir et masquer avec discrétion
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.38)';
+          ctx.fillRect(x, y, w, h);
+        }
+        // 'gaussian' keeps pure blurred pixels without additional color wash
+      }
+    }
 
     ctx.restore();
   } catch (e) {
@@ -704,9 +748,9 @@ function drawSingleBlurZone(
   // Subtle border only for interactive positioning when selected
   if (showIndicator) {
     ctx.save();
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
-    ctx.lineWidth = 0.75;
-    ctx.setLineDash([2, 2]);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2.5, 2.5]);
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, radius);
     ctx.stroke();
@@ -1551,6 +1595,7 @@ export function drawCalloutVignette(
     const isVignetteHovered = options.hoveredPart === 'vignette' && !isVignetteSelected;
 
     // Draw Source Target on screen (viewfinder matching vignette shape and corner radius)
+    // Styled in Fluorescent Neon Pink (#ff007f) with very fine dashed outline and micro crosshair
     const srcW = callout.sourceWidth || 40;
     const srcH = callout.sourceHeight || 40;
     const srcX = callout.sourceX;
@@ -1567,26 +1612,25 @@ export function drawCalloutVignette(
       : Math.min(maxSrcR, Math.max(0, Math.round((callout.borderRadius ?? 16) * shapeRatio)));
 
     ctx.save();
-    // Soft outer ring with refined, thin dashed line (no heavy thickness)
-    ctx.strokeStyle = isSourceSelected ? '#0088cc' : (isSourceHovered ? '#38bdf8' : 'rgba(0, 136, 204, 0.7)');
-    ctx.lineWidth = isSourceSelected ? 1 : 0.85;
-    ctx.setLineDash([2, 2]);
+
+    // 1. Contour très fin en pointillés rose fluo (#ff007f), sans voile intérieur
+    ctx.strokeStyle = '#ff007f';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2.5, 2.5]);
     ctx.beginPath();
     ctx.roundRect(srcX, srcY, srcW, srcH, srcRadius);
     ctx.stroke();
 
-    // Center crosshair mark (discrete fine hair)
+    // 2. Croix centrale très fine en rose fluo (#ff007f)
     ctx.setLineDash([]);
-    ctx.strokeStyle = isSourceSelected ? '#0088cc' : 'rgba(0, 136, 204, 0.6)';
-    ctx.lineWidth = 0.85;
-    const cX = srcX + srcW / 2;
-    const cY = srcY + srcH / 2;
+    ctx.lineWidth = 1;
+    const cX = Math.round(srcX + srcW / 2);
+    const cY = Math.round(srcY + srcH / 2);
     ctx.beginPath();
-    ctx.moveTo(cX - 4, cY);
-    ctx.lineTo(cX + 4, cY);
-    ctx.moveTo(cX, cY - 4);
-    ctx.lineTo(cX, cY + 4);
+    ctx.moveTo(cX - 4, cY); ctx.lineTo(cX + 4, cY);
+    ctx.moveTo(cX, cY - 4); ctx.lineTo(cX, cY + 4);
     ctx.stroke();
+
     ctx.restore();
 
     // Draw Vignette selection frame

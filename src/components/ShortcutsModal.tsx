@@ -24,6 +24,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
     { key: 'Espace + Glisser', desc: 'Déplacer la vue (Pan)' },
     { key: 'Échap', desc: 'Désélectionner le focus en cours' },
     { key: "Double-clic sur l'image", desc: 'Créer un focus instantané à cet endroit' },
+    { key: 'P', desc: 'Prévisualisation avec zoom et déplacement' },
     { key: 'Ctrl + E / ⌘E', desc: 'Exporter le visuel en PNG transparent' },
   ];
 
