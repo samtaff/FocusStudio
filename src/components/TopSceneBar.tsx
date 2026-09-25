@@ -81,23 +81,6 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           Scène Studio
         </span>
 
-        {/* Bouton Recentrer le plan de travail dans la div Scène Studio */}
-        {onCenterWorkspace && (
-          <button
-            id="btn-scene-center"
-            onClick={onCenterWorkspace}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] ${
-              isDarkMode
-                ? 'bg-[#353535] hover:bg-[#404040] text-white border border-[#444444]'
-                : 'bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000]'
-            }`}
-            title="Recentrer le plan de travail (vue 100%, centrée)"
-          >
-            <Maximize2 className={`w-3.5 h-3.5 ${isDarkMode ? 'text-[#bbbbbb]' : 'text-[#666666]'}`} />
-            <span>Recentrer</span>
-          </button>
-        )}
-
         {/* Undo / Redo Pills */}
         {(onUndo || onRedo) && (
           <div className={`flex items-center gap-0.5 p-0.5 rounded-full border ${
@@ -235,19 +218,25 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           </button>
         </div>
 
-        {/* Bouton Réinitialiser le zoom 100% */}
+        {/* Bouton Recentrer le plan de travail (vue 100%, centrée) */}
         <button
-          onClick={() => onSetZoom(1)}
-          className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all ${
+          id="btn-scene-center"
+          onClick={onCenterWorkspace || (() => onSetZoom(1))}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] ${
             zoomLevel === 1 
               ? isDarkMode ? 'bg-white text-black font-semibold' : 'bg-[#000000] text-white' 
               : isDarkMode
                 ? 'bg-[#353535] text-[#aaaaaa] hover:text-white hover:bg-[#404040] border border-[#444444]'
                 : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
           }`}
-          title="Taille réelle (100%)"
+          title="Recentrer le plan de travail (vue 100%, centrée)"
         >
-          100%
+          <Maximize2 className={`w-3.5 h-3.5 ${
+            zoomLevel === 1 
+              ? (isDarkMode ? 'text-black' : 'text-white') 
+              : (isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]')
+          }`} />
+          <span>Recentrer</span>
         </button>
       </div>
     </div>

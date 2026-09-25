@@ -21,7 +21,9 @@ import {
   Search,
   Maximize2,
   Sun,
-  Moon
+  Moon,
+  Move,
+  Crosshair
 } from 'lucide-react';
 import { 
   FocusZone, 
@@ -41,7 +43,7 @@ interface StudioSettingsPanelProps {
   focuses: FocusZone[];
   selectedFocus: FocusZone | null;
   onSelectFocus: (id: string | null) => void;
-  onAddFocus: () => void;
+  onAddFocus: (orientation?: 'horizontal' | 'vertical') => void;
   onUpdateFocus: (updated: Partial<FocusZone>) => void;
   onDeleteFocus: (id: string) => void;
   onDuplicateFocus: (id: string) => void;
@@ -99,6 +101,9 @@ interface StudioSettingsPanelProps {
   nextSequentialStep?: number;
   onChangeNextSequentialStep?: (step: number) => void;
   onResetSequentialCounter?: () => void;
+  // Internal screenshot framing
+  internalFramingFocusId?: string | null;
+  onToggleInternalFraming?: (id: string | null) => void;
 }
 
 export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
@@ -112,6 +117,8 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   onDuplicateFocus,
   onCenterFocusHorizontally,
   onRenumberFocuses,
+  internalFramingFocusId = null,
+  onToggleInternalFraming,
   globalStyles,
   onUpdateGlobalStyles,
   blurZones,
@@ -684,75 +691,211 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Dimensions : Largeur & Hauteur saisissables au pavé numérique */}
-                  <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex justify-between items-center">
-                          <label className="text-[10px] text-[#666666] font-medium">Largeur</label>
-                          <button
-                            onClick={() => onUpdateFocus({ width: 240 })}
-                            className="text-[9px] text-[#0088cc] hover:underline font-semibold"
-                          >
-                            240px
-                          </button>
-                        </div>
-                        <NumericInput
-                          value={Math.round(selectedFocus.width)}
-                          onChange={(val) => onUpdateFocus({ width: Math.max(40, val) })}
-                          min={40}
-                          max={500}
-                          unit="px"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex justify-between items-center">
-                          <label className="text-[10px] text-[#666666] font-medium">Hauteur</label>
-                          <button
-                            onClick={() => onUpdateFocus({ height: 50 })}
-                            className="text-[9px] text-[#0088cc] hover:underline font-semibold"
-                          >
-                            50px
-                          </button>
-                        </div>
-                        <NumericInput
-                          value={Math.round(selectedFocus.height)}
-                          onChange={(val) => onUpdateFocus({ height: Math.max(20, val) })}
-                          min={20}
-                          max={400}
-                          unit="px"
-                        />
-                      </div>
-                    </div>
+                  {/* Orientation de la zone : Horizontale (240x50) ou Verticale (50x240) */}
+                  {(() => {
+                    const isVertical = selectedFocus.orientation === 'vertical' || selectedFocus.height > selectedFocus.width;
+                    const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
+                    const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
 
-                    {/* Presets rapides de largeur pour les pas/étapes */}
-                    <div className="flex items-center gap-1.5 pt-0.5">
-                      <span className="text-[10px] text-[#666666]">Largeur pas :</span>
-                      {[240, 260].map((pw) => (
-                        <button
-                          key={pw}
-                          onClick={() => onUpdateFocus({ width: pw })}
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${
-                            Math.round(selectedFocus.width) === pw
-                              ? 'bg-[#000000] text-white'
-                              : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee]'
-                          }`}
-                        >
-                          {pw}px
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => {
-                          const targetW = globalStyles.workspaceWidth || 260;
-                          onUpdateFocus({ width: Math.max(100, targetW - 20) });
-                        }}
-                        className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#eeeeee]/80 text-[#0088cc] hover:bg-[#eeeeee]"
-                        title="Ajuster la largeur au screenshot/zone de travail"
-                      >
-                        Auto (responsive)
-                      </button>
-                    </div>
-                  </div>
+                    return (
+                      <div className="flex flex-col gap-2 pt-1 border-t border-[#eeeeee]">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-[#666666] font-medium">Orientation de la zone</span>
+                          <span className="text-[10px] text-[#0088cc] font-semibold">
+                            {isVertical ? 'Verticale (50 × 240 px)' : 'Horizontale (240 × 50 px)'}
+                          </span>
+                        </div>
+
+                        {/* Toggle Horizontale / Verticale */}
+                        <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#eeeeee]/70 rounded-xl">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onUpdateFocus({
+                                orientation: 'horizontal',
+                                width: 240,
+                                height: 50,
+                                x: Math.round(phoneCenterX - 240 / 2),
+                              });
+                            }}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
+                              !isVertical
+                                ? 'bg-[#0088cc] text-white shadow-2xs'
+                                : 'text-[#666666] hover:text-[#000000] hover:bg-white/50'
+                            }`}
+                          >
+                            <span className="inline-block w-4 h-2 border border-current rounded-xs" />
+                            <span>Horizontale (240×50)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Magnétiser par défaut le centre de la zone sur le bord gauche du screenshot original
+                              onUpdateFocus({
+                                orientation: 'vertical',
+                                width: 50,
+                                height: 240,
+                                x: Math.round(bounds.bgX - 50 / 2),
+                                zoom: 1.2,
+                              });
+                            }}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
+                              isVertical
+                                ? 'bg-[#0088cc] text-white shadow-2xs'
+                                : 'text-[#666666] hover:text-[#000000] hover:bg-white/50'
+                            }`}
+                          >
+                            <span className="inline-block w-2 h-4 border border-current rounded-xs" />
+                            <span>Verticale (50×240)</span>
+                          </button>
+                        </div>
+
+                        {/* Magnétisme bords screenshot pour zone verticale */}
+                        {isVertical && (
+                          <div className="flex flex-col gap-1.5 p-2.5 bg-sky-50/90 dark:bg-sky-950/40 rounded-xl border border-sky-200/80">
+                            <div className="flex items-center justify-between text-[11px] text-sky-900 dark:text-sky-300 font-semibold">
+                              <span className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-[#0088cc] animate-pulse" />
+                                Magnétisme bords screenshot (centré) :
+                              </span>
+                              <span className="text-[9px] text-sky-600 font-normal">Clic ou glisser</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1 pt-0.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onUpdateFocus({ x: Math.round(bounds.bgX - selectedFocus.width / 2) });
+                                }}
+                                className="px-2 py-1.5 bg-white dark:bg-[#252525] hover:bg-sky-100/80 text-[#25465F] dark:text-sky-200 rounded-lg text-[10px] font-bold border border-sky-200 transition-all flex items-center justify-center gap-1 shadow-2xs active:scale-95"
+                                title="Centrer la zone focus sur le bord gauche du screenshot original"
+                              >
+                                ⇤ Bord gauche
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onUpdateFocus({ x: Math.round(phoneCenterX - selectedFocus.width / 2) });
+                                }}
+                                className="px-2 py-1.5 bg-white dark:bg-[#252525] hover:bg-sky-100/80 text-[#25465F] dark:text-sky-200 rounded-lg text-[10px] font-bold border border-sky-200 transition-all flex items-center justify-center gap-1 shadow-2xs active:scale-95"
+                                title="Centrer horizontalement sur le screenshot"
+                              >
+                                ↔ Centre
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onUpdateFocus({ x: Math.round(bounds.bgX + bounds.bgWidth - selectedFocus.width / 2) });
+                                }}
+                                className="px-2 py-1.5 bg-white dark:bg-[#252525] hover:bg-sky-100/80 text-[#25465F] dark:text-sky-200 rounded-lg text-[10px] font-bold border border-sky-200 transition-all flex items-center justify-center gap-1 shadow-2xs active:scale-95"
+                                title="Centrer la zone focus sur le bord droit du screenshot original"
+                              >
+                                Bord droit ⇥
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Dimensions : Largeur & Hauteur saisissables au pavé numérique */}
+                  {(() => {
+                    const isVertical = selectedFocus.orientation === 'vertical' || selectedFocus.height > selectedFocus.width;
+                    return (
+                      <div className="flex flex-col gap-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex justify-between items-center">
+                              <label className="text-[10px] text-[#666666] font-medium">Largeur</label>
+                              <button
+                                onClick={() => onUpdateFocus({ width: isVertical ? 50 : 240 })}
+                                className="text-[9px] text-[#0088cc] hover:underline font-semibold"
+                              >
+                                {isVertical ? '50px' : '240px'}
+                              </button>
+                            </div>
+                            <NumericInput
+                              value={Math.round(selectedFocus.width)}
+                              onChange={(val) => onUpdateFocus({ width: Math.max(30, val) })}
+                              min={30}
+                              max={500}
+                              unit="px"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex justify-between items-center">
+                              <label className="text-[10px] text-[#666666] font-medium">Hauteur</label>
+                              <button
+                                onClick={() => onUpdateFocus({ height: isVertical ? 240 : 50 })}
+                                className="text-[9px] text-[#0088cc] hover:underline font-semibold"
+                              >
+                                {isVertical ? '240px' : '50px'}
+                              </button>
+                            </div>
+                            <NumericInput
+                              value={Math.round(selectedFocus.height)}
+                              onChange={(val) => onUpdateFocus({ height: Math.max(20, val) })}
+                              min={20}
+                              max={500}
+                              unit="px"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Presets rapides de dimensions selon l'orientation */}
+                        <div className="flex items-center gap-1.5 pt-0.5">
+                          <span className="text-[10px] text-[#666666]">Presets :</span>
+                          {isVertical ? (
+                            <>
+                              {[
+                                { label: '50 × 240', w: 50, h: 240 },
+                                { label: '50 × 300', w: 50, h: 300 },
+                                { label: '60 × 240', w: 60, h: 240 },
+                              ].map((p) => (
+                                <button
+                                  key={p.label}
+                                  onClick={() => onUpdateFocus({ width: p.w, height: p.h })}
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${
+                                    Math.round(selectedFocus.width) === p.w && Math.round(selectedFocus.height) === p.h
+                                      ? 'bg-[#000000] text-white'
+                                      : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee]'
+                                  }`}
+                                >
+                                  {p.label}
+                                </button>
+                              ))}
+                            </>
+                          ) : (
+                            <>
+                              {[240, 260].map((pw) => (
+                                <button
+                                  key={pw}
+                                  onClick={() => onUpdateFocus({ width: pw })}
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${
+                                    Math.round(selectedFocus.width) === pw
+                                      ? 'bg-[#000000] text-white'
+                                      : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee]'
+                                  }`}
+                                >
+                                  {pw}px
+                                </button>
+                              ))}
+                              <button
+                                onClick={() => {
+                                  const targetW = globalStyles.workspaceWidth || 260;
+                                  onUpdateFocus({ width: Math.max(100, targetW - 20) });
+                                }}
+                                className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#eeeeee]/80 text-[#0088cc] hover:bg-[#eeeeee]"
+                                title="Ajuster la largeur au screenshot/zone de travail"
+                              >
+                                Auto (responsive)
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Arrondis de la zone (défaut 10px) */}
                   <div className="flex flex-col gap-1.5 pt-2 border-t border-[#eeeeee]">
@@ -838,9 +981,38 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
                     const bgWidth = bounds.bgWidth > 0 ? bounds.bgWidth : 180;
                     const focusW = Math.round(selectedFocus.width);
-                    const defaultZoom = Number((focusW / bgWidth).toFixed(3));
-                    const currentZoom = selectedFocus.zoom || defaultZoom;
+                    const isVertical = selectedFocus.orientation === 'vertical' || selectedFocus.height > selectedFocus.width;
+                    
+                    // En mode horizontal (240x50), le zoom par défaut aligne la largeur du screenshot sur celle de la zone focus (240 / 180 = 1.33x).
+                    // En mode vertical (50x240), la largeur de la zone (50px) étant inférieure au screenshot (180px),
+                    // le zoom par défaut est de 1.2x (ou 1.0x minimum) pour préserver un grossissement valide >= 1.0x.
+                    const defaultZoom = isVertical
+                      ? 1.2
+                      : Math.max(1.0, Number((focusW / bgWidth).toFixed(3)));
+                    
+                    const currentZoom = Math.max(1.0, selectedFocus.zoom || defaultZoom);
                     const zoomPx = Math.round(bgWidth * currentZoom);
+
+                    // Bornes valides pour le curseur (min < max toujours garanti, en mode horizontal comme en vertical)
+                    const minPx = Math.round(bgWidth); // 1.0x (180px)
+                    const maxPx = Math.max(Math.round(bgWidth * 3.5), Math.round(focusW * 2.5)); // min 630px
+
+                    const presets = isVertical
+                      ? [
+                          { label: '1.0× (180px)', factor: 1.0, title: 'Taille originale (100%)' },
+                          { label: `1.2× (${Math.round(bgWidth * 1.2)}px)`, factor: 1.2, title: 'Zoom par défaut (+20%)' },
+                          { label: `1.4× (${Math.round(bgWidth * 1.4)}px)`, factor: 1.4, title: '+40% d\'agrandissement' },
+                          { label: `1.8× (${Math.round(bgWidth * 1.8)}px)`, factor: 1.8, title: '+80% d\'agrandissement' },
+                          { label: `2.0× (${Math.round(bgWidth * 2.0)}px)`, factor: 2.0, title: '2× agrandissement' },
+                        ]
+                      : [
+                          { label: `Défaut (${focusW}px)`, factor: defaultZoom, title: `Par défaut : largeur screenshot (${focusW}px) = largeur zone focus (${focusW}px)` },
+                          { label: `+20% (${Math.round(focusW * 1.2)}px)`, factor: Number((defaultZoom * 1.2).toFixed(3)), title: '+20% d\'agrandissement' },
+                          { label: `+40% (${Math.round(focusW * 1.4)}px)`, factor: Number((defaultZoom * 1.4).toFixed(3)), title: '+40% d\'agrandissement' },
+                          { label: `+80% (${Math.round(focusW * 1.8)}px)`, factor: Number((defaultZoom * 1.8).toFixed(3)), title: '+80% d\'agrandissement' },
+                          { label: `2× (${Math.round(focusW * 2.0)}px)`, factor: Number((defaultZoom * 2.0).toFixed(3)), title: '2× agrandissement' },
+                        ];
+
                     return (
                       <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
                         <div className="flex items-center justify-between text-[11px]">
@@ -852,11 +1024,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             <NumericInput
                               value={zoomPx}
                               onChange={(val) => {
-                                const newPx = Math.max(bgWidth, val);
-                                onUpdateFocus({ zoom: Math.max(1.0, Number((newPx / bgWidth).toFixed(3))) });
+                                const clamped = Math.max(minPx, Math.min(maxPx, val));
+                                onUpdateFocus({ zoom: Math.max(1.0, Number((clamped / bgWidth).toFixed(3))) });
                               }}
-                              min={Math.round(bgWidth)}
-                              max={Math.round(focusW * 3)}
+                              min={minPx}
+                              max={maxPx}
                               unit="px"
                             />
                           </div>
@@ -865,8 +1037,8 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         <div className="flex items-center gap-2">
                           <input
                             type="range"
-                            min={Math.round(bgWidth)}
-                            max={Math.round(focusW * 2.5)}
+                            min={minPx}
+                            max={maxPx}
                             step="2"
                             value={zoomPx}
                             onChange={(e) => {
@@ -879,13 +1051,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
                         {/* Presets rapides de zoom en pixel */}
                         <div className="flex gap-1 flex-wrap">
-                          {[
-                            { label: `Défaut (${focusW}px)`, factor: defaultZoom, title: `Par défaut : largeur screenshot (${focusW}px) = largeur zone focus (${focusW}px)` },
-                            { label: `+20% (${Math.round(focusW * 1.2)}px)`, factor: Number((defaultZoom * 1.2).toFixed(3)), title: '+20% d\'agrandissement' },
-                            { label: `+40% (${Math.round(focusW * 1.4)}px)`, factor: Number((defaultZoom * 1.4).toFixed(3)), title: '+40% d\'agrandissement' },
-                            { label: `+80% (${Math.round(focusW * 1.8)}px)`, factor: Number((defaultZoom * 1.8).toFixed(3)), title: '+80% d\'agrandissement' },
-                            { label: `2× (${Math.round(focusW * 2.0)}px)`, factor: Number((defaultZoom * 2.0).toFixed(3)), title: '2× agrandissement' },
-                          ].map((p) => (
+                          {presets.map((p) => (
                             <button
                               key={p.factor}
                               type="button"
@@ -893,7 +1059,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               title={p.title}
                               className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
                                 Math.abs(currentZoom - p.factor) < 0.05
-                                  ? 'bg-[#000000] text-white shadow-2xs'
+                                  ? 'bg-[#0088cc] text-white shadow-2xs'
                                   : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                               }`}
                             >
@@ -904,6 +1070,117 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       </div>
                     );
                   })()}
+
+                  {/* Cadrage interne du screenshot (sans altérer l'image d'origine) */}
+                  <div className="flex flex-col gap-2.5 pt-2.5 border-t border-[#eeeeee]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Move className="w-3.5 h-3.5 text-[#0088cc]" />
+                        <span className="text-[#333333] font-semibold text-[11px]">
+                          Cadrage interne du screenshot
+                        </span>
+                      </div>
+                      {((selectedFocus.sourceOffsetX || 0) !== 0 || (selectedFocus.sourceOffsetY || 0) !== 0) && (
+                        <button
+                          type="button"
+                          onClick={() => onUpdateFocus({ sourceOffsetX: 0, sourceOffsetY: 0 })}
+                          className="text-[10px] text-[#0088cc] hover:underline font-medium"
+                        >
+                          Recentrer
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-[#888888] leading-tight">
+                      Déplace la capture à l'intérieur de cette zone sans modifier la position du screenshot original.
+                    </p>
+
+                    {/* Bouton d'activation du mode recadrage direct */}
+                    <button
+                      type="button"
+                      onClick={() => onToggleInternalFraming?.(selectedFocus.id)}
+                      className={`w-full py-1.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-[11px] font-semibold transition-all ${
+                        internalFramingFocusId === selectedFocus.id
+                          ? 'bg-[#25465F] text-white border-[#25465F] shadow-sm'
+                          : 'bg-white hover:bg-sky-50 text-[#25465F] border-sky-200'
+                      }`}
+                    >
+                      <Crosshair className={`w-3.5 h-3.5 ${internalFramingFocusId === selectedFocus.id ? 'animate-pulse text-sky-300' : 'text-[#0088cc]'}`} />
+                      <span>
+                        {internalFramingFocusId === selectedFocus.id
+                          ? 'Recadrage actif (Glisser / Flèches)'
+                          : 'Ajuster à la souris (ou Alt + Glisser)'}
+                      </span>
+                    </button>
+
+                    {/* Saisie numérique Décalage X et Y */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between items-center text-[10px] text-[#666666]">
+                          <span>Décalage X</span>
+                          <span className="font-mono">{Math.round(selectedFocus.sourceOffsetX || 0)} px</span>
+                        </div>
+                        <NumericInput
+                          value={Math.round(selectedFocus.sourceOffsetX || 0)}
+                          onChange={(val) => onUpdateFocus({ sourceOffsetX: val })}
+                          min={-800}
+                          max={800}
+                          unit="px"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between items-center text-[10px] text-[#666666]">
+                          <span>Décalage Y</span>
+                          <span className="font-mono">{Math.round(selectedFocus.sourceOffsetY || 0)} px</span>
+                        </div>
+                        <NumericInput
+                          value={Math.round(selectedFocus.sourceOffsetY || 0)}
+                          onChange={(val) => onUpdateFocus({ sourceOffsetY: val })}
+                          min={-800}
+                          max={800}
+                          unit="px"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Micro-ajustements rapides au pas de ±5px */}
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] text-[#888888]">Micro-ajustement (±5px) :</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onUpdateFocus({ sourceOffsetX: (selectedFocus.sourceOffsetX || 0) - 5 })}
+                          className="w-6 h-6 rounded-md bg-[#f4f4f4] hover:bg-slate-200 text-[#333333] text-[11px] font-bold flex items-center justify-center transition-colors"
+                          title="Décaler vers la gauche de 5px"
+                        >
+                          ←
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onUpdateFocus({ sourceOffsetY: (selectedFocus.sourceOffsetY || 0) - 5 })}
+                          className="w-6 h-6 rounded-md bg-[#f4f4f4] hover:bg-slate-200 text-[#333333] text-[11px] font-bold flex items-center justify-center transition-colors"
+                          title="Décaler vers le haut de 5px"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onUpdateFocus({ sourceOffsetY: (selectedFocus.sourceOffsetY || 0) + 5 })}
+                          className="w-6 h-6 rounded-md bg-[#f4f4f4] hover:bg-slate-200 text-[#333333] text-[11px] font-bold flex items-center justify-center transition-colors"
+                          title="Décaler vers le bas de 5px"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onUpdateFocus({ sourceOffsetX: (selectedFocus.sourceOffsetX || 0) + 5 })}
+                          className="w-6 h-6 rounded-md bg-[#f4f4f4] hover:bg-slate-200 text-[#333333] text-[11px] font-bold flex items-center justify-center transition-colors"
+                          title="Décaler vers la droite de 5px"
+                        >
+                          →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Ombre Portée (Photoshop : opacité 30%, angle 90°, distance 2px, taille 2px, #25465F) */}
                   <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
@@ -1006,14 +1283,24 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   </div>
                 </>
               ) : (
-                <div className="text-center py-4 text-[#666666]">
+                <div className="text-center py-5 text-[#666666] flex flex-col items-center gap-2">
                   <p className="text-[11px]">Aucun focus sélectionné</p>
-                  <button
-                    onClick={onAddFocus}
-                    className="mt-2 text-[#0088cc] hover:underline font-medium text-[11px]"
-                  >
-                    + Créer un focus
-                  </button>
+                  <div className="flex items-center gap-2 mt-1">
+                    <button
+                      onClick={() => onAddFocus('horizontal')}
+                      className="px-3 py-1.5 rounded-xl bg-white border border-[#eeeeee] hover:border-[#0088cc] text-[#0088cc] hover:bg-sky-50 font-semibold text-[11px] transition-all shadow-2xs flex items-center gap-1.5"
+                    >
+                      <span className="inline-block w-3.5 h-2 border border-current rounded-xs" />
+                      <span>+ Focus horizontal (240×50)</span>
+                    </button>
+                    <button
+                      onClick={() => onAddFocus('vertical')}
+                      className="px-3 py-1.5 rounded-xl bg-white border border-[#eeeeee] hover:border-[#0088cc] text-[#0088cc] hover:bg-sky-50 font-semibold text-[11px] transition-all shadow-2xs flex items-center gap-1.5"
+                    >
+                      <span className="inline-block w-2 h-3.5 border border-current rounded-xs" />
+                      <span>+ Focus vertical (50×240)</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

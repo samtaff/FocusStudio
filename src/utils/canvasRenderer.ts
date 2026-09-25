@@ -37,6 +37,7 @@ export interface RenderOptions {
   selectedFocusId?: string | null;
   hoveredFocusId?: string | null;
   hoveredHandle?: ResizeHandle | null;
+  internalFramingFocusId?: string | null;
   smartGuides?: SmartGuide[];
   userGuides?: UserGuide[];
   arrows?: AnnotationArrow[];
@@ -270,6 +271,7 @@ export function drawComposition(
     interactive = false, 
     selectedFocusId = null, 
     hoveredFocusId = null,
+    internalFramingFocusId = null,
     smartGuides = [],
     userGuides = [],
     globalStyles = {},
@@ -408,7 +410,7 @@ export function drawComposition(
         if (isHovered) {
           drawFocusHoverHighlight(ctx, focus);
         } else if (isSelected) {
-          drawFocusSelectionHandles(ctx, focus);
+          drawFocusSelectionHandles(ctx, focus, focus.id === internalFramingFocusId);
         }
       });
     }
@@ -473,11 +475,12 @@ function drawSingleFocusContentAndBorder(
   const destW = Math.round(focus.width);
   const destH = Math.round(focus.height);
 
-  const compCenterX = focus.x + focus.width / 2 + (focus.sourceOffsetX || 0);
-  const compCenterY = focus.y + focus.height / 2 + (focus.sourceOffsetY || 0);
+  const compCenterX = focus.x + focus.width / 2;
+  const compCenterY = focus.y + focus.height / 2;
 
-  const origCenterX = (compCenterX - bgX) / scale;
-  const origCenterY = (compCenterY - bgY) / scale;
+  // sourceOffsetX & sourceOffsetY: décalage du screenshot dans la zone focus sans altérer la capture d'origine
+  const origCenterX = (compCenterX - bgX) / scale - (focus.sourceOffsetX || 0) / (scale * zoom);
+  const origCenterY = (compCenterY - bgY) / scale - (focus.sourceOffsetY || 0) / (scale * zoom);
 
   const origCropW = (destW / zoom) / scale;
   const origCropH = (destH / zoom) / scale;
@@ -575,17 +578,25 @@ function drawStepBadge(
   const badgeRadius = 5;
   const num = focus.stepNumber || 1;
 
+  const isVertical = focus.orientation === 'vertical' || focus.height > focus.width;
+
   let alignLeft = true;
   if (focus.badgePosition === 'left') {
     alignLeft = true;
   } else if (focus.badgePosition === 'right') {
     alignLeft = false;
   } else {
-    // 'auto': Odd on left edge, Even on right edge
-    alignLeft = num % 2 !== 0;
+    // 'auto': Odd on left edge, Even on right edge (or based on vertical focus placement)
+    if (isVertical) {
+      const focusCenterX = focus.x + focus.width / 2;
+      const phoneCenterX = bgX + bgWidth / 2;
+      alignLeft = focusCenterX < phoneCenterX;
+    } else {
+      alignLeft = num % 2 !== 0;
+    }
   }
 
-  // Centered horizontally on the vertical edge of the imported screenshot
+  // Centered horizontally on the vertical border of the imported original screenshot (50% inside, 50% outside)
   const badgeX = alignLeft
     ? Math.round(bgX - badgeW / 2)
     : Math.round(bgX + bgWidth - badgeW / 2);
@@ -753,10 +764,10 @@ function drawSingleMaskShape(
     ctx.fill();
   }
 
-  // 2. Contour / Border
+  // 2. Contour / Border (only if explicit borderWidth > 0)
   if (mask.borderWidth && mask.borderWidth > 0) {
     ctx.save();
-    ctx.strokeStyle = mask.borderColor || '#ffffff';
+    ctx.strokeStyle = mask.borderColor || BASE_COLOR;
     ctx.lineWidth = mask.borderWidth;
     if (mask.borderStyle === 'dashed') {
       ctx.setLineDash([4, 3]);
@@ -769,11 +780,6 @@ function drawSingleMaskShape(
     ctx.roundRect(mask.x, mask.y, mask.width, mask.height, radius);
     ctx.stroke();
     ctx.restore();
-  } else {
-    // Subtle boundary stroke if no explicit border
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
   }
 
   ctx.restore();
@@ -822,7 +828,7 @@ function drawSingleTriangle(
   ctx.fill();
 
   if (triangle.borderWidth && triangle.borderWidth > 0) {
-    ctx.strokeStyle = triangle.borderColor || '#ffffff';
+    ctx.strokeStyle = triangle.borderColor || BASE_COLOR;
     ctx.lineWidth = triangle.borderWidth;
     ctx.stroke();
   }
@@ -1016,11 +1022,11 @@ function drawSymmetryAxis(ctx: CanvasRenderingContext2D, centerX: number, bgY: n
  */
 function drawSmartGuides(ctx: CanvasRenderingContext2D, guides: SmartGuide[]) {
   ctx.save();
-  ctx.lineWidth = 0.5;
-  ctx.setLineDash([2, 2]);
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
 
   guides.forEach((g) => {
-    ctx.strokeStyle = g.type === 'vertical' ? 'rgba(56, 189, 248, 0.35)' : 'rgba(236, 72, 153, 0.35)';
+    ctx.strokeStyle = g.color || (g.type === 'vertical' ? 'rgba(56, 189, 248, 0.75)' : 'rgba(236, 72, 153, 0.75)');
     ctx.beginPath();
     if (g.type === 'vertical') {
       ctx.moveTo(g.position, 0);
@@ -1034,12 +1040,33 @@ function drawSmartGuides(ctx: CanvasRenderingContext2D, guides: SmartGuide[]) {
     if (g.label) {
       ctx.save();
       ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(100, 116, 139, 0.7)';
-      ctx.font = '7.5px "JetBrains Mono", system-ui, sans-serif';
+      ctx.font = 'bold 9px system-ui, -apple-system, sans-serif';
+      const textMetrics = ctx.measureText(g.label);
+      const textW = textMetrics.width;
+      const textH = 14;
+
       if (g.type === 'vertical') {
-        ctx.fillText(g.label, g.position + 2, 12);
+        const lx = Math.min(ctx.canvas.width - textW - 8, Math.max(4, g.position + 4));
+        const ly = 16;
+        // Pill background
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect(lx - 4, ly - 10, textW + 8, textH, 4);
+        ctx.fill();
+        // Text
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(g.label, lx, ly);
       } else {
-        ctx.fillText(g.label, 4, g.position - 2);
+        const lx = 6;
+        const ly = g.position - 4;
+        // Pill background
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect(lx - 2, ly - 10, textW + 8, textH, 4);
+        ctx.fill();
+        // Text
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(g.label, lx + 2, ly);
       }
       ctx.restore();
     }
@@ -1091,17 +1118,95 @@ export function getFocusHandles(focus: FocusZone): Record<ResizeHandle, { x: num
   };
 }
 
-function drawFocusSelectionHandles(ctx: CanvasRenderingContext2D, focus: FocusZone) {
+function drawFocusSelectionHandles(ctx: CanvasRenderingContext2D, focus: FocusZone, isFramingMode = false) {
   const { x, y, width: w, height: h, borderRadius = 10 } = focus;
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(0, 136, 204, 0.45)';
-  ctx.lineWidth = 0.85;
-  ctx.setLineDash([2, 2]);
-  ctx.beginPath();
-  ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
-  ctx.stroke();
-  ctx.setLineDash([]);
+
+  if (isFramingMode) {
+    // Mode recadrage actif : surbrillance cyan avec grille de cadrage interne
+    ctx.strokeStyle = '#0088cc';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Grille interne des tiers pour assister l'alignement précis
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, borderRadius);
+    ctx.clip();
+
+    ctx.strokeStyle = 'rgba(0, 136, 204, 0.35)';
+    ctx.lineWidth = 0.75;
+    ctx.setLineDash([2, 3]);
+
+    // 2 lignes verticales (tiers)
+    ctx.beginPath();
+    ctx.moveTo(x + w / 3, y);
+    ctx.lineTo(x + w / 3, y + h);
+    ctx.moveTo(x + (2 * w) / 3, y);
+    ctx.lineTo(x + (2 * w) / 3, y + h);
+    // 2 lignes horizontales (tiers)
+    ctx.moveTo(x, y + h / 3);
+    ctx.lineTo(x + w, y + h / 3);
+    ctx.moveTo(x, y + (2 * h) / 3);
+    ctx.lineTo(x + w, y + (2 * h) / 3);
+    ctx.stroke();
+
+    // Réticule central
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    ctx.strokeStyle = 'rgba(0, 136, 204, 0.7)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, cy);
+    ctx.lineTo(cx + 5, cy);
+    ctx.moveTo(cx, cy - 5);
+    ctx.lineTo(cx, cy + 5);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Badge indicateur au-dessus
+    const badgeText = `Recadrage actif : X: ${focus.sourceOffsetX ? `${focus.sourceOffsetX > 0 ? '+' : ''}${Math.round(focus.sourceOffsetX)}` : '0'}px, Y: ${focus.sourceOffsetY ? `${focus.sourceOffsetY > 0 ? '+' : ''}${Math.round(focus.sourceOffsetY)}` : '0'}px`;
+    ctx.font = '600 8.5px system-ui, -apple-system, sans-serif';
+    const textMetrics = ctx.measureText(badgeText);
+    const badgeW = textMetrics.width + 12;
+    const badgeH = 14;
+    const badgeX = Math.round(x + (w - badgeW) / 2);
+    const badgeY = Math.round(y - badgeH - 3);
+
+    ctx.fillStyle = 'rgba(0, 136, 204, 0.95)';
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 7);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 0.5);
+  } else {
+    // Mode standard : bordure pointillée discrète
+    ctx.strokeStyle = 'rgba(0, 136, 204, 0.45)';
+    ctx.lineWidth = 0.85;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Si un décalage interne est appliqué, afficher un micro-repère discret
+    if ((focus.sourceOffsetX && focus.sourceOffsetX !== 0) || (focus.sourceOffsetY && focus.sourceOffsetY !== 0)) {
+      ctx.fillStyle = 'rgba(0, 136, 204, 0.15)';
+      ctx.beginPath();
+      ctx.arc(x + w - 8, y + 8, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   const handles = getFocusHandles(focus);
   const radius = 1.75;

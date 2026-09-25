@@ -11,10 +11,13 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
 
   const shortcuts = [
     { key: '+ ou A', desc: 'Ajouter un nouveau focus (240 × 50 px)' },
+    { key: 'V', desc: 'Basculer orientation Verticale (50 × 240 px) / Horizontale' },
     { key: 'Suppr / Retour arrière', desc: 'Supprimer le focus sélectionné' },
     { key: 'Ctrl + D / ⌘D', desc: 'Dupliquer le focus sélectionné' },
     { key: 'Flèches directionnelles', desc: 'Déplacer le focus de 1 px' },
     { key: 'Shift + Flèches', desc: 'Déplacer le focus de 10 px' },
+    { key: 'Alt + Glisser / Double-clic', desc: 'Décaler le screenshot dans le focus (recadrage)' },
+    { key: 'Alt + Flèches', desc: 'Ajuster le décalage interne (1 px, 10 px avec Shift)' },
     { key: 'Ctrl + Z / ⌘Z', desc: 'Annuler la dernière action' },
     { key: 'Ctrl + Shift + Z / ⌘Y', desc: 'Rétablir la dernière action' },
     { key: 'Ctrl + V / ⌘V', desc: "Coller une capture d'écran directement" },

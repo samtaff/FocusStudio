@@ -78,6 +78,13 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+  // Internal screenshot framing (recadrage du screenshot dans la zone focus sans altérer l'original)
+  const [internalFramingFocusId, setInternalFramingFocusId] = useState<string | null>(null);
+
+  const handleToggleInternalFraming = useCallback((id: string | null) => {
+    setInternalFramingFocusId((prev) => (prev === id ? null : id));
+  }, []);
+
   // Mutually exclusive selection handlers so arrow keys and panels target the exact active object
   const handleSelectFocus = useCallback((id: string | null) => {
     setSelectedFocusId(id);
@@ -86,6 +93,8 @@ export default function App() {
       setSelectedMaskId(null);
       setSelectedTriangleId(null);
       setSelectedCalloutPart(null);
+    } else {
+      setInternalFramingFocusId(null);
     }
   }, []);
 
@@ -96,6 +105,7 @@ export default function App() {
       setSelectedMaskId(null);
       setSelectedTriangleId(null);
       setSelectedCalloutPart(null);
+      setInternalFramingFocusId(null);
     }
   }, []);
 
@@ -106,6 +116,7 @@ export default function App() {
       setSelectedBlurId(null);
       setSelectedTriangleId(null);
       setSelectedCalloutPart(null);
+      setInternalFramingFocusId(null);
     }
   }, []);
 
@@ -116,6 +127,7 @@ export default function App() {
       setSelectedBlurId(null);
       setSelectedMaskId(null);
       setSelectedCalloutPart(null);
+      setInternalFramingFocusId(null);
     }
   }, []);
 
@@ -126,6 +138,7 @@ export default function App() {
       setSelectedBlurId(null);
       setSelectedMaskId(null);
       setSelectedTriangleId(null);
+      setInternalFramingFocusId(null);
     }
   }, []);
 
@@ -373,17 +386,52 @@ export default function App() {
     }
   };
 
-  // Add Focus Zone: default width = 240px, default zoom = screenshot width in focus zone (240px)
-  const handleAddFocus = () => {
+  // Add Focus Zone:
+  // - Horizontal par défaut : width = 240px, height = 50px
+  // - Vertical (option demandée) : width = 50px, height = 240px, magnétisé sur le bord gauche du screenshot
+  const handleAddFocus = (orientation: 'horizontal' | 'vertical' = 'horizontal') => {
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
     const maxExisting = focuses.reduce((max, f) => Math.max(max, f.stepNumber || 0), 0);
     const nextStep = maxExisting > 0 ? maxExisting + 1 : focuses.length + 1;
-    const defaultFocusW = 240;
-    const defaultFocusH = 50;
-    const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
-    const posX = Math.round(phoneCenterX - defaultFocusW / 2);
-    const posY = Math.round(bounds.bgY + 40 + (nextStep - 1) * 60);
-    const defaultZoom = bounds.bgWidth > 0 ? Number((defaultFocusW / bounds.bgWidth).toFixed(3)) : 1.0;
+    
+    const isVert = orientation === 'vertical';
+    const defaultFocusW = isVert ? 50 : 240;
+    const defaultFocusH = isVert ? 240 : 50;
+
+    let posX = 0;
+    let posY = 0;
+
+    if (isVert) {
+      // Pour une zone verticale : son CENTRE est magnétisé par défaut avec le bord gauche du screenshot
+      // Si le bord gauche a déjà un focus vertical, magnétiser avec le bord droit
+      const hasLeftVert = focuses.some(
+        (f) => (f.orientation === 'vertical' || f.height > f.width) && Math.abs((f.x + f.width / 2) - bounds.bgX) < 20
+      );
+      posX = hasLeftVert ? Math.round(bounds.bgX + bounds.bgWidth - defaultFocusW / 2) : Math.round(bounds.bgX - defaultFocusW / 2);
+      
+      let candidateY = Math.round(bounds.bgY + 20 + ((nextStep - 1) % 4) * 30);
+      while (focuses.some((f) => Math.abs(f.y - candidateY) < 30 && Math.abs(f.x - posX) < 30)) {
+        candidateY += 35;
+      }
+      posY = candidateY;
+    } else {
+      const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
+      posX = Math.round(phoneCenterX - defaultFocusW / 2);
+
+      // Calcul intelligent de la position Y pour ne jamais chevaucher une zone existante
+      let candidateY = Math.round(bounds.bgY + 40 + (nextStep - 1) * 60);
+      while (focuses.some((f) => Math.abs(f.y - candidateY) < 40 && Math.abs(f.x - posX) < 40)) {
+        candidateY += 60;
+      }
+      if (candidateY > bounds.bgY + bounds.bgHeight - 50) {
+        candidateY = Math.round(bounds.bgY + 20 + ((focuses.length * 25) % 150));
+      }
+      posY = candidateY;
+    }
+
+    const defaultZoom = isVert
+      ? 1.2
+      : (bounds.bgWidth > 0 ? Number((defaultFocusW / bounds.bgWidth).toFixed(3)) : 1.0);
 
     const newFocus: FocusZone = {
       id: `focus-${Date.now()}`,
@@ -392,6 +440,7 @@ export default function App() {
       y: posY,
       width: defaultFocusW,
       height: defaultFocusH,
+      orientation: orientation,
       zoom: defaultZoom,
       sourceOffsetX: 0,
       sourceOffsetY: 0,
@@ -422,20 +471,33 @@ export default function App() {
     }
   };
 
-  const handleAddFocusAt = (x: number, y: number, w?: number, h = 50, label?: string) => {
+  const handleAddFocusAt = (
+    x: number, 
+    y: number, 
+    w?: number, 
+    h?: number, 
+    label?: string, 
+    orientation?: 'horizontal' | 'vertical'
+  ) => {
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
     const maxExisting = focuses.reduce((max, f) => Math.max(max, f.stepNumber || 0), 0);
     const nextStep = maxExisting > 0 ? maxExisting + 1 : focuses.length + 1;
-    const defaultFocusW = 240;
+    const isVert = orientation === 'vertical' || (h !== undefined && w !== undefined && h > w);
+    const defaultFocusW = isVert ? 50 : 240;
+    const defaultFocusH = isVert ? 240 : 50;
     const focusW = w !== undefined ? w : defaultFocusW;
-    const defaultZoom = bounds.bgWidth > 0 ? Number((focusW / bounds.bgWidth).toFixed(3)) : 1.0;
+    const focusH = h !== undefined ? h : defaultFocusH;
+    const defaultZoom = isVert
+      ? 1.2
+      : (bounds.bgWidth > 0 ? Number((focusW / bounds.bgWidth).toFixed(3)) : 1.0);
     const newFocus: FocusZone = {
       id: `focus-${Date.now()}`,
       name: label || `Zone ${nextStep}`,
       x,
       y,
       width: focusW,
-      height: h,
+      height: focusH,
+      orientation: orientation || (focusH > focusW ? 'vertical' : 'horizontal'),
       zoom: defaultZoom,
       sourceOffsetX: 0,
       sourceOffsetY: 0,
@@ -505,6 +567,7 @@ export default function App() {
     const remaining = focuses.filter((f) => f.id !== id);
     const updated = remaining.map((f, i) => ({
       ...f,
+      name: f.name.startsWith('Zone ') ? `Zone ${i + 1}` : f.name,
       stepNumber: i + 1,
     }));
     setFocuses(updated);
@@ -1083,8 +1146,12 @@ export default function App() {
         return;
       }
 
-      // Escape: Quitter la prévisualisation ou désélectionner
+      // Escape: Quitter le recadrage interne, la prévisualisation ou désélectionner
       if (e.key === 'Escape') {
+        if (internalFramingFocusId) {
+          setInternalFramingFocusId(null);
+          return;
+        }
         if (isPreviewMode) {
           setIsPreviewMode(false);
           return;
@@ -1097,10 +1164,44 @@ export default function App() {
         return;
       }
 
+      // Enter: Valider et quitter le mode recadrage interne
+      if (e.key === 'Enter' && internalFramingFocusId) {
+        setInternalFramingFocusId(null);
+        return;
+      }
+
       // Add Focus: 'a' / 'A' (strictly without modifier keys to prevent unintended creation)
       if ((e.key === 'a' || e.key === 'A') && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         handleAddFocus();
+        return;
+      }
+
+      // Basculer orientation Verticale (50x240) / Horizontale (240x50): 'v' / 'V'
+      if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey && !e.altKey && selectedFocusId) {
+        e.preventDefault();
+        const curFocus = focuses.find((f) => f.id === selectedFocusId);
+        if (curFocus) {
+          const isV = curFocus.orientation === 'vertical' || curFocus.height > curFocus.width;
+          const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
+          if (isV) {
+            const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
+            handleUpdateFocus({
+              orientation: 'horizontal',
+              width: 240,
+              height: 50,
+              x: Math.round(phoneCenterX - 240 / 2),
+            });
+          } else {
+            handleUpdateFocus({
+              orientation: 'vertical',
+              width: 50,
+              height: 240,
+              x: Math.round(bounds.bgX - 50 / 2),
+              zoom: 1.2,
+            });
+          }
+        }
         return;
       }
 
@@ -1157,10 +1258,19 @@ export default function App() {
         } else if (selectedFocusId) {
           const current = focuses.find((f) => f.id === selectedFocusId);
           if (current) {
-            handleUpdateFocus({
-              x: current.x + dx,
-              y: current.y + dy,
-            });
+            // Si Alt est maintenu ou si le mode recadrage interne est actif :
+            // Déplacer le screenshot dans la zone focus sans altérer la capture d'origine
+            if (e.altKey || internalFramingFocusId === selectedFocusId) {
+              handleUpdateFocus({
+                sourceOffsetX: Math.round((current.sourceOffsetX || 0) + dx),
+                sourceOffsetY: Math.round((current.sourceOffsetY || 0) + dy),
+              });
+            } else {
+              handleUpdateFocus({
+                x: current.x + dx,
+                y: current.y + dy,
+              });
+            }
             handled = true;
           }
         } else if (selectedBlurId) {
@@ -1227,6 +1337,7 @@ export default function App() {
     maskShapes,
     triangles,
     selectedFocusId,
+    internalFramingFocusId,
     selectedBlurId,
     selectedMaskId,
     selectedTriangleId,
@@ -1268,6 +1379,8 @@ export default function App() {
           onSelectFocus={handleSelectFocus}
           onUpdateFocus={handleUpdateFocus}
           onRenumberFocuses={handleAutoRenumberFocuses}
+          internalFramingFocusId={internalFramingFocusId}
+          onToggleInternalFraming={handleToggleInternalFraming}
           onAddFocus={handleAddFocus}
           onDeleteFocus={handleDeleteFocus}
           onDuplicateFocus={handleDuplicateFocus}
@@ -1344,6 +1457,8 @@ export default function App() {
           onDuplicateFocus={handleDuplicateFocus}
           onCenterFocusHorizontally={handleCenterFocusHorizontally}
           onRenumberFocuses={handleAutoRenumberFocuses}
+          internalFramingFocusId={internalFramingFocusId}
+          onToggleInternalFraming={handleToggleInternalFraming}
           globalStyles={globalStyles}
           onUpdateGlobalStyles={(updated) => setGlobalStyles((prev) => ({ ...prev, ...updated }))}
           blurZones={blurZones}

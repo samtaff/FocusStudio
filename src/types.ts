@@ -10,6 +10,7 @@ export interface FocusZone {
   y: number;
   width: number;
   height: number;
+  orientation?: 'horizontal' | 'vertical'; // default 'horizontal' (240x50) or 'vertical' (50x240)
   
   // Magnification & Source sampling
   zoom: number; // e.g., 1.0 to 3.5 (default: 1.4)

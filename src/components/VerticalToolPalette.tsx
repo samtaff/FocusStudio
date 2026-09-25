@@ -35,7 +35,7 @@ interface VerticalToolPaletteProps {
   focuses: FocusZone[];
   selectedFocus: FocusZone | null;
   onSelectFocus?: (id: string) => void;
-  onAddFocus: () => void;
+  onAddFocus: (orientation?: 'horizontal' | 'vertical') => void;
   onDeleteFocus?: () => void;
   onDeleteFocusWithId?: (id: string) => void;
   onDuplicateFocus?: (id: string) => void;
@@ -118,6 +118,7 @@ interface RadialToolOptionsProps {
   onAdd: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  canAdd?: boolean;
   canDuplicate?: boolean;
   canDelete?: boolean;
   addTitle?: string;
@@ -143,6 +144,7 @@ const RadialToolOptions: React.FC<RadialToolOptionsProps> = ({
   onAdd,
   onDuplicate,
   onDelete,
+  canAdd = true,
   canDuplicate = true,
   canDelete = true,
   addTitle = "Ajouter (+)",
@@ -166,13 +168,16 @@ const RadialToolOptions: React.FC<RadialToolOptionsProps> = ({
         {/* Option A: Ajouter (+) */}
         <button
           type="button"
-          title={addTitle}
+          title={!canAdd ? "Aucune zone active" : addTitle}
+          disabled={!canAdd}
           onClick={(e) => {
             e.stopPropagation();
             e.currentTarget.blur();
-            onAdd();
+            if (canAdd) onAdd();
           }}
-          className="uiverse-radial-option pointer-events-auto"
+          className={`uiverse-radial-option pointer-events-auto ${
+            !canAdd ? 'opacity-40 cursor-not-allowed' : ''
+          }`}
           style={{
             ['--target-x' as string]: `${dirX * 34}px`,
             ['--target-y' as string]: '-42px',
@@ -258,13 +263,16 @@ const RadialToolOptions: React.FC<RadialToolOptionsProps> = ({
       {/* Option A: Ajouter (+) */}
       <button
         type="button"
-        title={addTitle}
+        title={!canAdd ? "Aucun élément actif" : addTitle}
+        disabled={!canAdd}
         onClick={(e) => {
           e.stopPropagation();
           e.currentTarget.blur();
-          onAdd();
+          if (canAdd) onAdd();
         }}
-        className="uiverse-radial-option pointer-events-auto"
+        className={`uiverse-radial-option pointer-events-auto ${
+          !canAdd ? 'opacity-40 cursor-not-allowed' : ''
+        }`}
         style={{
           ['--target-x' as string]: `${dirX * 42}px`,
           ['--target-y' as string]: '-38px',
@@ -427,7 +435,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
   // Gestion du déplacement libre
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('input') || target.closest('.uiverse-radial-option')) {
+    if (target.closest('button') || target.closest('input') || target.closest('.uiverse-radial-option') || target.closest('.uiverse-radial-pill')) {
       return;
     }
 
@@ -577,102 +585,165 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
         <RadialToolOptions
           isOpen={activeMenu === 'focus'}
           dirX={dirX}
-          addTitle="Ajouter une zone de focus (+)"
+          canAdd={focuses.length > 0}
+          addTitle={focuses.length > 0 ? "Ajouter une autre zone de focus (+)" : "Aucune zone active"}
           duplicateTitle="Dupliquer la zone de focus active"
           deleteTitle="Supprimer la zone de focus active"
           canDuplicate={focuses.length > 0}
           canDelete={focuses.length > 0}
           pillContent={
-            <div
-              className="uiverse-radial-pill pointer-events-auto flex items-center gap-1 px-1.5"
-              style={{
-                ['--target-x' as string]: `${dirX * 72}px`,
-                ['--target-y' as string]: '0px',
-              }}
-              onWheel={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (e.deltaY < 0) {
-                  handleStepNumberChange(currentStepNumber + 1);
-                } else {
-                  handleStepNumberChange(currentStepNumber - 1);
-                }
-              }}
-            >
-              {/* Checkbox / Toggle Masquer-Afficher */}
-              <button
-                type="button"
-                title={targetFocus?.showStepBadge !== false ? "Masquer la pastille sur le visuel" : "Afficher la pastille sur le visuel"}
-                onClick={(e) => {
+            focuses.length > 0 ? (
+              <div
+                className="uiverse-radial-pill pointer-events-auto flex items-center gap-1 px-1.5"
+                style={{
+                  ['--target-x' as string]: `${dirX * 72}px`,
+                  ['--target-y' as string]: '0px',
+                }}
+                onWheel={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
-                  if (targetFocus && onUpdateFocus) {
-                    onUpdateFocus(targetFocus.id, { showStepBadge: targetFocus.showStepBadge === false });
+                  if (e.deltaY < 0) {
+                    handleStepNumberChange(currentStepNumber + 1);
+                  } else {
+                    handleStepNumberChange(currentStepNumber - 1);
                   }
                 }}
-                className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                  targetFocus?.showStepBadge !== false
-                    ? 'text-sky-400 hover:text-sky-300 hover:bg-white/10'
-                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/10 opacity-70'
-                }`}
               >
-                {targetFocus?.showStepBadge !== false ? (
-                  <Eye className="w-3.5 h-3.5 stroke-[2.2]" />
-                ) : (
-                  <EyeOff className="w-3.5 h-3.5 stroke-[2.2] text-rose-400" />
-                )}
-              </button>
+                {/* Checkbox / Toggle Masquer-Afficher */}
+                <button
+                  type="button"
+                  title={targetFocus?.showStepBadge !== false ? "Masquer la pastille sur le visuel" : "Afficher la pastille sur le visuel"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (targetFocus && onUpdateFocus) {
+                      onUpdateFocus(targetFocus.id, { showStepBadge: targetFocus.showStepBadge === false });
+                    }
+                  }}
+                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+                    targetFocus?.showStepBadge !== false
+                      ? 'text-sky-400 hover:text-sky-300 hover:bg-white/10'
+                      : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/10 opacity-70'
+                  }`}
+                >
+                  {targetFocus?.showStepBadge !== false ? (
+                    <Eye className="w-3.5 h-3.5 stroke-[2.2]" />
+                  ) : (
+                    <EyeOff className="w-3.5 h-3.5 stroke-[2.2] text-rose-400" />
+                  )}
+                </button>
 
-              <div className="w-px h-3.5 bg-white/20" />
+                <div className="w-px h-3.5 bg-white/20" />
 
-              {/* Bouton Moins (-) */}
-              <button
-                type="button"
-                title="Diminuer le numéro (-1)"
-                disabled={currentStepNumber <= 1}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleStepNumberChange(currentStepNumber - 1);
-                }}
-                className="w-5 h-5 rounded-full flex items-center justify-center text-white/90 hover:text-white hover:bg-white/15 disabled:opacity-25 disabled:cursor-not-allowed transition-all text-xs font-bold"
-              >
-                <Minus className="w-3 h-3 stroke-[2.5]" />
-              </button>
+                {/* Bouton Moins (-) */}
+                <button
+                  type="button"
+                  title="Diminuer le numéro d'étape (-1)"
+                  disabled={currentStepNumber <= 1}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStepNumberChange(currentStepNumber - 1);
+                  }}
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-white/90 hover:text-white hover:bg-white/15 disabled:opacity-25 disabled:cursor-not-allowed transition-all text-xs font-bold"
+                >
+                  <Minus className="w-3 h-3 stroke-[2.5]" />
+                </button>
 
-              {/* Champ Numéro de pastille (éditable directement) */}
-              <input
-                type="text"
-                value={currentStepNumber}
-                title="Numéro de pastille (cliquer pour éditer, ou molette pour ajuster)"
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  if (!isNaN(val)) {
-                    handleStepNumberChange(val);
+                {/* Champ Numéro de pastille (éditable directement) */}
+                <div className="flex items-center gap-0.5 px-1 bg-white/10 hover:bg-white/20 focus-within:bg-white/25 rounded transition-all">
+                  <span className="text-[10px] text-white/60 font-semibold select-none">N°</span>
+                  <input
+                    type="text"
+                    value={currentStepNumber}
+                    title="Numéro d'étape du badge (cliquer pour éditer, ou molette pour ajuster)"
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val)) {
+                        handleStepNumberChange(val);
+                      }
+                    }}
+                    onFocus={() => {
+                      setIsTyping(true);
+                      handleMenuMouseEnter();
+                    }}
+                    onBlur={() => setIsTyping(false)}
+                    className={`w-5 h-5 text-center text-xs font-black bg-transparent text-white focus:outline-none select-all transition-all ${
+                      targetFocus?.showStepBadge === false ? 'line-through opacity-45' : ''
+                    }`}
+                  />
+                </div>
+
+                {/* Bouton Plus (+) */}
+                <button
+                  type="button"
+                  title="Augmenter le numéro d'étape (+1)"
+                  disabled={currentStepNumber >= 99}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStepNumberChange(currentStepNumber + 1);
+                  }}
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-white/90 hover:text-white hover:bg-white/15 disabled:opacity-25 disabled:cursor-not-allowed transition-all text-xs font-bold"
+                >
+                  <Plus className="w-3 h-3 stroke-[2.5]" />
+                </button>
+
+                <div className="w-px h-3.5 bg-white/20" />
+
+                {/* Bouton Orientation (Horizontal 240x50 / Vertical 50x240) */}
+                <button
+                  type="button"
+                  title={
+                    targetFocus?.orientation === 'vertical' || (targetFocus && targetFocus.height > targetFocus.width)
+                      ? "Zone verticale active (50x240px) • Cliquer pour passer en horizontale"
+                      : "Zone horizontale active (240x50px) • Cliquer pour passer en verticale"
                   }
-                }}
-                onFocus={() => {
-                  setIsTyping(true);
-                  handleMenuMouseEnter();
-                }}
-                onBlur={() => setIsTyping(false)}
-                className={`w-7 h-5 text-center text-xs font-black bg-white/10 hover:bg-white/20 focus:bg-white/25 rounded text-white focus:outline-none focus:ring-1 focus:ring-sky-400 select-all transition-all ${
-                  targetFocus?.showStepBadge === false ? 'line-through opacity-45' : ''
-                }`}
-              />
-
-              {/* Bouton Plus (+) */}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (targetFocus && onUpdateFocus) {
+                      const isV = targetFocus.orientation === 'vertical' || targetFocus.height > targetFocus.width;
+                      if (isV) {
+                        onUpdateFocus(targetFocus.id, {
+                          orientation: 'horizontal',
+                          width: 240,
+                          height: 50,
+                        });
+                      } else {
+                        onUpdateFocus(targetFocus.id, {
+                          orientation: 'vertical',
+                          width: 50,
+                          height: 240,
+                          zoom: 1.2,
+                        });
+                      }
+                    }
+                  }}
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-white/90 hover:text-white hover:bg-white/15 transition-all"
+                >
+                  {targetFocus?.orientation === 'vertical' || (targetFocus && targetFocus.height > targetFocus.width) ? (
+                    <span className="w-1.5 h-3 border border-sky-300 bg-sky-400/40 rounded-2xs inline-block" />
+                  ) : (
+                    <span className="w-3 h-1.5 border border-white/80 rounded-2xs inline-block" />
+                  )}
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
-                title="Augmenter le numéro (+1)"
-                disabled={currentStepNumber >= 99}
+                title="Ajouter une zone de focus (+)"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleStepNumberChange(currentStepNumber + 1);
+                  onAddFocus('horizontal');
+                  closeMenu();
                 }}
-                className="w-5 h-5 rounded-full flex items-center justify-center text-white/90 hover:text-white hover:bg-white/15 disabled:opacity-25 disabled:cursor-not-allowed transition-all text-xs font-bold"
+                className="uiverse-radial-pill pointer-events-auto flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-sky-400 hover:text-white"
+                style={{
+                  ['--target-x' as string]: `${dirX * 65}px`,
+                  ['--target-y' as string]: '0px',
+                }}
               >
-                <Plus className="w-3 h-3 stroke-[2.5]" />
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Ajouter une zone</span>
               </button>
-            </div>
+            )
           }
           extraAction={focuses.length > 1 && onRenumberFocuses ? {
             icon: <RotateCcw className="w-3.5 h-3.5 stroke-[2.2]" />,
@@ -680,21 +751,24 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
             onClick: onRenumberFocuses,
           } : undefined}
           onAdd={() => {
-            onAddFocus();
-            onSelectTool('select');
+            onAddFocus(targetFocus?.orientation || 'horizontal');
+            closeMenu();
           }}
           onDuplicate={() => {
             const targetId = selectedFocus ? selectedFocus.id : (focuses[0] ? focuses[0].id : null);
             if (targetId && onDuplicateFocus) {
               onDuplicateFocus(targetId);
             }
-            onSelectTool('select');
+            closeMenu();
           }}
           onDelete={() => {
             const targetId = selectedFocus ? selectedFocus.id : (focuses[0] ? focuses[0].id : null);
             if (targetId) {
               if (onDeleteFocusWithId) onDeleteFocusWithId(targetId);
               else onDeleteFocus?.();
+            }
+            if (focuses.length <= 1) {
+              closeMenu();
             }
             onSelectTool('select');
           }}

@@ -31,7 +31,7 @@ interface CanvasWorkspaceProps {
   onSelectFocus: (id: string | null) => void;
   onUpdateFocus: (updated: Partial<FocusZone>) => void;
   onRenumberFocuses?: () => void;
-  onAddFocus: () => void;
+  onAddFocus: (orientation?: 'horizontal' | 'vertical') => void;
   onDeleteFocus?: (id: string) => void;
   onDuplicateFocus?: (id: string) => void;
   onAddFocusAt: (x: number, y: number, w?: number, h?: number, label?: string) => void;
@@ -94,6 +94,9 @@ interface CanvasWorkspaceProps {
   // Workspace centering & reset
   resetWorkspaceTrigger?: number;
   onCenterWorkspace?: () => void;
+  // Internal screenshot framing inside focus zone
+  internalFramingFocusId?: string | null;
+  onToggleInternalFraming?: (id: string | null) => void;
   // History
   onUndo?: () => void;
   onRedo?: () => void;
@@ -163,6 +166,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onImportClick,
   resetWorkspaceTrigger,
   onCenterWorkspace: externalCenterWorkspace,
+  internalFramingFocusId = null,
+  onToggleInternalFraming,
   onUndo,
   onRedo,
   canUndo = false,
@@ -182,6 +187,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
   // Drag & Resize State
   const [dragState, setDragState] = useState<DragState | null>(null);
+  // Internal screenshot framing drag (Alt + drag inside focus zone)
+  const [dragFramingState, setDragFramingState] = useState<{
+    focusId: string;
+    startX: number;
+    startY: number;
+    initialOffsetX: number;
+    initialOffsetY: number;
+  } | null>(null);
   const [dragBlurState, setDragBlurState] = useState<{
     id: string;
     startX: number;
@@ -291,6 +304,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const handleGlobalMouseUp = () => {
       setIsPanning(false);
       setDragState(null);
+      setDragFramingState(null);
       setDragBlurState(null);
       setDragMaskState(null);
       setDragTriangleState(null);
@@ -353,6 +367,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       selectedFocusId: isPreviewMode ? null : selectedFocusId,
       hoveredFocusId: isPreviewMode ? null : hoveredFocusId,
       hoveredHandle: isPreviewMode ? null : hoveredHandle,
+      internalFramingFocusId: isPreviewMode ? null : internalFramingFocusId,
       smartGuides: isPreviewMode ? [] : activeGuides,
       userGuides: isPreviewMode ? [] : userGuides,
       globalStyles,
@@ -631,6 +646,17 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
+    // Déplacement / Cadrage interne du screenshot dans la zone focus (Alt + Glisser ou mode recadrage actif)
+    if (dragFramingState && dragFramingState.focusId) {
+      const dx = cx - dragFramingState.startX;
+      const dy = cy - dragFramingState.startY;
+      onUpdateFocus({
+        sourceOffsetX: Math.round(dragFramingState.initialOffsetX + dx),
+        sourceOffsetY: Math.round(dragFramingState.initialOffsetY + dy),
+      });
+      return;
+    }
+
     // Dragging Focus Zone
     if (dragState && dragState.focusId) {
       const dx = cx - dragState.startX;
@@ -643,25 +669,89 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
         // Alignment guides
         const currentGuides: SmartGuide[] = [];
+        const isVertical = init.orientation === 'vertical' || init.height > init.width;
         const focusCenterX = newX + init.width / 2;
         const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
-        const snapDist = 6;
+        const phoneLeft = bounds.bgX;
+        const phoneRight = bounds.bgX + bounds.bgWidth;
+        const snapDist = 8;
 
-        if (Math.abs(focusCenterX - phoneCenterX) <= snapDist) {
-          newX = Math.round(phoneCenterX - init.width / 2);
+        if (isVertical) {
+          // Le magnétisme en mode vertical se base sur le CENTRE de la zone focus
+          let snappedX = false;
+
+          // 1. Bord gauche du screenshot original : aligner le CENTRE du focus sur le bord gauche
+          if (Math.abs(focusCenterX - phoneLeft) <= snapDist) {
+            newX = Math.round(phoneLeft - init.width / 2);
+            currentGuides.push({
+              type: 'vertical',
+              position: phoneLeft,
+              label: 'Bord gauche (Centré)',
+              color: '#0088cc',
+            });
+            snappedX = true;
+          }
+          // 2. Bord droit du screenshot original : aligner le CENTRE du focus sur le bord droit
+          else if (Math.abs(focusCenterX - phoneRight) <= snapDist) {
+            newX = Math.round(phoneRight - init.width / 2);
+            currentGuides.push({
+              type: 'vertical',
+              position: phoneRight,
+              label: 'Bord droit (Centré)',
+              color: '#0088cc',
+            });
+            snappedX = true;
+          }
+          // 3. Centre horizontal du screenshot original : aligner le CENTRE du focus sur le centre du screenshot
+          else if (Math.abs(focusCenterX - phoneCenterX) <= snapDist) {
+            newX = Math.round(phoneCenterX - init.width / 2);
+            currentGuides.push({
+              type: 'vertical',
+              position: phoneCenterX,
+              label: 'Centre Screenshot',
+              color: '#38bdf8',
+            });
+            snappedX = true;
+          }
+
+          // Magnétisme vertical (Haut / Bas du screenshot)
+          const phoneTop = bounds.bgY;
+          const phoneBottom = bounds.bgY + bounds.bgHeight;
+          if (Math.abs(newY - phoneTop) <= snapDist) {
+            newY = Math.round(phoneTop);
+            currentGuides.push({
+              type: 'horizontal',
+              position: phoneTop,
+              label: 'Haut Screenshot',
+              color: '#10b981',
+            });
+          } else if (Math.abs((newY + init.height) - phoneBottom) <= snapDist) {
+            newY = Math.round(phoneBottom - init.height);
+            currentGuides.push({
+              type: 'horizontal',
+              position: phoneBottom,
+              label: 'Bas Screenshot',
+              color: '#10b981',
+            });
+          }
+        } else {
+          // Focus horizontal standard : centre et ligne horizontale
+          if (Math.abs(focusCenterX - phoneCenterX) <= snapDist) {
+            newX = Math.round(phoneCenterX - init.width / 2);
+            currentGuides.push({
+              type: 'vertical',
+              position: phoneCenterX,
+              label: 'Centre',
+              color: '#38bdf8',
+            });
+          }
+
           currentGuides.push({
-            type: 'vertical',
-            position: phoneCenterX,
-            label: 'Centre',
-            color: '#38bdf8',
+            type: 'horizontal',
+            position: newY + init.height / 2,
+            color: 'rgba(16, 185, 129, 0.6)',
           });
         }
-
-        currentGuides.push({
-          type: 'horizontal',
-          position: newY + init.height / 2,
-          color: 'rgba(16, 185, 129, 0.6)',
-        });
 
         setActiveGuides(currentGuides);
 
@@ -952,6 +1042,20 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       onSelectBlur(null);
       onSelectMask(null);
       onSelectTriangle?.(null);
+
+      // Si la touche Alt est maintenue ou si la zone est en mode recadrage interne :
+      // -> Déplacer le screenshot dans la zone focus sans altérer la capture d'origine
+      if (e.altKey || internalFramingFocusId === clickedFocus.id) {
+        setDragFramingState({
+          focusId: clickedFocus.id,
+          startX: cx,
+          startY: cy,
+          initialOffsetX: clickedFocus.sourceOffsetX || 0,
+          initialOffsetY: clickedFocus.sourceOffsetY || 0,
+        });
+        return;
+      }
+
       const attachedArrow = arrows.find((a) => a.focusId === clickedFocus.id);
 
       setDragState({
@@ -997,6 +1101,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const handleMouseUp = () => {
     if (isPanning) setIsPanning(false);
     if (dragCalloutState) setDragCalloutState(null);
+    if (dragFramingState) setDragFramingState(null);
     if (dragState) {
       setDragState(null);
       setActiveGuides([]);
@@ -1007,16 +1112,28 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   };
 
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
+
+    // Double-clic sur une zone focus : activer / quitter le mode recadrage interne
+    const clickedFocus = getFocusAtCoord(cx, cy);
+    if (clickedFocus) {
+      onSelectFocus(clickedFocus.id);
+      onToggleInternalFraming?.(clickedFocus.id);
+      return;
+    }
+
     // Only allow double-click creation if user explicitly has the 'focus' tool selected
     if (activeTool !== 'focus') return;
-    const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
-    const defaultW = 240;
-    const defaultH = 50;
+    const isVert = e.altKey || e.shiftKey;
+    const defaultW = isVert ? 50 : 240;
+    const defaultH = isVert ? 240 : 50;
     onAddFocusAt(
       Math.round(cx - defaultW / 2),
       Math.round(cy - defaultH / 2),
       defaultW,
-      defaultH
+      defaultH,
+      undefined,
+      isVert ? 'vertical' : 'horizontal'
     );
     onSelectTool('select');
   };
@@ -1080,6 +1197,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   // Cursor style calculation
   const getCursor = () => {
     if (isSpacePressed || isPanning) return isPanning ? 'grabbing' : 'grab';
+    if (dragFramingState) return 'grabbing';
     if (activeTool === 'zoom') return isAltPressed ? 'zoom-out' : 'zoom-in';
     if (activeTool === 'blur' || activeTool === 'mask' || activeTool === 'triangle') return 'crosshair';
     if (isPanMode) return 'grab';
@@ -1108,6 +1226,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return 'grab';
     }
     if (hoveredFocusId && !calloutVignette?.enabled) {
+      if (isAltPressed || internalFramingFocusId === hoveredFocusId) {
+        return 'all-scroll';
+      }
       return hoveredFocusId === selectedFocusId ? 'move' : 'pointer';
     }
 
@@ -1183,6 +1304,41 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               title="Quitter la prévisualisation"
             >
               <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Banner indicator if Internal Framing Mode is ON */}
+        {!isPreviewMode && internalFramingFocusId && selectedFocus && (
+          <div className="absolute top-4 z-40 bg-[#25465F]/95 text-white backdrop-blur-xl px-4 py-2 rounded-2xl shadow-xl border border-sky-400/40 flex items-center gap-3 text-xs font-medium animate-in fade-in slide-in-from-top-2 select-none">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+              <span className="font-semibold text-white">Mode Cadrage interne :</span>
+              <span className="font-mono text-sky-200">
+                X: {(selectedFocus.sourceOffsetX ?? 0) > 0 ? `+${Math.round(selectedFocus.sourceOffsetX ?? 0)}` : Math.round(selectedFocus.sourceOffsetX ?? 0)}px, 
+                Y: {(selectedFocus.sourceOffsetY ?? 0) > 0 ? `+${Math.round(selectedFocus.sourceOffsetY ?? 0)}` : Math.round(selectedFocus.sourceOffsetY ?? 0)}px
+              </span>
+            </div>
+            <span className="text-[11px] text-sky-100/70 hidden md:inline">
+              Glissez la souris ou utilisez les flèches (Alt pour 1px, Shift pour 10px)
+            </span>
+            {((selectedFocus.sourceOffsetX ?? 0) !== 0 || (selectedFocus.sourceOffsetY ?? 0) !== 0) && (
+              <button
+                type="button"
+                onClick={() => onUpdateFocus({ sourceOffsetX: 0, sourceOffsetY: 0 })}
+                className="px-2 py-0.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-[10px] font-medium transition-colors"
+                title="Recentrer à (0, 0)"
+              >
+                Recentrer
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onToggleInternalFraming?.(null)}
+              className="px-2.5 py-1 rounded-full bg-white text-[#25465F] hover:bg-sky-50 font-bold text-[11px] transition-all shadow-sm"
+              title="Terminer le recadrage (Échap ou Entrée)"
+            >
+              Terminer
             </button>
           </div>
         )}
