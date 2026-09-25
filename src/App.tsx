@@ -699,6 +699,33 @@ export default function App() {
     handleSelectMask(duplicated.id);
   };
 
+  const handleSplitMaskMultiplier = (id: string) => {
+    const target = maskShapes.find((m) => m.id === id);
+    if (!target || !target.multiplier?.enabled) return;
+    const cols = Math.max(1, target.multiplier.cols || 2);
+    const rows = Math.max(1, target.multiplier.rows || 2);
+    const gapX = target.multiplier.gapX ?? 10;
+    const gapY = target.multiplier.gapY ?? 10;
+    const newShapes: MaskShape[] = [];
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const itemX = target.x + c * (target.width + gapX);
+        const itemY = target.y + r * (target.height + gapY);
+        newShapes.push({
+          ...target,
+          id: `mask-${Date.now()}-${r}-${c}`,
+          name: `${target.name} (${r + 1},${c + 1})`,
+          x: Math.round(itemX),
+          y: Math.round(itemY),
+          multiplier: undefined,
+        });
+      }
+    }
+    setMaskShapes((prev) => [...prev.filter((m) => m.id !== id), ...newShapes]);
+    if (newShapes[0]) handleSelectMask(newShapes[0].id);
+  };
+
   // Triangle Shape Management (15x13px, #25465F ou blanc)
   const handleAddTriangle = (x?: number, y?: number) => {
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
@@ -1477,6 +1504,7 @@ export default function App() {
           onAddMask={() => handleAddMaskShape()}
           onUpdateMask={handleUpdateMaskShape}
           onDeleteMask={handleDeleteMaskShape}
+          onSplitMaskMultiplier={handleSplitMaskMultiplier}
           triangles={triangles}
           selectedTriangleId={selectedTriangleId}
           onSelectTriangle={handleSelectTriangle}

@@ -489,8 +489,24 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const getMaskAtCoord = (cx: number, cy: number): MaskShape | null => {
     for (let i = maskShapes.length - 1; i >= 0; i--) {
       const m = maskShapes[i];
-      if (cx >= m.x && cx <= m.x + m.width && cy >= m.y && cy <= m.y + m.height) {
-        return m;
+      if (m.multiplier?.enabled) {
+        const cols = Math.max(1, m.multiplier.cols || 2);
+        const rows = Math.max(1, m.multiplier.rows || 2);
+        const gapX = m.multiplier.gapX ?? 10;
+        const gapY = m.multiplier.gapY ?? 10;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const ix = m.x + c * (m.width + gapX);
+            const iy = m.y + r * (m.height + gapY);
+            if (cx >= ix && cx <= ix + m.width && cy >= iy && cy <= iy + m.height) {
+              return m;
+            }
+          }
+        }
+      } else {
+        if (cx >= m.x && cx <= m.x + m.width && cy >= m.y && cy <= m.y + m.height) {
+          return m;
+        }
       }
     }
     return null;
@@ -915,7 +931,17 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     // 2. Check if clicking handles on selected Mask Shape
     const selectedMask = maskShapes.find((m) => m.id === selectedMaskId);
     if (selectedMask) {
-      const handle = getGenericHandleAtCoord(cx, cy, selectedMask);
+      let handleRect = selectedMask;
+      if (selectedMask.multiplier?.enabled) {
+        const cols = Math.max(1, selectedMask.multiplier.cols || 2);
+        const rows = Math.max(1, selectedMask.multiplier.rows || 2);
+        const gapX = selectedMask.multiplier.gapX ?? 10;
+        const gapY = selectedMask.multiplier.gapY ?? 10;
+        const totalW = cols * selectedMask.width + (cols - 1) * gapX;
+        const totalH = rows * selectedMask.height + (rows - 1) * gapY;
+        handleRect = { x: selectedMask.x, y: selectedMask.y, width: totalW, height: totalH };
+      }
+      const handle = getGenericHandleAtCoord(cx, cy, handleRect) || getGenericHandleAtCoord(cx, cy, selectedMask);
       if (handle) {
         setDragMaskState({
           id: selectedMask.id,

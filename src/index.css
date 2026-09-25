@@ -103,33 +103,77 @@ body.dark-mode aside .text-\[\#979797\] {
   color: #888888 !important;
 }
 
+/* Any active black button in dark mode inside aside becomes crisp white with black text */
+.dark aside .bg-\[\#000000\],
+body.dark-mode aside .bg-\[\#000000\],
+.dark aside button.bg-\[\#000000\],
+body.dark-mode aside button.bg-\[\#000000\] {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+}
+
 .dark aside .bg-\[\#eeeeee\],
 .dark aside .bg-\[\#eeeeee\]\/80,
+.dark aside .bg-\[\#eeeeee\]\/60,
+.dark aside .bg-\[\#eeeeee\]\/50,
 .dark aside .bg-\[\#eeeeee\]\/40,
 body.dark-mode aside .bg-\[\#eeeeee\],
 body.dark-mode aside .bg-\[\#eeeeee\]\/80,
+body.dark-mode aside .bg-\[\#eeeeee\]\/60,
+body.dark-mode aside .bg-\[\#eeeeee\]\/50,
 body.dark-mode aside .bg-\[\#eeeeee\]\/40 {
-  background-color: #2e2e2e !important;
+  background-color: #2d2d2d !important;
+  border-color: #404040 !important;
   color: #e0e0e0 !important;
 }
 
 .dark aside .bg-slate-50,
 body.dark-mode aside .bg-slate-50 {
   background-color: #262626 !important;
-  border-color: #333333 !important;
+  border-color: #383838 !important;
 }
 
 .dark aside .bg-slate-100,
 body.dark-mode aside .bg-slate-100 {
   background-color: #2e2e2e !important;
-  border-color: #383838 !important;
+  border-color: #404040 !important;
   color: #ffffff !important;
 }
 
 .dark aside .bg-white,
 body.dark-mode aside .bg-white {
   background-color: #282828 !important;
+  border-color: #404040 !important;
   color: #ffffff !important;
+}
+
+/* All pill buttons (rounded-full) in dark mode: ensure high contrast and clear borders */
+.dark aside button.rounded-full,
+body.dark-mode aside button.rounded-full {
+  border-width: 1px;
+}
+
+/* Unselected pill buttons in dark mode: visible border and contrast */
+.dark aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-[#000000]"]):not(.bg-white) {
+  background-color: #2e2e2e !important;
+  border-color: #4a4a4a !important;
+  color: #d6d6d6 !important;
+}
+
+.dark aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):hover {
+  background-color: #383838 !important;
+  border-color: #5c5c5c !important;
+  color: #ffffff !important;
+}
+
+/* Counter / Tag pills in accordion headers and info chips */
+.dark aside span.rounded-full.bg-\[\#eeeeee\],
+body.dark-mode aside span.rounded-full.bg-\[\#eeeeee\],
+.dark aside span.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-rose"]):not([class*="bg-[#25465F]"]) {
+  background-color: #303030 !important;
+  border: 1px solid #484848 !important;
+  color: #cccccc !important;
 }
 
 .dark aside input:not([type="range"]),
@@ -147,12 +191,23 @@ body.dark-mode aside input[type="range"] {
 }
 
 .dark aside .border-\[\#eeeeee\],
+.dark aside .border-\[\#e5e5e5\],
+.dark aside .border-\[\#cccccc\],
 .dark aside .border-\[\#eeeeee\]\/60,
 .dark aside .border-\[\#eeeeee\]\/80,
 body.dark-mode aside .border-\[\#eeeeee\],
+body.dark-mode aside .border-\[\#e5e5e5\],
+body.dark-mode aside .border-\[\#cccccc\],
 body.dark-mode aside .border-\[\#eeeeee\]\/60,
 body.dark-mode aside .border-\[\#eeeeee\]\/80 {
-  border-color: #333333 !important;
+  border-color: #3a3a3a !important;
+}
+
+/* Inner card containers in aside in dark mode */
+.dark aside .rounded-2xl.border-white,
+body.dark-mode aside .rounded-2xl.border-white {
+  border-color: #383838 !important;
+  background-color: #262626 !important;
 }
 
 .dark aside .hover\:bg-\[\#eeeeee\]\/40:hover,

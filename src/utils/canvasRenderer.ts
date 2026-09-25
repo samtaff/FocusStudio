@@ -232,10 +232,23 @@ export function calculateExportBounds(
   });
 
   maskShapes.forEach((m) => {
-    minX = Math.min(minX, m.x);
-    maxX = Math.max(maxX, m.x + m.width);
-    minY = Math.min(minY, m.y);
-    maxY = Math.max(maxY, m.y + m.height);
+    if (m.multiplier?.enabled) {
+      const cols = Math.max(1, m.multiplier.cols || 2);
+      const rows = Math.max(1, m.multiplier.rows || 2);
+      const gapX = m.multiplier.gapX ?? 10;
+      const gapY = m.multiplier.gapY ?? 10;
+      const totalW = cols * m.width + (cols - 1) * gapX;
+      const totalH = rows * m.height + (rows - 1) * gapY;
+      minX = Math.min(minX, m.x);
+      maxX = Math.max(maxX, m.x + totalW);
+      minY = Math.min(minY, m.y);
+      maxY = Math.max(maxY, m.y + totalH);
+    } else {
+      minX = Math.min(minX, m.x);
+      maxX = Math.max(maxX, m.x + m.width);
+      minY = Math.min(minY, m.y);
+      maxY = Math.max(maxY, m.y + m.height);
+    }
   });
 
   triangles.forEach((t) => {
@@ -435,7 +448,40 @@ export function drawComposition(
       if (isHovered) {
         drawMaskHoverHighlight(ctx, mask);
       } else if (isSelected) {
-        drawGenericSelectionHandles(ctx, mask.x, mask.y, mask.width, mask.height, '#38bdf8', mask.name || 'Forme');
+        if (mask.multiplier?.enabled) {
+          const cols = Math.max(1, mask.multiplier.cols || 2);
+          const rows = Math.max(1, mask.multiplier.rows || 2);
+          const gapX = mask.multiplier.gapX ?? 10;
+          const gapY = mask.multiplier.gapY ?? 10;
+          const totalW = cols * mask.width + (cols - 1) * gapX;
+          const totalH = rows * mask.height + (rows - 1) * gapY;
+          
+          // Subtle frame around individual replicated items in the grid
+          ctx.save();
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const ix = mask.x + c * (mask.width + gapX);
+              const iy = mask.y + r * (mask.height + gapY);
+              ctx.strokeRect(ix, iy, mask.width, mask.height);
+            }
+          }
+          ctx.restore();
+
+          drawGenericSelectionHandles(
+            ctx, 
+            mask.x, 
+            mask.y, 
+            totalW, 
+            totalH, 
+            '#38bdf8', 
+            `${mask.name || 'Forme'} (${cols * rows}x)`
+          );
+        } else {
+          drawGenericSelectionHandles(ctx, mask.x, mask.y, mask.width, mask.height, '#38bdf8', mask.name || 'Forme');
+        }
       }
     });
 
@@ -770,63 +816,75 @@ function drawSingleMaskShape(
   const color = mask.color || BASE_COLOR;
   const opacity = mask.opacity ?? 1.0;
 
-  ctx.save();
-  ctx.globalAlpha = opacity;
+  const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 2) : 1;
+  const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 2) : 1;
+  const gapX = mask.multiplier?.gapX ?? 10;
+  const gapY = mask.multiplier?.gapY ?? 10;
 
-  // 1. Clipping mask with an imported screenshot if present
-  if (mask.clipImage && (mask.clipImage.element || mask.clipImage.dataUrl)) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(mask.x, mask.y, mask.width, mask.height, radius);
-    ctx.clip();
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const curX = mask.x + c * (mask.width + gapX);
+      const curY = mask.y + r * (mask.height + gapY);
 
-    // Background base
-    ctx.fillStyle = color;
-    ctx.fillRect(mask.x, mask.y, mask.width, mask.height);
+      ctx.save();
+      ctx.globalAlpha = opacity;
 
-    const imgEl = mask.clipImage.element;
-    if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
-      const scale = mask.clipImage.scale ?? 1;
-      const offX = mask.clipImage.offsetX ?? 0;
-      const offY = mask.clipImage.offsetY ?? 0;
+      // 1. Clipping mask with an imported screenshot if present
+      if (mask.clipImage && (mask.clipImage.element || mask.clipImage.dataUrl)) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(curX, curY, mask.width, mask.height, radius);
+        ctx.clip();
 
-      const destW = mask.width * scale;
-      const destH = mask.height * scale;
-      const destX = mask.x + (mask.width - destW) / 2 + offX;
-      const destY = mask.y + (mask.height - destH) / 2 + offY;
+        // Background base
+        ctx.fillStyle = color;
+        ctx.fillRect(curX, curY, mask.width, mask.height);
 
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(imgEl, destX, destY, destW, destH);
+        const imgEl = mask.clipImage.element;
+        if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
+          const scale = mask.clipImage.scale ?? 1;
+          const offX = mask.clipImage.offsetX ?? 0;
+          const offY = mask.clipImage.offsetY ?? 0;
+
+          const destW = mask.width * scale;
+          const destH = mask.height * scale;
+          const destX = curX + (mask.width - destW) / 2 + offX;
+          const destY = curY + (mask.height - destH) / 2 + offY;
+
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(imgEl, destX, destY, destW, destH);
+        }
+        ctx.restore();
+      } else {
+        // Standard solid color fill
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.roundRect(curX, curY, mask.width, mask.height, radius);
+        ctx.fill();
+      }
+
+      // 2. Contour / Border (only if explicit borderWidth > 0)
+      if (mask.borderWidth && mask.borderWidth > 0) {
+        ctx.save();
+        ctx.strokeStyle = mask.borderColor || BASE_COLOR;
+        ctx.lineWidth = mask.borderWidth;
+        if (mask.borderStyle === 'dashed') {
+          ctx.setLineDash([4, 3]);
+        } else if (mask.borderStyle === 'dotted') {
+          ctx.setLineDash([2, 2]);
+        } else {
+          ctx.setLineDash([]);
+        }
+        ctx.beginPath();
+        ctx.roundRect(curX, curY, mask.width, mask.height, radius);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.restore();
     }
-    ctx.restore();
-  } else {
-    // Standard solid color fill
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.roundRect(mask.x, mask.y, mask.width, mask.height, radius);
-    ctx.fill();
   }
-
-  // 2. Contour / Border (only if explicit borderWidth > 0)
-  if (mask.borderWidth && mask.borderWidth > 0) {
-    ctx.save();
-    ctx.strokeStyle = mask.borderColor || BASE_COLOR;
-    ctx.lineWidth = mask.borderWidth;
-    if (mask.borderStyle === 'dashed') {
-      ctx.setLineDash([4, 3]);
-    } else if (mask.borderStyle === 'dotted') {
-      ctx.setLineDash([2, 2]);
-    } else {
-      ctx.setLineDash([]);
-    }
-    ctx.beginPath();
-    ctx.roundRect(mask.x, mask.y, mask.width, mask.height, radius);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  ctx.restore();
 }
 
 /**
@@ -926,9 +984,27 @@ function drawMaskHoverHighlight(ctx: CanvasRenderingContext2D, mask: MaskShape) 
   ctx.shadowBlur = 6;
   ctx.strokeStyle = '#38bdf8';
   ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
-  ctx.stroke();
+
+  if (mask.multiplier?.enabled) {
+    const cols = Math.max(1, mask.multiplier.cols || 2);
+    const rows = Math.max(1, mask.multiplier.rows || 2);
+    const gapX = mask.multiplier.gapX ?? 10;
+    const gapY = mask.multiplier.gapY ?? 10;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const curX = x + c * (w + gapX);
+        const curY = y + r * (h + gapY);
+        ctx.beginPath();
+        ctx.roundRect(curX - 1, curY - 1, w + 2, h + 2, borderRadius + 1);
+        ctx.stroke();
+      }
+    }
+  } else {
+    ctx.beginPath();
+    ctx.roundRect(x - 1, y - 1, w + 2, h + 2, borderRadius + 1);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 

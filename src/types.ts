@@ -89,6 +89,14 @@ export interface BlurZone {
   pixelSize?: number; // for pixelate mode
 }
 
+export interface MaskMultiplier {
+  enabled: boolean;
+  cols: number; // Number of columns, e.g. 2
+  rows: number; // Number of rows, e.g. 2 (2x2 = 4 shapes)
+  gapX: number; // Horizontal gap between shapes in px, e.g. 10
+  gapY: number; // Vertical gap between shapes in px, e.g. 10
+}
+
 export interface MaskShape {
   id: string;
   name: string;
@@ -102,6 +110,7 @@ export interface MaskShape {
   borderWidth?: number; // 0, 1, 2, etc.
   borderColor?: string;
   borderStyle?: 'solid' | 'dashed' | 'dotted';
+  multiplier?: MaskMultiplier;
   clipImage?: {
     dataUrl: string;
     name: string;

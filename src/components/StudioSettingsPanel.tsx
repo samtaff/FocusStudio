@@ -25,7 +25,11 @@ import {
   Move,
   Crosshair,
   Grid,
-  Shield
+  Shield,
+  LayoutGrid,
+  Link,
+  Unlink,
+  Split
 } from 'lucide-react';
 import { 
   FocusZone, 
@@ -67,6 +71,7 @@ interface StudioSettingsPanelProps {
   onAddMask: () => void;
   onUpdateMask: (id: string, updated: Partial<MaskShape>) => void;
   onDeleteMask: (id: string) => void;
+  onSplitMaskMultiplier?: (id: string) => void;
   // Triangle Shapes (15x13px)
   triangles?: TriangleShape[];
   selectedTriangleId?: string | null;
@@ -135,6 +140,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   onAddMask,
   onUpdateMask,
   onDeleteMask,
+  onSplitMaskMultiplier,
   triangles = [],
   selectedTriangleId = null,
   onSelectTriangle,
@@ -215,6 +221,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const clipImageInputRef = React.useRef<HTMLInputElement>(null);
+  const [isMaskGapsLinked, setIsMaskGapsLinked] = useState<boolean>(true);
 
   const activeBlur = blurZones.find((b) => b.id === selectedBlurId) || null;
   const activeMask = maskShapes.find((m) => m.id === selectedMaskId) || null;
@@ -550,7 +557,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all ${
                         selectedFocus?.id === f.id
                           ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
-                          : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                          : isDarkMode
+                            ? 'bg-[#333333] border border-[#484848] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                            : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                       }`}
                     >
                       Zone {f.stepNumber || idx + 1}
@@ -1367,7 +1376,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all ${
                         selectedBlurId === b.id
                           ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
-                          : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                          : isDarkMode
+                            ? 'bg-[#333333] border border-[#484848] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                            : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                       }`}
                     >
                       {b.name || `Flou ${idx + 1}`}
@@ -1867,7 +1878,362 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Option Masque d'écrêtage avec un autre screenshot */}
+                  {/* Multiplicateur de forme (Répétition / Grille & Espacements) */}
+                  <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <LayoutGrid className="w-3.5 h-3.5 text-[#0088cc]" />
+                        <span className="text-[10px] text-[#000000] font-semibold">
+                          Multiplicateur de forme
+                        </span>
+                        {activeMask.multiplier?.enabled && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-[#0088cc] text-white font-mono font-bold">
+                            {(activeMask.multiplier.cols || 2) * (activeMask.multiplier.rows || 2)}×
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Bouton Toggle Multiplier */}
+                      <button
+                        onClick={() => {
+                          const isCurrentlyEnabled = Boolean(activeMask.multiplier?.enabled);
+                          if (isCurrentlyEnabled) {
+                            onUpdateMask(activeMask.id, {
+                              multiplier: undefined,
+                            });
+                          } else {
+                            onUpdateMask(activeMask.id, {
+                              multiplier: {
+                                enabled: true,
+                                cols: 2,
+                                rows: 2,
+                                gapX: 10,
+                                gapY: 10,
+                              },
+                            });
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all ${
+                          activeMask.multiplier?.enabled
+                            ? 'bg-[#0088cc] text-white shadow-2xs'
+                            : 'bg-white border border-[#cccccc] text-[#444444] hover:bg-[#f5f5f5]'
+                        }`}
+                      >
+                        {activeMask.multiplier?.enabled ? 'Actif' : 'Multiplier'}
+                      </button>
+                    </div>
+
+                    {!activeMask.multiplier?.enabled ? (
+                      <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white border border-[#e5e5e5]">
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[10px] font-semibold text-[#111111]">Multiplier la forme en 4</span>
+                          <span className="text-[9px] text-[#777777]">Grille 2×2 avec espacement ajustable</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            onUpdateMask(activeMask.id, {
+                              multiplier: {
+                                enabled: true,
+                                cols: 2,
+                                rows: 2,
+                                gapX: 10,
+                                gapY: 10,
+                              },
+                            });
+                          }}
+                          className="px-3 py-1.5 rounded-full bg-[#000000] hover:bg-[#25465F] text-white text-[10px] font-semibold transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] shrink-0"
+                        >
+                          Multiplier en 4
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2.5 p-2.5 rounded-xl bg-white border border-[#e5e5e5]">
+                        {/* Presets rapides de disposition (Grille 2x2, Ligne 4x1, Colonne 1x4) */}
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[9px] uppercase font-bold text-[#777777] tracking-wider">
+                            Disposition (Total : {(activeMask.multiplier.cols || 2) * (activeMask.multiplier.rows || 2)} formes)
+                          </span>
+                          <div className="grid grid-cols-3 gap-1">
+                            {[
+                              { label: 'Grille 2×2 (4)', cols: 2, rows: 2 },
+                              { label: 'Ligne 4×1 (4)', cols: 4, rows: 1 },
+                              { label: 'Colonne 1×4 (4)', cols: 1, rows: 4 },
+                            ].map((preset) => {
+                              const isMatch =
+                                (activeMask.multiplier?.cols || 2) === preset.cols &&
+                                (activeMask.multiplier?.rows || 2) === preset.rows;
+                              return (
+                                <button
+                                  key={preset.label}
+                                  onClick={() => {
+                                    onUpdateMask(activeMask.id, {
+                                      multiplier: {
+                                        ...activeMask.multiplier!,
+                                        enabled: true,
+                                        cols: preset.cols,
+                                        rows: preset.rows,
+                                      },
+                                    });
+                                  }}
+                                  className={`py-1 px-1.5 rounded-lg text-[9px] font-medium transition-all text-center ${
+                                    isMatch
+                                      ? 'bg-[#0088cc] text-white font-semibold shadow-2xs'
+                                      : 'bg-[#f4f4f4] hover:bg-[#e8e8e8] text-[#555555]'
+                                  }`}
+                                >
+                                  {preset.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Colonnes & Lignes personnalisées */}
+                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#f0f0f0]">
+                          <div className="flex flex-col gap-0.5">
+                            <label className="text-[9px] text-[#666666] font-medium">Colonnes (H)</label>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  const currentCols = activeMask.multiplier?.cols || 2;
+                                  if (currentCols > 1) {
+                                    onUpdateMask(activeMask.id, {
+                                      multiplier: { ...activeMask.multiplier!, cols: currentCols - 1 },
+                                    });
+                                  }
+                                }}
+                                className="w-6 h-6 rounded-md bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-bold text-xs flex items-center justify-center transition-colors"
+                              >
+                                -
+                              </button>
+                              <div className="flex-1">
+                                <NumericInput
+                                  value={activeMask.multiplier.cols || 2}
+                                  onChange={(c) => {
+                                    onUpdateMask(activeMask.id, {
+                                      multiplier: { ...activeMask.multiplier!, cols: Math.max(1, Math.min(8, c)) },
+                                    });
+                                  }}
+                                  min={1}
+                                  max={8}
+                                  unit="col"
+                                />
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const currentCols = activeMask.multiplier?.cols || 2;
+                                  if (currentCols < 8) {
+                                    onUpdateMask(activeMask.id, {
+                                      multiplier: { ...activeMask.multiplier!, cols: currentCols + 1 },
+                                    });
+                                  }
+                                }}
+                                className="w-6 h-6 rounded-md bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-bold text-xs flex items-center justify-center transition-colors"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-0.5">
+                            <label className="text-[9px] text-[#666666] font-medium">Lignes (V)</label>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  const currentRows = activeMask.multiplier?.rows || 2;
+                                  if (currentRows > 1) {
+                                    onUpdateMask(activeMask.id, {
+                                      multiplier: { ...activeMask.multiplier!, rows: currentRows - 1 },
+                                    });
+                                  }
+                                }}
+                                className="w-6 h-6 rounded-md bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-bold text-xs flex items-center justify-center transition-colors"
+                              >
+                                -
+                              </button>
+                              <div className="flex-1">
+                                <NumericInput
+                                  value={activeMask.multiplier.rows || 2}
+                                  onChange={(r) => {
+                                    onUpdateMask(activeMask.id, {
+                                      multiplier: { ...activeMask.multiplier!, rows: Math.max(1, Math.min(8, r)) },
+                                    });
+                                  }}
+                                  min={1}
+                                  max={8}
+                                  unit="lig"
+                                />
+                              </div>
+                              <button
+                                onClick={() => {
+                                  const currentRows = activeMask.multiplier?.rows || 2;
+                                  if (currentRows < 8) {
+                                    onUpdateMask(activeMask.id, {
+                                      multiplier: { ...activeMask.multiplier!, rows: currentRows + 1 },
+                                    });
+                                  }
+                                }}
+                                className="w-6 h-6 rounded-md bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-bold text-xs flex items-center justify-center transition-colors"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Gestion des espacements (Gaps) */}
+                        <div className="flex flex-col gap-2 pt-1 border-t border-[#f0f0f0]">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] uppercase font-bold text-[#777777] tracking-wider">
+                              Espacements entre formes
+                            </span>
+                            <button
+                              onClick={() => setIsMaskGapsLinked(!isMaskGapsLinked)}
+                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] transition-colors ${
+                                isMaskGapsLinked ? 'bg-sky-100 text-[#0088cc] font-semibold' : 'text-[#888888] hover:text-[#333333]'
+                              }`}
+                              title={isMaskGapsLinked ? 'Espacements H & V liés' : 'Espacements H & V indépendants'}
+                            >
+                              {isMaskGapsLinked ? <Link className="w-2.5 h-2.5" /> : <Unlink className="w-2.5 h-2.5" />}
+                              <span>{isMaskGapsLinked ? 'Liés' : 'Indépendants'}</span>
+                            </button>
+                          </div>
+
+                          {/* Espacement Horizontal */}
+                          <div className="flex flex-col gap-1">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="text-[#666666]">Espacement horizontal</span>
+                              <div className="w-16">
+                                <NumericInput
+                                  value={activeMask.multiplier.gapX ?? 10}
+                                  onChange={(gx) => {
+                                    const val = Math.max(0, Math.min(150, gx));
+                                    onUpdateMask(activeMask.id, {
+                                      multiplier: {
+                                        ...activeMask.multiplier!,
+                                        gapX: val,
+                                        ...(isMaskGapsLinked ? { gapY: val } : {}),
+                                      },
+                                    });
+                                  }}
+                                  min={0}
+                                  max={150}
+                                  unit="px"
+                                />
+                              </div>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="60"
+                              value={activeMask.multiplier.gapX ?? 10}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                onUpdateMask(activeMask.id, {
+                                  multiplier: {
+                                    ...activeMask.multiplier!,
+                                    gapX: val,
+                                    ...(isMaskGapsLinked ? { gapY: val } : {}),
+                                  },
+                                });
+                              }}
+                              className="accent-[#0088cc]"
+                            />
+                          </div>
+
+                          {/* Espacement Vertical */}
+                          <div className="flex flex-col gap-1">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="text-[#666666]">Espacement vertical</span>
+                              <div className="w-16">
+                                <NumericInput
+                                  value={activeMask.multiplier.gapY ?? 10}
+                                  onChange={(gy) => {
+                                    const val = Math.max(0, Math.min(150, gy));
+                                    onUpdateMask(activeMask.id, {
+                                      multiplier: {
+                                        ...activeMask.multiplier!,
+                                        gapY: val,
+                                        ...(isMaskGapsLinked ? { gapX: val } : {}),
+                                      },
+                                    });
+                                  }}
+                                  min={0}
+                                  max={150}
+                                  unit="px"
+                                />
+                              </div>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="60"
+                              value={activeMask.multiplier.gapY ?? 10}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                onUpdateMask(activeMask.id, {
+                                  multiplier: {
+                                    ...activeMask.multiplier!,
+                                    gapY: val,
+                                    ...(isMaskGapsLinked ? { gapX: val } : {}),
+                                  },
+                                });
+                              }}
+                              className="accent-[#0088cc]"
+                            />
+                          </div>
+
+                          {/* Presets rapides d'espacement */}
+                          <div className="flex gap-1 pt-0.5">
+                            {[
+                              { label: '0px', val: 0 },
+                              { label: '6px', val: 6 },
+                              { label: '10px', val: 10 },
+                              { label: '16px', val: 16 },
+                              { label: '24px', val: 24 },
+                            ].map((preset) => (
+                              <button
+                                key={preset.label}
+                                onClick={() => {
+                                  onUpdateMask(activeMask.id, {
+                                    multiplier: {
+                                      ...activeMask.multiplier!,
+                                      gapX: preset.val,
+                                      gapY: preset.val,
+                                    },
+                                  });
+                                }}
+                                className={`flex-1 py-1 rounded text-[9px] font-medium transition-all ${
+                                  (activeMask.multiplier?.gapX ?? 10) === preset.val &&
+                                  (activeMask.multiplier?.gapY ?? 10) === preset.val
+                                    ? 'bg-[#000000] text-white font-semibold'
+                                    : 'bg-[#eeeeee] hover:bg-[#dddddd] text-[#555555]'
+                                }`}
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Action : Éclater en formes indépendantes */}
+                        {onSplitMaskMultiplier && (
+                          <div className="pt-2 border-t border-[#f0f0f0]">
+                            <button
+                              onClick={() => onSplitMaskMultiplier(activeMask.id)}
+                              className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-sky-50 hover:bg-sky-100 text-[#0088cc] text-[10px] font-semibold transition-colors border border-sky-200"
+                              title="Convertir la grille en formes individuelles distinctes"
+                            >
+                              <Split className="w-3 h-3" />
+                              <span>
+                                Convertir en {(activeMask.multiplier.cols || 2) * (activeMask.multiplier.rows || 2)} formes distinctes
+                              </span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] text-[#000000] font-semibold flex items-center gap-1.5">
