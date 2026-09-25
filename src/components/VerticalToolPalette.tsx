@@ -585,8 +585,8 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
         <RadialToolOptions
           isOpen={activeMenu === 'focus'}
           dirX={dirX}
-          canAdd={focuses.length > 0}
-          addTitle={focuses.length > 0 ? "Ajouter une autre zone de focus (+)" : "Aucune zone active"}
+          canAdd={true}
+          addTitle={focuses.length > 0 ? "Ajouter une autre zone de focus (+)" : "Ajouter une zone de focus (+)"}
           duplicateTitle="Dupliquer la zone de focus active"
           deleteTitle="Supprimer la zone de focus active"
           canDuplicate={focuses.length > 0}
@@ -725,25 +725,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
                   )}
                 </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                title="Ajouter une zone de focus (+)"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddFocus('horizontal');
-                  closeMenu();
-                }}
-                className="uiverse-radial-pill pointer-events-auto flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-sky-400 hover:text-white"
-                style={{
-                  ['--target-x' as string]: `${dirX * 65}px`,
-                  ['--target-y' as string]: '0px',
-                }}
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Ajouter une zone</span>
-              </button>
-            )
+            ) : undefined
           }
           extraAction={focuses.length > 1 && onRenumberFocuses ? {
             icon: <RotateCcw className="w-3.5 h-3.5 stroke-[2.2]" />,

@@ -208,6 +208,15 @@ body.dark-mode aside .hover\:bg-\[\#eeeeee\]\/40:hover {
   box-shadow: none;
 }
 
+.uiverse-radial-option:disabled,
+.uiverse-radial-option[disabled] {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: none !important;
+}
+
 .uiverse-radial-pill {
   position: absolute;
   top: 50%;
