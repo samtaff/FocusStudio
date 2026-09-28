@@ -148,9 +148,9 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           onClick={() => onUpdateGlobalStyles({ showHandles: !showHandles })}
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
             showHandles 
-              ? isDarkMode ? 'bg-white text-black font-semibold' : 'bg-[#000000] text-white' 
+              ? isDarkMode ? 'bg-[#0088cc] text-white font-semibold shadow-xs' : 'bg-[#000000] text-white' 
               : isDarkMode 
-                ? 'bg-[#353535] text-[#aaaaaa] hover:text-white hover:bg-[#404040] border border-[#444444]'
+                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border border-[#525252]'
                 : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
           }`}
           title="Afficher/masquer les poignées de redimensionnement"
@@ -165,9 +165,9 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           onClick={() => onUpdateGlobalStyles({ showRulers: !showRulers })}
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
             showRulers 
-              ? 'bg-[#0088cc] text-white font-medium' 
+              ? 'bg-[#0088cc] text-white font-medium shadow-xs' 
               : isDarkMode
-                ? 'bg-[#353535] text-[#aaaaaa] hover:text-white hover:bg-[#404040] border border-[#444444]'
+                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border border-[#525252]'
                 : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
           }`}
           title="Afficher/masquer les règles de mesure en pixels"
@@ -180,12 +180,12 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
       {/* Right: Zoom controls */}
       <div className="flex items-center gap-1.5">
         <div className={`flex items-center rounded-full p-0.5 text-[11px] ${
-          isDarkMode ? 'bg-[#353535] border border-[#444444]' : 'bg-[#eeeeee]/80'
+          isDarkMode ? 'bg-[#353535] border border-[#525252]' : 'bg-[#eeeeee]/80'
         }`}>
           <button
             onClick={() => onSetZoom(Math.max(0.25, Math.round((zoomLevel - 0.25) * 100) / 100))}
             className={`p-1 rounded-full transition-colors ${
-              isDarkMode ? 'text-[#aaaaaa] hover:text-white' : 'text-[#666666] hover:text-[#000000]'
+              isDarkMode ? 'text-[#e0e0e0] hover:text-white' : 'text-[#666666] hover:text-[#000000]'
             }`}
             title="Zoom arrière (Alt + Clic ou Ctrl+-)"
           >
@@ -210,7 +210,7 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           <button
             onClick={() => onSetZoom(Math.min(5, Math.round((zoomLevel + 0.25) * 100) / 100))}
             className={`p-1 rounded-full transition-colors ${
-              isDarkMode ? 'text-[#aaaaaa] hover:text-white' : 'text-[#666666] hover:text-[#000000]'
+              isDarkMode ? 'text-[#e0e0e0] hover:text-white' : 'text-[#666666] hover:text-[#000000]'
             }`}
             title="Zoom avant (Clic ou Ctrl++)"
           >
@@ -224,17 +224,17 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           onClick={onCenterWorkspace || (() => onSetZoom(1))}
           className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] ${
             zoomLevel === 1 
-              ? isDarkMode ? 'bg-white text-black font-semibold' : 'bg-[#000000] text-white' 
+              ? isDarkMode ? 'bg-[#0088cc] text-white font-semibold shadow-xs' : 'bg-[#000000] text-white' 
               : isDarkMode
-                ? 'bg-[#353535] text-[#aaaaaa] hover:text-white hover:bg-[#404040] border border-[#444444]'
+                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border border-[#525252]'
                 : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
           }`}
           title="Recentrer le plan de travail (vue 100%, centrée)"
         >
           <Maximize2 className={`w-3.5 h-3.5 ${
             zoomLevel === 1 
-              ? (isDarkMode ? 'text-black' : 'text-white') 
-              : (isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]')
+              ? 'text-white' 
+              : (isDarkMode ? 'text-[#e0e0e0]' : 'text-[#666666]')
           }`} />
           <span>Recentrer</span>
         </button>

@@ -110,6 +110,7 @@ export interface MaskShape {
   borderWidth?: number; // 0, 1, 2, etc.
   borderColor?: string;
   borderStyle?: 'solid' | 'dashed' | 'dotted';
+  layer?: 'above' | 'below'; // 'above' = au-dessus de la zone focus (défaut), 'below' = derrière la zone focus
   multiplier?: MaskMultiplier;
   clipImage?: {
     dataUrl: string;

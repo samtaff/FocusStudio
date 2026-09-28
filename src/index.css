@@ -154,26 +154,39 @@ body.dark-mode aside button.rounded-full {
   border-width: 1px;
 }
 
-/* Unselected pill buttons in dark mode: visible border and contrast */
-.dark aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-[#000000]"]):not(.bg-white) {
-  background-color: #2e2e2e !important;
-  border-color: #4a4a4a !important;
-  color: #d6d6d6 !important;
+/* Active / Selected black or default pill buttons in dark mode: crisp cyan/sky blue with white text */
+.dark aside button.rounded-full.bg-\[\#000000\],
+body.dark-mode aside button.rounded-full.bg-\[\#000000\],
+.dark aside button.rounded-full[class*="bg-[#000000]"],
+body.dark-mode aside button.rounded-full[class*="bg-[#000000]"] {
+  background-color: #0088cc !important;
+  border-color: #0088cc !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 136, 204, 0.4) !important;
 }
 
-.dark aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):hover {
-  background-color: #383838 !important;
-  border-color: #5c5c5c !important;
+/* Unselected pill buttons in dark mode: clear visible background and border */
+.dark aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):not([class*="bg-[#000000]"]),
+body.dark-mode aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):not([class*="bg-[#000000]"]) {
+  background-color: #333333 !important;
+  border: 1px solid #4f4f4f !important;
+  color: #e5e5e5 !important;
+}
+
+.dark aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):hover,
+body.dark-mode aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):hover {
+  background-color: #404040 !important;
+  border-color: #666666 !important;
   color: #ffffff !important;
 }
 
-/* Counter / Tag pills in accordion headers and info chips */
-.dark aside span.rounded-full.bg-\[\#eeeeee\],
-body.dark-mode aside span.rounded-full.bg-\[\#eeeeee\],
-.dark aside span.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-rose"]):not([class*="bg-[#25465F]"]) {
-  background-color: #303030 !important;
-  border: 1px solid #484848 !important;
-  color: #cccccc !important;
+/* Counter / Tag pills in accordion headers and info chips in dark mode */
+.dark aside span.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-rose"]):not([class*="bg-[#25465F]"]):not([class*="bg-emerald"]):not([class*="bg-amber"]),
+body.dark-mode aside span.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-rose"]):not([class*="bg-[#25465F]"]):not([class*="bg-emerald"]):not([class*="bg-amber"]) {
+  background-color: #383838 !important;
+  border: 1px solid #555555 !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
 }
 
 .dark aside input:not([type="range"]),

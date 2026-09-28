@@ -486,9 +486,12 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   };
 
   // Hit-test mask shapes
-  const getMaskAtCoord = (cx: number, cy: number): MaskShape | null => {
+  const getMaskAtCoord = (cx: number, cy: number, layerFilter?: 'above' | 'below'): MaskShape | null => {
     for (let i = maskShapes.length - 1; i >= 0; i--) {
       const m = maskShapes[i];
+      const mLayer = m.layer === 'below' ? 'below' : 'above';
+      if (layerFilter && mLayer !== layerFilter) continue;
+
       if (m.multiplier?.enabled) {
         const cols = Math.max(1, m.multiplier.cols || 2);
         const rows = Math.max(1, m.multiplier.rows || 2);
@@ -834,21 +837,23 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     }
     setHoveredHandle(null);
 
-    // FLUID HOVER DETECTION OVER ALL ELEMENTS (Strict layering: Callout -> Triangle -> Mask -> Focus -> Blur)
+    // FLUID HOVER DETECTION OVER ALL ELEMENTS (Strict layering: Callout -> Triangle -> Mask (Above) -> Focus -> Mask (Below) -> Blur)
     const hCallout = getCalloutPartAtCoord(cx, cy);
     setHoveredCalloutPart(hCallout);
 
     const hTri = getTriangleAtCoord(cx, cy);
     setHoveredTriangleId(hTri ? hTri.id : null);
 
-    const hMask = getMaskAtCoord(cx, cy);
-    setHoveredMaskId(hMask ? hMask.id : null);
-
+    const hMaskAbove = getMaskAtCoord(cx, cy, 'above');
     const hFocus = getFocusAtCoord(cx, cy);
-    setHoveredFocusId(hFocus ? hFocus.id : null);
+    const hMaskBelow = hFocus ? null : getMaskAtCoord(cx, cy, 'below');
+
+    const hMask = hMaskAbove || hMaskBelow;
+    setHoveredMaskId(hMask ? hMask.id : null);
+    setHoveredFocusId(hMaskAbove ? null : (hFocus ? hFocus.id : null));
 
     // Blur is strictly underneath all other elements (Callout, Triangle, Mask, Focus)
-    const hasElementAbove = Boolean(hCallout || hTri || hMask || hFocus);
+    const hasElementAbove = Boolean(hCallout || hTri || hMaskAbove || hFocus || hMaskBelow);
     const hBlur = hasElementAbove ? null : getBlurAtCoord(cx, cy);
     setHoveredBlurId(hBlur ? hBlur.id : null);
   };
@@ -1020,28 +1025,28 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 5. PRIORITY SELECTION: Check clicked Mask Shape
-    const clickedMask = getMaskAtCoord(cx, cy);
-    if (clickedMask) {
+    // 5. PRIORITY SELECTION: Check clicked Mask Shape positioned ABOVE focus zones
+    const clickedMaskAbove = getMaskAtCoord(cx, cy, 'above');
+    if (clickedMaskAbove) {
       updateSelectedCallout(null);
-      onSelectMask(clickedMask.id);
+      onSelectMask(clickedMaskAbove.id);
       onSelectFocus(null);
       onSelectBlur(null);
       onSelectTriangle?.(null);
       setDragMaskState({
-        id: clickedMask.id,
+        id: clickedMaskAbove.id,
         startX: cx,
         startY: cy,
-        initialX: clickedMask.x,
-        initialY: clickedMask.y,
-        initialW: clickedMask.width,
-        initialH: clickedMask.height,
+        initialX: clickedMaskAbove.x,
+        initialY: clickedMaskAbove.y,
+        initialW: clickedMaskAbove.width,
+        initialH: clickedMaskAbove.height,
         handle: null,
       });
       return;
     }
 
-    // 6. PRIORITY SELECTION: Check clicked Focus Zone (Focus is strictly above blur zones)
+    // 6. PRIORITY SELECTION: Check clicked Focus Zone (Focus is strictly above blur zones and below-masks)
     const clickedFocus = getFocusAtCoord(cx, cy);
     if (clickedFocus) {
       updateSelectedCallout(null);
@@ -1074,6 +1079,27 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         startY: cy,
         initialFocus: { ...clickedFocus },
         initialArrow: attachedArrow ? { ...attachedArrow } : undefined,
+      });
+      return;
+    }
+
+    // 6.b. PRIORITY SELECTION: Check clicked Mask Shape positioned BEHIND focus zones
+    const clickedMaskBelow = getMaskAtCoord(cx, cy, 'below');
+    if (clickedMaskBelow) {
+      updateSelectedCallout(null);
+      onSelectMask(clickedMaskBelow.id);
+      onSelectFocus(null);
+      onSelectBlur(null);
+      onSelectTriangle?.(null);
+      setDragMaskState({
+        id: clickedMaskBelow.id,
+        startX: cx,
+        startY: cy,
+        initialX: clickedMaskBelow.x,
+        initialY: clickedMaskBelow.y,
+        initialW: clickedMaskBelow.width,
+        initialH: clickedMaskBelow.height,
+        handle: null,
       });
       return;
     }

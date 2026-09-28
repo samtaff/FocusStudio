@@ -18,6 +18,8 @@ import {
   Image as ImageIcon,
   Triangle,
   Layers,
+  BringToFront,
+  SendToBack,
   Search,
   Maximize2,
   Sun,
@@ -289,7 +291,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
             <div className="flex items-center gap-2">
               <span className="text-[11px] tracking-wide uppercase">1. Capture Source</span>
               {image && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono font-medium">
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                  isDarkMode ? 'bg-[#383838] border border-[#555555] text-white' : 'bg-[#eeeeee] text-[#666666]'
+                }`}>
                   {image.displayWidth} × {image.displayHeight}px
                 </span>
               )}
@@ -443,7 +447,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
           >
             <div className="flex items-center gap-2">
               <span className="text-[11px] tracking-wide uppercase">2. Zone de travail & Screenshot</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono font-medium">
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                isDarkMode ? 'bg-[#383838] border border-[#555555] text-white' : 'bg-[#eeeeee] text-[#666666]'
+              }`}>
                 {globalStyles.workspaceWidth || 260}px
               </span>
             </div>
@@ -510,7 +516,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
               className="flex items-center gap-2 text-left"
             >
               <span className="text-[11px] tracking-wide uppercase">3. Zones de Focus</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono font-medium">
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                isDarkMode ? 'bg-[#383838] border border-[#555555] text-white' : 'bg-[#eeeeee] text-[#666666]'
+              }`}>
                 {focuses.length} zone{focuses.length > 1 ? 's' : ''}
               </span>
             </button>
@@ -868,8 +876,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                                   onClick={() => onUpdateFocus({ width: p.w, height: p.h })}
                                   className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${
                                     Math.round(selectedFocus.width) === p.w && Math.round(selectedFocus.height) === p.h
-                                      ? 'bg-[#000000] text-white'
-                                      : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee]'
+                                      ? 'bg-[#0088cc] text-white font-semibold shadow-2xs'
+                                      : isDarkMode
+                                        ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                                        : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee]'
                                   }`}
                                 >
                                   {p.label}
@@ -884,8 +894,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                                   onClick={() => onUpdateFocus({ width: pw })}
                                   className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${
                                     Math.round(selectedFocus.width) === pw
-                                      ? 'bg-[#000000] text-white'
-                                      : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee]'
+                                      ? 'bg-[#0088cc] text-white font-semibold shadow-2xs'
+                                      : isDarkMode
+                                        ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                                        : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee]'
                                   }`}
                                 >
                                   {pw}px
@@ -896,7 +908,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                                   const targetW = globalStyles.workspaceWidth || 260;
                                   onUpdateFocus({ width: Math.max(100, targetW - 20) });
                                 }}
-                                className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#eeeeee]/80 text-[#0088cc] hover:bg-[#eeeeee]"
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${
+                                  isDarkMode
+                                    ? 'bg-[#333333] border border-[#4d4d4d] text-sky-400 hover:bg-[#404040] hover:text-white'
+                                    : 'bg-[#eeeeee]/80 text-[#0088cc] hover:bg-[#eeeeee]'
+                                }`}
                                 title="Ajuster la largeur au screenshot/zone de travail"
                               >
                                 Auto (responsive)
@@ -939,8 +955,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             onClick={() => onUpdateFocus({ borderRadius: rad })}
                             className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
                               (selectedFocus.borderRadius ?? 10) === rad
-                                ? 'bg-[#000000] text-white shadow-2xs'
-                                : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                                ? 'bg-[#0088cc] text-white font-semibold shadow-2xs'
+                                : isDarkMode
+                                  ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                                  : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                             }`}
                           >
                             {rad}px
@@ -1071,7 +1089,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all ${
                                 Math.abs(currentZoom - p.factor) < 0.05
                                   ? 'bg-[#0088cc] text-white shadow-2xs'
-                                  : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                                  : isDarkMode
+                                    ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                                    : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                               }`}
                             >
                               {p.label}
@@ -1327,7 +1347,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
             >
               <Droplet className="w-3.5 h-3.5 text-[#0088cc]" />
               <span className="text-[11px] tracking-wide uppercase">4. Flou & Confidentialité</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono font-medium">
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                isDarkMode ? 'bg-[#383838] border border-[#555555] text-white' : 'bg-[#eeeeee] text-[#666666]'
+              }`}>
                 {blurZones.length}
               </span>
             </button>
@@ -1521,7 +1543,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           className={`flex-1 py-1 rounded-full text-[10px] font-medium transition-all ${
                             Math.abs((activeBlur.opacity ?? 1.0) - preset.val) < 0.05
                               ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
-                              : 'bg-white border border-[#e5e5e5] text-[#666666] hover:text-[#000000]'
+                              : isDarkMode
+                                ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                                : 'bg-white border border-[#e5e5e5] text-[#666666] hover:text-[#000000]'
                           }`}
                         >
                           {preset.label}
@@ -1589,8 +1613,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           onClick={() => onUpdateBlur(activeBlur.id, { borderRadius: preset.val })}
                           className={`flex-1 py-1 px-1.5 rounded-full text-[10px] font-medium transition-all ${
                             (activeBlur.borderRadius ?? 4) === preset.val
-                              ? 'bg-[#000000] text-white shadow-2xs font-semibold'
-                              : 'bg-white border border-[#e5e5e5] text-[#666666] hover:text-[#000000]'
+                              ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
+                              : isDarkMode
+                                ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                                : 'bg-white border border-[#e5e5e5] text-[#666666] hover:text-[#000000]'
                           }`}
                         >
                           {preset.label}
@@ -1623,7 +1649,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
             >
               <div className="w-3.5 h-3.5 rounded-sm bg-[#25465F] inline-block" />
               <span className="text-[11px] tracking-wide uppercase">5. Forme Bleue (#25465F)</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono font-medium">
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                isDarkMode ? 'bg-[#383838] border border-[#555555] text-white' : 'bg-[#eeeeee] text-[#666666]'
+              }`}>
                 {maskShapes.length}
               </span>
             </button>
@@ -1671,11 +1699,21 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       onClick={() => onSelectMask(m.id)}
                       className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all ${
                         selectedMaskId === m.id
-                          ? 'bg-[#000000] text-white shadow-2xs font-semibold'
-                          : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                          ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
+                          : isDarkMode
+                            ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                            : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                       }`}
+                      title={m.layer === 'below' ? 'Forme positionnée sous le focus (arrière-plan)' : 'Forme positionnée sur le focus (premier plan)'}
                     >
-                      {m.name || `Masque ${idx + 1}`}
+                      <span className="flex items-center gap-1">
+                        <span>{m.name || `Masque ${idx + 1}`}</span>
+                        {m.layer === 'below' && (
+                          <span className="text-[8.5px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-500 font-bold">
+                            sous
+                          </span>
+                        )}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -1697,6 +1735,57 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     >
                       Supprimer
                     </button>
+                  </div>
+
+                  {/* Ordre de superposition : Passe derrière ou devant la zone focus */}
+                  <div className="flex flex-col gap-1.5 pt-1 border-t border-[#eeeeee]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-[#0088cc]" />
+                        <label className="text-[10px] text-[#666666] font-medium">Position par rapport au focus</label>
+                      </div>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-semibold ${
+                        activeMask.layer === 'below'
+                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                          : 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30'
+                      }`}>
+                        {activeMask.layer === 'below' ? 'Derrière le focus' : 'Sur le focus'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => onUpdateMask(activeMask.id, { layer: 'above' })}
+                        className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-[10px] font-medium transition-all ${
+                          (activeMask.layer || 'above') === 'above'
+                            ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
+                            : isDarkMode
+                              ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                              : 'bg-white border border-[#e5e5e5] text-[#666666] hover:bg-[#f5f5f5]'
+                        }`}
+                        title="La forme masque passe par-dessus la zone de focus (premier plan)"
+                      >
+                        <BringToFront className="w-3.5 h-3.5" />
+                        <span>Devant le focus</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onUpdateMask(activeMask.id, { layer: 'below' })}
+                        className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-[10px] font-medium transition-all ${
+                          activeMask.layer === 'below'
+                            ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
+                            : isDarkMode
+                              ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                              : 'bg-white border border-[#e5e5e5] text-[#666666] hover:bg-[#f5f5f5]'
+                        }`}
+                        title="La forme masque passe derrière la zone de focus (arrière-plan)"
+                      >
+                        <SendToBack className="w-3.5 h-3.5" />
+                        <span>Derrière le focus</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Option de couleur de fond */}
@@ -1916,7 +2005,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all ${
                           activeMask.multiplier?.enabled
                             ? 'bg-[#0088cc] text-white shadow-2xs'
-                            : 'bg-white border border-[#cccccc] text-[#444444] hover:bg-[#f5f5f5]'
+                            : isDarkMode
+                              ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                              : 'bg-white border border-[#cccccc] text-[#444444] hover:bg-[#f5f5f5]'
                         }`}
                       >
                         {activeMask.multiplier?.enabled ? 'Actif' : 'Multiplier'}
@@ -1975,10 +2066,12 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                                       },
                                     });
                                   }}
-                                  className={`py-1 px-1.5 rounded-lg text-[9px] font-medium transition-all text-center ${
+                                  className={`py-1 px-1.5 rounded-full text-[9px] font-medium transition-all text-center ${
                                     isMatch
                                       ? 'bg-[#0088cc] text-white font-semibold shadow-2xs'
-                                      : 'bg-[#f4f4f4] hover:bg-[#e8e8e8] text-[#555555]'
+                                      : isDarkMode
+                                        ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                                        : 'bg-[#f4f4f4] hover:bg-[#e8e8e8] text-[#555555]'
                                   }`}
                                 >
                                   {preset.label}
@@ -2203,11 +2296,13 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                                     },
                                   });
                                 }}
-                                className={`flex-1 py-1 rounded text-[9px] font-medium transition-all ${
+                                className={`flex-1 py-1 rounded-full text-[9px] font-medium transition-all ${
                                   (activeMask.multiplier?.gapX ?? 10) === preset.val &&
                                   (activeMask.multiplier?.gapY ?? 10) === preset.val
-                                    ? 'bg-[#000000] text-white font-semibold'
-                                    : 'bg-[#eeeeee] hover:bg-[#dddddd] text-[#555555]'
+                                    ? 'bg-[#0088cc] text-white font-semibold shadow-2xs'
+                                    : isDarkMode
+                                      ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                                      : 'bg-[#eeeeee] hover:bg-[#dddddd] text-[#555555]'
                                 }`}
                               >
                                 {preset.label}
@@ -2350,7 +2445,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
             >
               <Triangle className="w-3.5 h-3.5 text-[#0088cc]" />
               <span className="text-[11px] tracking-wide uppercase">6. Triangles (15×13px)</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#eeeeee] text-[#666666] font-mono font-medium">
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                isDarkMode ? 'bg-[#383838] border border-[#555555] text-white' : 'bg-[#eeeeee] text-[#666666]'
+              }`}>
                 {triangles.length}
               </span>
             </button>
@@ -2402,8 +2499,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       onClick={() => onSelectTriangle(t.id)}
                       className={`px-3 py-1 rounded-full text-[11px] font-medium transition-all ${
                         selectedTriangleId === t.id
-                          ? 'bg-[#000000] text-white shadow-2xs font-semibold'
-                          : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                          ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
+                          : isDarkMode
+                            ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                            : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                       }`}
                     >
                       {t.name || `Triangle ${idx + 1}`}

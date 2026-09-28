@@ -348,7 +348,16 @@ export function drawComposition(
     });
   }
 
-  // 5. Draw Focus zones content & borders (renders on top of blur zones)
+  // 4.5. Draw Mask shapes positioned BEHIND focus zones (layer === 'below')
+  if (maskShapes.length > 0) {
+    maskShapes.forEach((mask) => {
+      if (mask.layer === 'below') {
+        drawSingleMaskShape(ctx, mask);
+      }
+    });
+  }
+
+  // 5. Draw Focus zones content & borders (renders on top of blur zones and behind-masks)
   // When Callout option is chosen, the focus zone disappears!
   if (!isCalloutMode) {
     focuses.forEach((focus) => {
@@ -356,10 +365,12 @@ export function drawComposition(
     });
   }
 
-  // 6. Draw Mask shapes (renders on top of blur zones)
+  // 6. Draw Mask shapes positioned ABOVE focus zones (layer !== 'below', default)
   if (maskShapes.length > 0) {
     maskShapes.forEach((mask) => {
-      drawSingleMaskShape(ctx, mask);
+      if (mask.layer !== 'below') {
+        drawSingleMaskShape(ctx, mask);
+      }
     });
   }
 
