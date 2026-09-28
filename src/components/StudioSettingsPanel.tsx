@@ -31,7 +31,11 @@ import {
   LayoutGrid,
   Link,
   Unlink,
-  Split
+  Split,
+  Ruler,
+  Magnet,
+  Compass,
+  RotateCw
 } from 'lucide-react';
 import { 
   FocusZone, 
@@ -40,7 +44,8 @@ import {
   BlurZone,
   MaskShape,
   TriangleShape,
-  CalloutVignette
+  CalloutVignette,
+  UserGuide
 } from '../types';
 import { BASE_COLOR, calculateCompositionBounds } from '../utils/canvasRenderer';
 import { SAMPLE_PRESETS } from '../utils/sampleImages';
@@ -113,6 +118,14 @@ interface StudioSettingsPanelProps {
   // Internal screenshot framing
   internalFramingFocusId?: string | null;
   onToggleInternalFraming?: (id: string | null) => void;
+  // User Guides & Photoshop Rulers
+  userGuides?: UserGuide[];
+  onAddGuideH?: () => void;
+  onAddGuideV?: () => void;
+  onAddCustomGuide?: (type: 'horizontal' | 'vertical', position: number) => void;
+  onUpdateGuide?: (id: string, position: number) => void;
+  onDeleteGuide?: (id: string) => void;
+  onClearAllGuides?: () => void;
 }
 
 export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
@@ -175,7 +188,16 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   nextSequentialStep = 1,
   onChangeNextSequentialStep,
   onResetSequentialCounter,
+  userGuides = [],
+  onAddGuideH,
+  onAddGuideV,
+  onAddCustomGuide,
+  onUpdateGuide,
+  onDeleteGuide,
+  onClearAllGuides,
 }) => {
+  const [customGuideH, setCustomGuideH] = useState<number>(100);
+  const [customGuideV, setCustomGuideV] = useState<number>(100);
   // Requirement: Toutes les sections doivent être fermées par défaut et se déplier SEULEMENT au clic !
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     capture: false,
@@ -439,25 +461,37 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
           )}
         </div>
 
-        {/* 2. ZONE DE TRAVAIL & SCREENSHOT */}
+        {/* 2. ZONE DE TRAVAIL & RÈGLES (PHOTOSHOP) */}
         <div className="flex flex-col">
           <button
             onClick={() => toggleSection('workspace')}
             className="w-full px-4 py-3.5 flex items-center justify-between font-semibold text-[#000000] hover:bg-[#eeeeee]/40 transition-colors text-left"
           >
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] tracking-wide uppercase">2. Zone de travail & Screenshot</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] tracking-wide uppercase">2. Zone de travail & Règles</span>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium ${
                 isDarkMode ? 'bg-[#383838] border border-[#555555] text-white' : 'bg-[#eeeeee] text-[#666666]'
               }`}>
                 {globalStyles.workspaceWidth || 260}px
               </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-medium ${
+                globalStyles.showRulers
+                  ? 'bg-[#0088cc] text-white'
+                  : isDarkMode ? 'bg-[#303030] text-[#888888] border border-[#444444]' : 'bg-[#eeeeee] text-[#888888]'
+              }`}>
+                Règles {globalStyles.showRulers ? 'ON' : 'OFF'}
+              </span>
+              {userGuides.length > 0 && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-medium bg-[#0088cc]/20 text-[#0088cc] border border-[#0088cc]/30">
+                  {userGuides.length} repère{userGuides.length > 1 ? 's' : ''}
+                </span>
+              )}
             </div>
             {openSections.workspace ? <ChevronDown className="w-4 h-4 text-[#979797]" /> : <ChevronRight className="w-4 h-4 text-[#979797]" />}
           </button>
 
           {openSections.workspace && (
-            <div className="px-4 pb-4 pt-1 flex flex-col gap-3">
+            <div className="px-4 pb-4 pt-1 flex flex-col gap-3.5">
               {/* Largeur zone de travail (jusqu'à 500px max, damier Photoshop) */}
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-[11px]">
@@ -495,13 +529,266 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       onClick={() => onUpdateGlobalStyles({ workspaceWidth: w })}
                       className={`flex-1 py-1 px-2 rounded-full text-[10px] font-semibold transition-all ${
                         (globalStyles.workspaceWidth || 260) === w
-                          ? 'bg-[#000000] text-white shadow-xs'
-                          : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                          ? 'bg-[#0088cc] text-white shadow-xs'
+                          : isDarkMode
+                            ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                            : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                       }`}
                     >
                       {w}px
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* RÈGLES & PRÉCISION PHOTOSHOP */}
+              <div className="flex flex-col gap-2.5 pt-3 border-t border-[#eeeeee]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-[#000000]">
+                    <Ruler className="w-3.5 h-3.5 text-[#0088cc]" />
+                    <span>Règles & Précision Photoshop</span>
+                  </div>
+                </div>
+
+                {/* 4 Boutons de bascule rapide */}
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Règles graduées ON / OFF */}
+                  <button
+                    onClick={() => onUpdateGlobalStyles({ showRulers: !globalStyles.showRulers })}
+                    className={`p-2 rounded-xl text-left border transition-all flex flex-col gap-1 ${
+                      globalStyles.showRulers
+                        ? 'bg-[#0088cc]/10 border-[#0088cc] text-[#0088cc]'
+                        : isDarkMode
+                          ? 'bg-[#2a2a2a] border-[#444444] text-[#aaaaaa] hover:border-[#666666]'
+                          : 'bg-white border-[#e5e7eb] text-[#666666] hover:bg-[#f9fafb]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-semibold">
+                      <span className="flex items-center gap-1">
+                        <Ruler className="w-3 h-3" />
+                        Règles (px)
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                        globalStyles.showRulers ? 'bg-[#0088cc] text-white' : 'bg-[#888888]/20 text-[#888888]'
+                      }`}>
+                        {globalStyles.showRulers ? 'ON' : 'OFF'}
+                      </span>
+                    </div>
+                    <span className="text-[9.5px] opacity-75">Graduations 0px à droite et en haut</span>
+                  </button>
+
+                  {/* Magnétisme / Snap ON / OFF */}
+                  <button
+                    onClick={() => onUpdateGlobalStyles({ snapToGuides: globalStyles.snapToGuides === false ? true : false })}
+                    className={`p-2 rounded-xl text-left border transition-all flex flex-col gap-1 ${
+                      globalStyles.snapToGuides !== false
+                        ? 'bg-[#0088cc]/10 border-[#0088cc] text-[#0088cc]'
+                        : isDarkMode
+                          ? 'bg-[#2a2a2a] border-[#444444] text-[#aaaaaa] hover:border-[#666666]'
+                          : 'bg-white border-[#e5e7eb] text-[#666666] hover:bg-[#f9fafb]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-semibold">
+                      <span className="flex items-center gap-1">
+                        <Magnet className="w-3 h-3" />
+                        Magnétisme
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                        globalStyles.snapToGuides !== false ? 'bg-[#0088cc] text-white' : 'bg-[#888888]/20 text-[#888888]'
+                      }`}>
+                        {globalStyles.snapToGuides !== false ? 'ON' : 'OFF'}
+                      </span>
+                    </div>
+                    <span className="text-[9.5px] opacity-75">Aimante aux repères & bords</span>
+                  </button>
+
+                  {/* Afficher les repères cyan ON / OFF */}
+                  <button
+                    onClick={() => onUpdateGlobalStyles({ showGuides: globalStyles.showGuides === false ? true : false })}
+                    className={`p-2 rounded-xl text-left border transition-all flex flex-col gap-1 ${
+                      globalStyles.showGuides !== false
+                        ? 'bg-[#0088cc]/10 border-[#0088cc] text-[#0088cc]'
+                        : isDarkMode
+                          ? 'bg-[#2a2a2a] border-[#444444] text-[#aaaaaa] hover:border-[#666666]'
+                          : 'bg-white border-[#e5e7eb] text-[#666666] hover:bg-[#f9fafb]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-semibold">
+                      <span className="flex items-center gap-1">
+                        <Eye className="w-3 h-3" />
+                        Repères
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                        globalStyles.showGuides !== false ? 'bg-[#0088cc] text-white' : 'bg-[#888888]/20 text-[#888888]'
+                      }`}>
+                        {globalStyles.showGuides !== false ? 'Visibles' : 'Masqués'}
+                      </span>
+                    </div>
+                    <span className="text-[9.5px] opacity-75">Lignes guides cyan Photoshop</span>
+                  </button>
+
+                  {/* Grille de précision ON / OFF */}
+                  <button
+                    onClick={() => onUpdateGlobalStyles({ showGrid: !globalStyles.showGrid })}
+                    className={`p-2 rounded-xl text-left border transition-all flex flex-col gap-1 ${
+                      globalStyles.showGrid
+                        ? 'bg-[#0088cc]/10 border-[#0088cc] text-[#0088cc]'
+                        : isDarkMode
+                          ? 'bg-[#2a2a2a] border-[#444444] text-[#aaaaaa] hover:border-[#666666]'
+                          : 'bg-white border-[#e5e7eb] text-[#666666] hover:bg-[#f9fafb]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-[11px] font-semibold">
+                      <span className="flex items-center gap-1">
+                        <Grid className="w-3 h-3" />
+                        Grille
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                        globalStyles.showGrid ? 'bg-[#0088cc] text-white' : 'bg-[#888888]/20 text-[#888888]'
+                      }`}>
+                        {globalStyles.showGrid ? 'ON' : 'OFF'}
+                      </span>
+                    </div>
+                    <span className="text-[9.5px] opacity-75">Maillage pixels 20px</span>
+                  </button>
+                </div>
+
+                {/* Ajout rapide de repères manuels */}
+                <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-[#eeeeee]/60 border border-white">
+                  <div className="text-[10.5px] font-semibold text-[#000000]">
+                    Ajouter un repère précis :
+                  </div>
+
+                  {/* Repère horizontal */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-[#666666] w-14 shrink-0 font-medium">Ligne H :</span>
+                    <div className="w-20">
+                      <NumericInput
+                        value={customGuideH}
+                        onChange={(val) => setCustomGuideH(Math.max(0, val))}
+                        min={0}
+                        max={1000}
+                        unit="px"
+                      />
+                    </div>
+                    <button
+                      onClick={() => onAddCustomGuide?.('horizontal', customGuideH)}
+                      className="flex-1 py-1 px-2 rounded-full text-[10px] font-medium bg-[#0088cc] text-white hover:bg-[#0077b5] transition-colors flex items-center justify-center gap-1 shadow-2xs"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Ajouter H</span>
+                    </button>
+                  </div>
+
+                  {/* Repère vertical */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-[#666666] w-14 shrink-0 font-medium">Ligne V :</span>
+                    <div className="w-20">
+                      <NumericInput
+                        value={customGuideV}
+                        onChange={(val) => setCustomGuideV(Math.max(0, val))}
+                        min={0}
+                        max={1000}
+                        unit="px"
+                      />
+                    </div>
+                    <button
+                      onClick={() => onAddCustomGuide?.('vertical', customGuideV)}
+                      className="flex-1 py-1 px-2 rounded-full text-[10px] font-medium bg-[#0088cc] text-white hover:bg-[#0077b5] transition-colors flex items-center justify-center gap-1 shadow-2xs"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Ajouter V</span>
+                    </button>
+                  </div>
+
+                  {/* Presets rapides de repères */}
+                  <div className="flex items-center gap-1 pt-1">
+                    <span className="text-[9px] text-[#777777] shrink-0">Centres :</span>
+                    <button
+                      onClick={onAddGuideH}
+                      className={`flex-1 py-0.5 px-1.5 rounded-full text-[9.5px] font-medium transition-all ${
+                        isDarkMode ? 'bg-[#333333] text-[#dddddd] hover:bg-[#404040]' : 'bg-white text-[#555555] hover:bg-[#f0f0f0]'
+                      }`}
+                    >
+                      Centre H
+                    </button>
+                    <button
+                      onClick={onAddGuideV}
+                      className={`flex-1 py-0.5 px-1.5 rounded-full text-[9.5px] font-medium transition-all ${
+                        isDarkMode ? 'bg-[#333333] text-[#dddddd] hover:bg-[#404040]' : 'bg-white text-[#555555] hover:bg-[#f0f0f0]'
+                      }`}
+                    >
+                      Centre V
+                    </button>
+                  </div>
+                </div>
+
+                {/* Liste des repères actifs */}
+                {userGuides.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between text-[10.5px]">
+                      <span className="font-semibold text-[#000000]">
+                        Repères placés ({userGuides.length})
+                      </span>
+                      {onClearAllGuides && (
+                        <button
+                          onClick={onClearAllGuides}
+                          className="text-[9.5px] text-rose-500 hover:text-rose-600 font-medium hover:underline"
+                        >
+                          Tout effacer
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1 max-h-36 overflow-y-auto pr-1">
+                      {userGuides.map((g) => (
+                        <div
+                          key={g.id}
+                          className={`flex items-center justify-between p-1.5 rounded-lg border text-[10px] ${
+                            isDarkMode ? 'bg-[#2a2a2a] border-[#3f3f3f]' : 'bg-white border-[#e5e7eb]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className={`px-1.5 py-0.2 rounded font-bold uppercase text-[9px] ${
+                              g.type === 'horizontal' ? 'bg-sky-500/20 text-sky-400' : 'bg-emerald-500/20 text-emerald-400'
+                            }`}>
+                              {g.type === 'horizontal' ? 'H' : 'V'}
+                            </span>
+                            <span className="text-[#666666]">
+                              {g.type === 'horizontal' ? 'Y =' : 'X ='}
+                            </span>
+                            <div className="w-16">
+                              <NumericInput
+                                value={g.position}
+                                onChange={(val) => onUpdateGuide?.(g.id, val)}
+                                min={0}
+                                max={1200}
+                                unit="px"
+                              />
+                            </div>
+                          </div>
+                          {onDeleteGuide && (
+                            <button
+                              onClick={() => onDeleteGuide(g.id)}
+                              className="p-1 rounded text-[#888888] hover:text-rose-500 transition-colors"
+                              title="Supprimer ce repère"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Astuce Photoshop */}
+                <div className={`p-2.5 rounded-xl border text-[10px] leading-relaxed flex items-start gap-2 ${
+                  isDarkMode ? 'bg-[#222222] border-[#3d3d3d] text-[#aaaaaa]' : 'bg-sky-50/70 border-sky-100 text-[#006699]'
+                }`}>
+                  <span className="text-base select-none leading-none">💡</span>
+                  <div>
+                    <span className="font-semibold">Comme sur Photoshop :</span> Glissez depuis la règle du haut vers le bas pour tirer un repère horizontal, ou depuis la règle de gauche vers la droite pour un repère vertical.
+                  </div>
                 </div>
               </div>
             </div>
@@ -1713,6 +2000,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             sous
                           </span>
                         )}
+                        {Boolean(m.rotation && m.rotation !== 0) && (
+                          <span className="text-[8.5px] px-1 py-0.2 rounded bg-sky-500/20 text-sky-400 font-mono font-bold">
+                            ⟳{m.rotation}°
+                          </span>
+                        )}
                       </span>
                     </button>
                   ))}
@@ -1920,7 +2212,140 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Arrondis des angles de la forme (Masque / Forme Bleue) */}
+                  {/* Rotation & Orientation de la forme */}
+                  <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-[#666666] font-medium flex items-center gap-1.5">
+                        <RotateCcw className="w-3.5 h-3.5 text-[#0088cc]" />
+                        <span>Rotation de la forme</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {Boolean((activeMask.rotation || 0) !== 0) && (
+                          <button
+                            onClick={() => onUpdateMask(activeMask.id, { rotation: 0 })}
+                            className="text-[9px] px-2 py-0.5 rounded-full bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-medium transition-all"
+                            title="Réinitialiser l'angle à 0° (droit)"
+                          >
+                            0° (Droit)
+                          </button>
+                        )}
+                        <div className="w-20">
+                          <NumericInput
+                            value={activeMask.rotation ?? 0}
+                            onChange={(rot) => {
+                              let r = rot;
+                              while (r > 180) r -= 360;
+                              while (r <= -180) r += 360;
+                              onUpdateMask(activeMask.id, { rotation: r });
+                            }}
+                            min={-180}
+                            max={180}
+                            unit="°"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Curseur rotatif */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="-180"
+                        max="180"
+                        step="1"
+                        value={activeMask.rotation ?? 0}
+                        onChange={(e) => onUpdateMask(activeMask.id, { rotation: parseInt(e.target.value) })}
+                        className="flex-1 accent-[#0088cc]"
+                      />
+                    </div>
+
+                    {/* Boutons de rotation pas à pas (-90°, -15°, +15°, +90°) */}
+                    <div className="grid grid-cols-4 gap-1.5">
+                      <button
+                        onClick={() => {
+                          const cur = activeMask.rotation ?? 0;
+                          let r = cur - 90;
+                          while (r <= -180) r += 360;
+                          onUpdateMask(activeMask.id, { rotation: r });
+                        }}
+                        className={`py-1 px-1 rounded-full text-[10px] font-medium transition-all flex items-center justify-center gap-1 ${
+                          isDarkMode
+                            ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                            : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
+                        }`}
+                        title="Pivoter de -90° (sens anti-horaire)"
+                      >
+                        <span>⟲ -90°</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const cur = activeMask.rotation ?? 0;
+                          let r = cur - 15;
+                          while (r <= -180) r += 360;
+                          onUpdateMask(activeMask.id, { rotation: r });
+                        }}
+                        className={`py-1 px-1 rounded-full text-[10px] font-medium transition-all flex items-center justify-center gap-1 ${
+                          isDarkMode
+                            ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                            : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
+                        }`}
+                        title="Pivoter de -15°"
+                      >
+                        <span>-15°</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const cur = activeMask.rotation ?? 0;
+                          let r = cur + 15;
+                          while (r > 180) r -= 360;
+                          onUpdateMask(activeMask.id, { rotation: r });
+                        }}
+                        className={`py-1 px-1 rounded-full text-[10px] font-medium transition-all flex items-center justify-center gap-1 ${
+                          isDarkMode
+                            ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                            : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
+                        }`}
+                        title="Pivoter de +15°"
+                      >
+                        <span>+15°</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const cur = activeMask.rotation ?? 0;
+                          let r = cur + 90;
+                          while (r > 180) r -= 360;
+                          onUpdateMask(activeMask.id, { rotation: r });
+                        }}
+                        className={`py-1 px-1 rounded-full text-[10px] font-medium transition-all flex items-center justify-center gap-1 ${
+                          isDarkMode
+                            ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                            : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
+                        }`}
+                        title="Pivoter de +90° (sens horaire)"
+                      >
+                        <span>⟳ +90°</span>
+                      </button>
+                    </div>
+
+                    {/* Presets rapides d'angle */}
+                    <div className="flex gap-1 flex-wrap">
+                      {[0, 45, 90, 135, 180, -45, -90].map((deg) => (
+                        <button
+                          key={deg}
+                          onClick={() => onUpdateMask(activeMask.id, { rotation: deg })}
+                          className={`flex-1 min-w-[36px] py-0.5 px-1.5 rounded-full text-[10px] font-medium transition-all ${
+                            (activeMask.rotation ?? 0) === deg
+                              ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
+                              : isDarkMode
+                                ? 'bg-[#333333] border border-[#4d4d4d] text-[#c0c0c0] hover:bg-[#404040] hover:text-white'
+                                : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                          }`}
+                        >
+                          {deg}°
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="flex flex-col gap-1.5 pt-2 border-t border-[#eeeeee]">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-[#666666] font-medium">Angles de la forme (arrondi)</span>
@@ -2505,7 +2930,14 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                       }`}
                     >
-                      {t.name || `Triangle ${idx + 1}`}
+                      <span className="flex items-center gap-1">
+                        <span>{t.name || `Triangle ${idx + 1}`}</span>
+                        {Boolean(t.rotation && t.rotation !== 0) && (
+                          <span className="text-[8.5px] px-1 py-0.2 rounded bg-sky-500/20 text-sky-400 font-mono font-bold">
+                            ⟳{t.rotation}°
+                          </span>
+                        )}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -2580,7 +3012,140 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Dimensions : Fixe 15x13px avec possibilité de micro-ajustement */}
+                  {/* Rotation & Angle personnalisé du triangle */}
+                  <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-[#666666] font-medium flex items-center gap-1.5">
+                        <RotateCcw className="w-3.5 h-3.5 text-[#0088cc]" />
+                        <span>Rotation fine du triangle</span>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {Boolean((activeTriangle.rotation || 0) !== 0) && (
+                          <button
+                            onClick={() => onUpdateTriangle(activeTriangle.id, { rotation: 0 })}
+                            className="text-[9px] px-2 py-0.5 rounded-full bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-medium transition-all"
+                            title="Réinitialiser l'angle à 0°"
+                          >
+                            0°
+                          </button>
+                        )}
+                        <div className="w-20">
+                          <NumericInput
+                            value={activeTriangle.rotation ?? 0}
+                            onChange={(rot) => {
+                              let r = rot;
+                              while (r > 180) r -= 360;
+                              while (r <= -180) r += 360;
+                              onUpdateTriangle(activeTriangle.id, { rotation: r });
+                            }}
+                            min={-180}
+                            max={180}
+                            unit="°"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Curseur rotatif */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="-180"
+                        max="180"
+                        step="1"
+                        value={activeTriangle.rotation ?? 0}
+                        onChange={(e) => onUpdateTriangle(activeTriangle.id, { rotation: parseInt(e.target.value) })}
+                        className="flex-1 accent-[#0088cc]"
+                      />
+                    </div>
+
+                    {/* Boutons de rotation pas à pas */}
+                    <div className="grid grid-cols-4 gap-1.5">
+                      <button
+                        onClick={() => {
+                          const cur = activeTriangle.rotation ?? 0;
+                          let r = cur - 90;
+                          while (r <= -180) r += 360;
+                          onUpdateTriangle(activeTriangle.id, { rotation: r });
+                        }}
+                        className={`py-1 px-1 rounded-full text-[10px] font-medium transition-all flex items-center justify-center gap-1 ${
+                          isDarkMode
+                            ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                            : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
+                        }`}
+                        title="Pivoter de -90°"
+                      >
+                        <span>⟲ -90°</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const cur = activeTriangle.rotation ?? 0;
+                          let r = cur - 15;
+                          while (r <= -180) r += 360;
+                          onUpdateTriangle(activeTriangle.id, { rotation: r });
+                        }}
+                        className={`py-1 px-1 rounded-full text-[10px] font-medium transition-all flex items-center justify-center gap-1 ${
+                          isDarkMode
+                            ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                            : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
+                        }`}
+                        title="Pivoter de -15°"
+                      >
+                        <span>-15°</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const cur = activeTriangle.rotation ?? 0;
+                          let r = cur + 15;
+                          while (r > 180) r -= 360;
+                          onUpdateTriangle(activeTriangle.id, { rotation: r });
+                        }}
+                        className={`py-1 px-1 rounded-full text-[10px] font-medium transition-all flex items-center justify-center gap-1 ${
+                          isDarkMode
+                            ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                            : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
+                        }`}
+                        title="Pivoter de +15°"
+                      >
+                        <span>+15°</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const cur = activeTriangle.rotation ?? 0;
+                          let r = cur + 90;
+                          while (r > 180) r -= 360;
+                          onUpdateTriangle(activeTriangle.id, { rotation: r });
+                        }}
+                        className={`py-1 px-1 rounded-full text-[10px] font-medium transition-all flex items-center justify-center gap-1 ${
+                          isDarkMode
+                            ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                            : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
+                        }`}
+                        title="Pivoter de +90°"
+                      >
+                        <span>⟳ +90°</span>
+                      </button>
+                    </div>
+
+                    {/* Presets d'angle */}
+                    <div className="flex gap-1 flex-wrap">
+                      {[0, 45, 90, 180, -90, -45].map((deg) => (
+                        <button
+                          key={deg}
+                          onClick={() => onUpdateTriangle(activeTriangle.id, { rotation: deg })}
+                          className={`flex-1 min-w-[36px] py-0.5 px-1.5 rounded-full text-[10px] font-medium transition-all ${
+                            (activeTriangle.rotation ?? 0) === deg
+                              ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
+                              : isDarkMode
+                                ? 'bg-[#333333] border border-[#4d4d4d] text-[#c0c0c0] hover:bg-[#404040] hover:text-white'
+                                : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                          }`}
+                        >
+                          {deg}°
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <div>
                       <div className="flex justify-between items-center text-[10px]">

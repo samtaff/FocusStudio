@@ -3,6 +3,8 @@ import {
   Eye, 
   Maximize2, 
   Ruler, 
+  Magnet,
+  Grid,
   ZoomIn, 
   ZoomOut, 
   Plus,
@@ -170,10 +172,44 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
                 ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border border-[#525252]'
                 : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
           }`}
-          title="Afficher/masquer les règles de mesure en pixels"
+          title="Afficher/masquer les règles graduées Photoshop"
         >
           <Ruler className="w-3.5 h-3.5" />
           <span>Règles {showRulers ? 'ON' : 'OFF'}</span>
+        </button>
+
+        {/* Magnétisme (Snap) ON / OFF */}
+        <button
+          id="btn-toggle-snap"
+          onClick={() => onUpdateGlobalStyles({ snapToGuides: globalStyles.snapToGuides === false ? true : false })}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+            globalStyles.snapToGuides !== false
+              ? 'bg-[#0088cc] text-white font-medium shadow-xs' 
+              : isDarkMode
+                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border border-[#525252]'
+                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
+          }`}
+          title="Activer/désactiver le magnétisme Photoshop (Snap aux repères et aux bords)"
+        >
+          <Magnet className="w-3.5 h-3.5" />
+          <span>Snap {globalStyles.snapToGuides !== false ? 'ON' : 'OFF'}</span>
+        </button>
+
+        {/* Grille Photoshop ON / OFF */}
+        <button
+          id="btn-toggle-grid"
+          onClick={() => onUpdateGlobalStyles({ showGrid: !globalStyles.showGrid })}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+            globalStyles.showGrid
+              ? 'bg-[#0088cc] text-white font-medium shadow-xs' 
+              : isDarkMode
+                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border border-[#525252]'
+                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
+          }`}
+          title="Afficher/masquer la grille de précision Photoshop"
+        >
+          <Grid className="w-3.5 h-3.5" />
+          <span>Grille {globalStyles.showGrid ? 'ON' : 'OFF'}</span>
         </button>
       </div>
 

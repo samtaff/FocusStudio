@@ -414,6 +414,11 @@ export function drawComposition(
     const phoneCenterX = bgX + bgWidth / 2;
     drawSymmetryAxis(ctx, phoneCenterX, bgY, bgHeight);
 
+    // Photoshop precision grid (if enabled)
+    if (globalStyles.showGrid) {
+      drawPhotoshopGrid(ctx, bgX, bgY, bgWidth, bgHeight, globalStyles.gridSize || 20);
+    }
+
     if (smartGuides.length > 0) {
       drawSmartGuides(ctx, smartGuides);
     }
@@ -488,10 +493,22 @@ export function drawComposition(
             totalW, 
             totalH, 
             '#38bdf8', 
-            `${mask.name || 'Forme'} (${cols * rows}x)`
+            `${mask.name || 'Forme'} (${cols * rows}x)`,
+            mask.rotation || 0,
+            true
           );
         } else {
-          drawGenericSelectionHandles(ctx, mask.x, mask.y, mask.width, mask.height, '#38bdf8', mask.name || 'Forme');
+          drawGenericSelectionHandles(
+            ctx, 
+            mask.x, 
+            mask.y, 
+            mask.width, 
+            mask.height, 
+            '#38bdf8', 
+            mask.name || 'Forme',
+            mask.rotation || 0,
+            true
+          );
         }
       }
     });
@@ -504,7 +521,17 @@ export function drawComposition(
       if (isHovered) {
         drawTriangleHoverHighlight(ctx, triangle);
       } else if (isSelected) {
-        drawGenericSelectionHandles(ctx, triangle.x, triangle.y, triangle.width, triangle.height, '#f59e0b', 'Triangle');
+        drawGenericSelectionHandles(
+          ctx, 
+          triangle.x, 
+          triangle.y, 
+          triangle.width, 
+          triangle.height, 
+          '#f59e0b', 
+          'Triangle',
+          triangle.rotation || 0,
+          true
+        );
       }
     });
   }
@@ -831,6 +858,18 @@ function drawSingleMaskShape(
   const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 2) : 1;
   const gapX = mask.multiplier?.gapX ?? 10;
   const gapY = mask.multiplier?.gapY ?? 10;
+  const totalW = cols * mask.width + (cols - 1) * gapX;
+  const totalH = rows * mask.height + (rows - 1) * gapY;
+  const centerX = mask.x + totalW / 2;
+  const centerY = mask.y + totalH / 2;
+  const rotation = mask.rotation || 0;
+
+  ctx.save();
+  if (rotation !== 0) {
+    ctx.translate(centerX, centerY);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-centerX, -centerY);
+  }
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -896,6 +935,8 @@ function drawSingleMaskShape(
       ctx.restore();
     }
   }
+
+  ctx.restore();
 }
 
 /**
@@ -908,10 +949,18 @@ function drawSingleTriangle(
   ctx: CanvasRenderingContext2D,
   triangle: TriangleShape
 ) {
-  const { x, y, width: w, height: h, color, direction = 'down', opacity = 1 } = triangle;
+  const { x, y, width: w, height: h, color, direction = 'down', opacity = 1, rotation = 0 } = triangle;
+  const centerX = x + w / 2;
+  const centerY = y + h / 2;
 
   ctx.save();
   ctx.globalAlpha = opacity;
+
+  if (rotation !== 0) {
+    ctx.translate(centerX, centerY);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-centerX, -centerY);
+  }
 
   ctx.beginPath();
   if (direction === 'down') {
@@ -988,19 +1037,29 @@ function drawBlurHoverHighlight(ctx: CanvasRenderingContext2D, blur: BlurZone) {
  * High-visibility ergonomic hover highlight for Mask shape
  */
 function drawMaskHoverHighlight(ctx: CanvasRenderingContext2D, mask: MaskShape) {
-  const { x, y, width: w, height: h, borderRadius = 4 } = mask;
+  const { x, y, width: w, height: h, borderRadius = 4, rotation = 0 } = mask;
+  const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 2) : 1;
+  const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 2) : 1;
+  const gapX = mask.multiplier?.gapX ?? 10;
+  const gapY = mask.multiplier?.gapY ?? 10;
+  const totalW = cols * w + (cols - 1) * gapX;
+  const totalH = rows * h + (rows - 1) * gapY;
+  const centerX = x + totalW / 2;
+  const centerY = y + totalH / 2;
 
   ctx.save();
+  if (rotation !== 0) {
+    ctx.translate(centerX, centerY);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-centerX, -centerY);
+  }
+
   ctx.shadowColor = 'rgba(56, 189, 248, 0.5)';
   ctx.shadowBlur = 6;
   ctx.strokeStyle = '#38bdf8';
   ctx.lineWidth = 1.5;
 
   if (mask.multiplier?.enabled) {
-    const cols = Math.max(1, mask.multiplier.cols || 2);
-    const rows = Math.max(1, mask.multiplier.rows || 2);
-    const gapX = mask.multiplier.gapX ?? 10;
-    const gapY = mask.multiplier.gapY ?? 10;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const curX = x + c * (w + gapX);
@@ -1023,9 +1082,17 @@ function drawMaskHoverHighlight(ctx: CanvasRenderingContext2D, mask: MaskShape) 
  * High-visibility hover highlight for Triangle
  */
 function drawTriangleHoverHighlight(ctx: CanvasRenderingContext2D, triangle: TriangleShape) {
-  const { x, y, width: w, height: h } = triangle;
+  const { x, y, width: w, height: h, rotation = 0 } = triangle;
+  const centerX = x + w / 2;
+  const centerY = y + h / 2;
 
   ctx.save();
+  if (rotation !== 0) {
+    ctx.translate(centerX, centerY);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-centerX, -centerY);
+  }
+
   ctx.strokeStyle = '#f59e0b';
   ctx.lineWidth = 1.5;
   ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
@@ -1033,7 +1100,7 @@ function drawTriangleHoverHighlight(ctx: CanvasRenderingContext2D, triangle: Tri
 }
 
 /**
- * Generic selection handles for blur, mask or triangle shapes (discreet, 8 handles)
+ * Generic selection handles for blur, mask or triangle shapes (discreet, 8 handles + rotation stem)
  */
 function drawGenericSelectionHandles(
   ctx: CanvasRenderingContext2D,
@@ -1042,18 +1109,68 @@ function drawGenericSelectionHandles(
   w: number,
   h: number,
   color = '#38bdf8',
-  label?: string
+  label?: string,
+  rotation = 0,
+  showRotationHandle = false
 ) {
+  const centerX = x + w / 2;
+  const centerY = y + h / 2;
+
   ctx.save();
+  if (rotation !== 0) {
+    ctx.translate(centerX, centerY);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-centerX, -centerY);
+  }
+
   ctx.strokeStyle = color;
-  ctx.globalAlpha = 0.55;
+  ctx.globalAlpha = 0.75;
   ctx.lineWidth = 1;
-  ctx.setLineDash([2, 2]);
+  ctx.setLineDash([3, 3]);
   ctx.strokeRect(x, y, w, h);
   ctx.setLineDash([]);
 
-  // Discreet micro-handles (1.75px radius, soft alpha)
-  const radius = 1.75;
+  // Photoshop Rotation Handle: vertical stem + circular anchor at top
+  if (showRotationHandle) {
+    const stemLength = 20;
+    const rotY = y - stemLength;
+
+    // Stem line
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.moveTo(centerX, y);
+    ctx.lineTo(centerX, rotY);
+    ctx.stroke();
+
+    // Circular rotation anchor handle
+    ctx.beginPath();
+    ctx.arc(centerX, rotY, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Subtle angle label if rotated
+    if (Math.abs(rotation) > 0.5) {
+      ctx.save();
+      ctx.font = 'bold 8px system-ui, sans-serif';
+      const angleStr = `${Math.round(rotation)}°`;
+      const tw = ctx.measureText(angleStr).width;
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.beginPath();
+      ctx.roundRect(centerX - tw / 2 - 3, rotY - 14, tw + 6, 11, 3);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.fillText(angleStr, centerX, rotY - 5);
+      ctx.restore();
+    }
+  }
+
+  // 8 micro-handles (corners + midpoints)
+  const radius = 2.25;
   const corners = [
     { cx: x, cy: y },
     { cx: x + w / 2, cy: y },
@@ -1067,8 +1184,8 @@ function drawGenericSelectionHandles(
 
   ctx.fillStyle = '#ffffff';
   ctx.strokeStyle = color;
-  ctx.lineWidth = 0.75;
-  ctx.globalAlpha = 0.8;
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.95;
   corners.forEach(({ cx, cy }) => {
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
@@ -1207,24 +1324,92 @@ function drawSmartGuides(ctx: CanvasRenderingContext2D, guides: SmartGuide[]) {
 }
 
 /**
+ * Draws Photoshop precision pixel grid
+ */
+function drawPhotoshopGrid(
+  ctx: CanvasRenderingContext2D,
+  bgX: number,
+  bgY: number,
+  bgWidth: number,
+  bgHeight: number,
+  gridSize: number = 20
+) {
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(0, 136, 204, 0.22)';
+  ctx.setLineDash([1, 3]);
+
+  // Vertical grid lines
+  const startX = Math.floor(bgX / gridSize) * gridSize;
+  const endX = bgX + bgWidth;
+  for (let x = startX; x <= endX; x += gridSize) {
+    if (x < bgX) continue;
+    ctx.beginPath();
+    ctx.moveTo(x + 0.5, bgY);
+    ctx.lineTo(x + 0.5, bgY + bgHeight);
+    ctx.stroke();
+  }
+
+  // Horizontal grid lines
+  const startY = Math.floor(bgY / gridSize) * gridSize;
+  const endY = bgY + bgHeight;
+  for (let y = startY; y <= endY; y += gridSize) {
+    if (y < bgY) continue;
+    ctx.beginPath();
+    ctx.moveTo(bgX, y + 0.5);
+    ctx.lineTo(bgX + bgWidth, y + 0.5);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
  * Draws manual user-placed guides
  */
 function drawUserGuides(ctx: CanvasRenderingContext2D, guides: UserGuide[]) {
   ctx.save();
-  ctx.lineWidth = 0.5;
-  ctx.setLineDash([3, 3]);
-  ctx.strokeStyle = 'rgba(2, 132, 199, 0.30)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
 
   guides.forEach((g) => {
+    // Photoshop cyan guide line
+    ctx.strokeStyle = '#00e5ff';
     ctx.beginPath();
     if (g.type === 'vertical') {
-      ctx.moveTo(g.position, 0);
-      ctx.lineTo(g.position, ctx.canvas.height);
+      ctx.moveTo(g.position + 0.5, 0);
+      ctx.lineTo(g.position + 0.5, ctx.canvas.height);
     } else {
-      ctx.moveTo(0, g.position);
-      ctx.lineTo(ctx.canvas.width, g.position);
+      ctx.moveTo(0, g.position + 0.5);
+      ctx.lineTo(ctx.canvas.width, g.position + 0.5);
     }
     ctx.stroke();
+
+    // Position indicator badge along ruler edge
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.font = '8px "JetBrains Mono", Menlo, monospace';
+    const label = `${Math.round(g.position)}px`;
+    const tw = ctx.measureText(label).width;
+
+    if (g.type === 'vertical') {
+      const lx = Math.min(ctx.canvas.width - tw - 8, Math.max(4, g.position + 3));
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.9)';
+      ctx.beginPath();
+      ctx.roundRect(lx, 4, tw + 6, 12, 3);
+      ctx.fill();
+      ctx.fillStyle = '#000000';
+      ctx.fillText(label, lx + 3, 13);
+    } else {
+      const ly = Math.min(ctx.canvas.height - 4, Math.max(14, g.position - 3));
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.9)';
+      ctx.beginPath();
+      ctx.roundRect(4, ly - 10, tw + 6, 12, 3);
+      ctx.fill();
+      ctx.fillStyle = '#000000';
+      ctx.fillText(label, 7, ly - 1);
+    }
+    ctx.restore();
   });
 
   ctx.restore();

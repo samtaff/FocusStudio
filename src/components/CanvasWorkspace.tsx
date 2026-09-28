@@ -90,6 +90,10 @@ interface CanvasWorkspaceProps {
   userGuides: UserGuide[];
   onAddGuideH: () => void;
   onAddGuideV: () => void;
+  onAddCustomGuide?: (type: 'horizontal' | 'vertical', position: number) => void;
+  onUpdateGuide?: (id: string, position: number) => void;
+  onDeleteGuide?: (id: string) => void;
+  onClearAllGuides?: () => void;
   onImportClick: () => void;
   // Workspace centering & reset
   resetWorkspaceTrigger?: number;
@@ -163,6 +167,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   userGuides,
   onAddGuideH,
   onAddGuideV,
+  onAddCustomGuide,
+  onUpdateGuide,
+  onDeleteGuide,
+  onClearAllGuides,
   onImportClick,
   resetWorkspaceTrigger,
   onCenterWorkspace: externalCenterWorkspace,
@@ -252,6 +260,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   // Dynamic Alignment Guides
   const [activeGuides, setActiveGuides] = useState<SmartGuide[]>([]);
   const [canvasMousePos, setCanvasMousePos] = useState<{ x: number; y: number } | null>(null);
+
+  // Photoshop Rulers: Dragging Guide from Ruler or moving existing guide
+  const [draggingGuide, setDraggingGuide] = useState<{ type: 'horizontal' | 'vertical'; position: number; isNew: boolean; guideId?: string } | null>(null);
+  const [hoveredGuide, setHoveredGuide] = useState<UserGuide | null>(null);
+
+  // Shape Rotation state
+  const [hoveredRotationHandle, setHoveredRotationHandle] = useState<{ type: 'mask' | 'triangle'; id: string } | null>(null);
+  const [dragRotateState, setDragRotateState] = useState<{ id: string; type: 'mask' | 'triangle'; centerX: number; centerY: number; startAngle: number; initialRotation: number } | null>(null);
+
+  // Smart Snap guides & HUD info badge
+  const [activeSnapGuides, setActiveSnapGuides] = useState<SmartGuide[]>([]);
+  const [hudInfo, setHudInfo] = useState<{ x: number; y: number; text: string } | null>(null);
 
   // Key sequence buffer for "Z3" shortcut (User request: "lorsque j'appuie sur 'Z3' je veux que la petite fenêtre des zones s'ouvre")
   const keySequenceRef = useRef<string>('');
@@ -349,6 +369,102 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   // Calculate composition bounds with adjustable workspace width up to 500px, or dynamic Callout mode bounds
   const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, calloutVignette);
 
+  // Convert client viewport coordinates to Canvas composition coordinates
+  const clientToCanvasCoord = useCallback((clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const x = (clientX - rect.left) * (canvas.width / rect.width);
+    const y = (clientY - rect.top) * (canvas.height / rect.height);
+    return { x, y };
+  }, []);
+
+  // Global drag listener for Guide pulling (from rulers) and Shape Rotation
+  useEffect(() => {
+    if (!draggingGuide && !dragRotateState) return;
+
+    const handleGlobalPointerMove = (e: MouseEvent) => {
+      const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
+      setCanvasMousePos({ x: Math.round(cx), y: Math.round(cy) });
+
+      if (draggingGuide) {
+        const newPos = draggingGuide.type === 'horizontal' ? Math.round(cy) : Math.round(cx);
+        setDraggingGuide((prev) => (prev ? { ...prev, position: newPos } : null));
+        setHudInfo({
+          x: cx,
+          y: cy,
+          text: draggingGuide.type === 'horizontal'
+            ? `Repère Y : ${newPos} px (${newPos - bounds.bgY >= 0 ? '+' : ''}${newPos - bounds.bgY} px)`
+            : `Repère X : ${newPos} px (${newPos - bounds.bgX >= 0 ? '+' : ''}${newPos - bounds.bgX} px)`,
+        });
+      } else if (dragRotateState) {
+        const { centerX, centerY, startAngle, initialRotation } = dragRotateState;
+        const curAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
+        let delta = curAngle - startAngle;
+        let targetRot = Math.round(initialRotation + delta);
+        while (targetRot > 180) targetRot -= 360;
+        while (targetRot <= -180) targetRot += 360;
+
+        // Magnetic angle snapping (with shift: 15° steps; normal: 45° steps)
+        const snapAngles = e.shiftKey
+          ? [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, -15, -30, -45, -60, -75, -90, -105, -120, -135, -150, -165, -180]
+          : [0, 45, 90, 135, 180, -45, -90, -135];
+        for (const sa of snapAngles) {
+          if (Math.abs(targetRot - sa) <= (e.shiftKey ? 6 : 3.5)) {
+            targetRot = sa;
+            break;
+          }
+        }
+
+        if (dragRotateState.type === 'mask') {
+          onUpdateMask(dragRotateState.id, { rotation: targetRot });
+        } else {
+          onUpdateTriangle?.(dragRotateState.id, { rotation: targetRot });
+        }
+
+        setHudInfo({
+          x: cx,
+          y: cy,
+          text: `Angle : ${targetRot}°`,
+        });
+      }
+    };
+
+    const handleGlobalPointerUp = () => {
+      if (draggingGuide) {
+        if (draggingGuide.isNew) {
+          const isOffscreen = draggingGuide.type === 'horizontal'
+            ? (draggingGuide.position < -15 || draggingGuide.position > bounds.canvasHeight + 15)
+            : (draggingGuide.position < -15 || draggingGuide.position > bounds.canvasWidth + 15);
+          if (!isOffscreen) {
+            onAddCustomGuide?.(draggingGuide.type, Math.max(0, draggingGuide.position));
+          }
+        } else if (draggingGuide.guideId) {
+          const isOffscreen = draggingGuide.type === 'horizontal'
+            ? (draggingGuide.position < 0 || draggingGuide.position > bounds.canvasHeight)
+            : (draggingGuide.position < 0 || draggingGuide.position > bounds.canvasWidth);
+          if (isOffscreen) {
+            onDeleteGuide?.(draggingGuide.guideId);
+          } else {
+            onUpdateGuide?.(draggingGuide.guideId, draggingGuide.position);
+          }
+        }
+        setDraggingGuide(null);
+      }
+      if (dragRotateState) {
+        setDragRotateState(null);
+      }
+      setHudInfo(null);
+    };
+
+    window.addEventListener('mousemove', handleGlobalPointerMove);
+    window.addEventListener('mouseup', handleGlobalPointerUp);
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalPointerMove);
+      window.removeEventListener('mouseup', handleGlobalPointerUp);
+    };
+  }, [draggingGuide, dragRotateState, clientToCanvasCoord, bounds, onAddCustomGuide, onDeleteGuide, onUpdateGuide, onUpdateMask, onUpdateTriangle]);
+
   // Synchronize and draw on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -368,8 +484,12 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       hoveredFocusId: isPreviewMode ? null : hoveredFocusId,
       hoveredHandle: isPreviewMode ? null : hoveredHandle,
       internalFramingFocusId: isPreviewMode ? null : internalFramingFocusId,
-      smartGuides: isPreviewMode ? [] : activeGuides,
-      userGuides: isPreviewMode ? [] : userGuides,
+      smartGuides: isPreviewMode ? [] : [...activeGuides, ...activeSnapGuides],
+      userGuides: isPreviewMode ? [] : (
+        draggingGuide
+          ? [...userGuides.filter(g => g.id !== draggingGuide.guideId), { id: 'dragging-guide', type: draggingGuide.type, position: draggingGuide.position }]
+          : userGuides
+      ),
       globalStyles,
       showGuides: !isPreviewMode && globalStyles.showGuides !== false,
       showRulers: !isPreviewMode && globalStyles.showRulers !== false,
@@ -411,16 +531,6 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     hoveredCalloutPart,
     isPreviewMode
   ]);
-
-  // Convert client viewport coordinates to Canvas composition coordinates
-  const clientToCanvasCoord = useCallback((clientX: number, clientY: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const x = (clientX - rect.left) * (canvas.width / rect.width);
-    const y = (clientY - rect.top) * (canvas.height / rect.height);
-    return { x, y };
-  }, []);
 
   // Hit-test handles of the selected focus (disabled when in Callout mode)
   const getHandleAtCoord = (cx: number, cy: number, focus: FocusZone): ResizeHandle | null => {
@@ -485,29 +595,42 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     return null;
   };
 
-  // Hit-test mask shapes
+  // Hit-test mask shapes (with inverse rotation support)
   const getMaskAtCoord = (cx: number, cy: number, layerFilter?: 'above' | 'below'): MaskShape | null => {
     for (let i = maskShapes.length - 1; i >= 0; i--) {
       const m = maskShapes[i];
       const mLayer = m.layer === 'below' ? 'below' : 'above';
       if (layerFilter && mLayer !== layerFilter) continue;
 
+      const cols = m.multiplier?.enabled ? Math.max(1, m.multiplier.cols || 2) : 1;
+      const rows = m.multiplier?.enabled ? Math.max(1, m.multiplier.rows || 2) : 1;
+      const gapX = m.multiplier?.gapX ?? 10;
+      const gapY = m.multiplier?.gapY ?? 10;
+      const totalW = cols * m.width + (cols - 1) * gapX;
+      const totalH = rows * m.height + (rows - 1) * gapY;
+      const centerX = m.x + totalW / 2;
+      const centerY = m.y + totalH / 2;
+      const rot = m.rotation || 0;
+
+      // Inverse rotate (cx, cy) to local unrotated space
+      const rotRad = -((rot * Math.PI) / 180);
+      const dx = cx - centerX;
+      const dy = cy - centerY;
+      const lx = centerX + dx * Math.cos(rotRad) - dy * Math.sin(rotRad);
+      const ly = centerY + dx * Math.sin(rotRad) + dy * Math.cos(rotRad);
+
       if (m.multiplier?.enabled) {
-        const cols = Math.max(1, m.multiplier.cols || 2);
-        const rows = Math.max(1, m.multiplier.rows || 2);
-        const gapX = m.multiplier.gapX ?? 10;
-        const gapY = m.multiplier.gapY ?? 10;
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
             const ix = m.x + c * (m.width + gapX);
             const iy = m.y + r * (m.height + gapY);
-            if (cx >= ix && cx <= ix + m.width && cy >= iy && cy <= iy + m.height) {
+            if (lx >= ix && lx <= ix + m.width && ly >= iy && ly <= iy + m.height) {
               return m;
             }
           }
         }
       } else {
-        if (cx >= m.x && cx <= m.x + m.width && cy >= m.y && cy <= m.y + m.height) {
+        if (lx >= m.x && lx <= m.x + m.width && ly >= m.y && ly <= m.y + m.height) {
           return m;
         }
       }
@@ -515,18 +638,195 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     return null;
   };
 
-  // Hit-test triangles (15x13px)
+  // Hit-test triangles (15x13px with inverse rotation support)
   const getTriangleAtCoord = (cx: number, cy: number): TriangleShape | null => {
     const pad = 4; // click tolerance padding
     for (let i = triangles.length - 1; i >= 0; i--) {
       const t = triangles[i];
       const w = t.width || 15;
       const h = t.height || 13;
-      if (cx >= t.x - pad && cx <= t.x + w + pad && cy >= t.y - pad && cy <= t.y + h + pad) {
+      const centerX = t.x + w / 2;
+      const centerY = t.y + h / 2;
+      const rot = t.rotation || 0;
+
+      const rotRad = -((rot * Math.PI) / 180);
+      const dx = cx - centerX;
+      const dy = cy - centerY;
+      const lx = centerX + dx * Math.cos(rotRad) - dy * Math.sin(rotRad);
+      const ly = centerY + dx * Math.sin(rotRad) + dy * Math.cos(rotRad);
+
+      if (lx >= t.x - pad && lx <= t.x + w + pad && ly >= t.y - pad && ly <= t.y + h + pad) {
         return t;
       }
     }
     return null;
+  };
+
+  // Hit-test Photoshop Rotation Handle for selected mask or triangle
+  const getRotationHandleAtCoord = (cx: number, cy: number): { type: 'mask' | 'triangle'; id: string } | null => {
+    if (selectedMaskId) {
+      const mask = maskShapes.find((m) => m.id === selectedMaskId);
+      if (mask) {
+        const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 2) : 1;
+        const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 2) : 1;
+        const gapX = mask.multiplier?.gapX ?? 10;
+        const gapY = mask.multiplier?.gapY ?? 10;
+        const totalW = cols * mask.width + (cols - 1) * gapX;
+        const totalH = rows * mask.height + (rows - 1) * gapY;
+        const centerX = mask.x + totalW / 2;
+        const centerY = mask.y + totalH / 2;
+        const rot = mask.rotation || 0;
+
+        const rotRad = -((rot * Math.PI) / 180);
+        const dx = cx - centerX;
+        const dy = cy - centerY;
+        const lx = centerX + dx * Math.cos(rotRad) - dy * Math.sin(rotRad);
+        const ly = centerY + dx * Math.sin(rotRad) + dy * Math.cos(rotRad);
+
+        const targetX = centerX;
+        const targetY = mask.y - 20;
+        if ((lx - targetX) ** 2 + (ly - targetY) ** 2 <= 64) {
+          return { type: 'mask', id: mask.id };
+        }
+      }
+    }
+
+    if (selectedTriangleId) {
+      const tri = triangles.find((t) => t.id === selectedTriangleId);
+      if (tri) {
+        const w = tri.width || 15;
+        const h = tri.height || 13;
+        const centerX = tri.x + w / 2;
+        const centerY = tri.y + h / 2;
+        const rot = tri.rotation || 0;
+
+        const rotRad = -((rot * Math.PI) / 180);
+        const dx = cx - centerX;
+        const dy = cy - centerY;
+        const lx = centerX + dx * Math.cos(rotRad) - dy * Math.sin(rotRad);
+        const ly = centerY + dx * Math.sin(rotRad) + dy * Math.cos(rotRad);
+
+        const targetX = centerX;
+        const targetY = tri.y - 20;
+        if ((lx - targetX) ** 2 + (ly - targetY) ** 2 <= 64) {
+          return { type: 'triangle', id: tri.id };
+        }
+      }
+    }
+
+    return null;
+  };
+
+  // Hit-test existing User Guide on canvas
+  const getGuideAtCoord = (cx: number, cy: number): UserGuide | null => {
+    const pad = 5;
+    for (let i = userGuides.length - 1; i >= 0; i--) {
+      const g = userGuides[i];
+      if (g.type === 'horizontal' && Math.abs(cy - g.position) <= pad) {
+        return g;
+      }
+      if (g.type === 'vertical' && Math.abs(cx - g.position) <= pad) {
+        return g;
+      }
+    }
+    return null;
+  };
+
+  // Smart snapping calculation against screen borders, centers, and Photoshop guides
+  const calculateSmartSnaps = (
+    targetX: number, 
+    targetY: number, 
+    targetW: number, 
+    targetH: number, 
+    ignoreId?: string
+  ): { snappedX: number; snappedY: number; smartGuides: SmartGuide[] } => {
+    if (globalStyles.snapToGuides === false) {
+      return { snappedX: targetX, snappedY: targetY, smartGuides: [] };
+    }
+
+    const threshold = 6;
+    let snappedX = targetX;
+    let snappedY = targetY;
+    const smartGuides: SmartGuide[] = [];
+
+    // Candidate X lines
+    const candidateX: { pos: number; label: string }[] = [
+      { pos: bounds.bgX, label: 'Bord gauche screen' },
+      { pos: Math.round(bounds.bgX + bounds.bgWidth / 2), label: 'Centre screen' },
+      { pos: bounds.bgX + bounds.bgWidth, label: 'Bord droit screen' },
+    ];
+    userGuides.filter(g => g.type === 'vertical').forEach(g => {
+      candidateX.push({ pos: g.position, label: `Repère ${Math.round(g.position)}px` });
+    });
+
+    // Candidate Y lines
+    const candidateY: { pos: number; label: string }[] = [
+      { pos: bounds.bgY, label: 'Haut screen' },
+      { pos: Math.round(bounds.bgY + bounds.bgHeight / 2), label: 'Milieu screen' },
+      { pos: bounds.bgY + bounds.bgHeight, label: 'Bas screen' },
+    ];
+    userGuides.filter(g => g.type === 'horizontal').forEach(g => {
+      candidateY.push({ pos: g.position, label: `Repère ${Math.round(g.position)}px` });
+    });
+
+    // Snap X (left, center, right)
+    for (const c of candidateX) {
+      if (Math.abs(targetX - c.pos) < threshold) {
+        snappedX = c.pos;
+        smartGuides.push({ type: 'vertical', position: c.pos, label: c.label });
+        break;
+      }
+      if (Math.abs(targetX + targetW / 2 - c.pos) < threshold) {
+        snappedX = c.pos - targetW / 2;
+        smartGuides.push({ type: 'vertical', position: c.pos, label: c.label });
+        break;
+      }
+      if (Math.abs(targetX + targetW - c.pos) < threshold) {
+        snappedX = c.pos - targetW;
+        smartGuides.push({ type: 'vertical', position: c.pos, label: c.label });
+        break;
+      }
+    }
+
+    // Snap Y (top, center, bottom)
+    for (const c of candidateY) {
+      if (Math.abs(targetY - c.pos) < threshold) {
+        snappedY = c.pos;
+        smartGuides.push({ type: 'horizontal', position: c.pos, label: c.label });
+        break;
+      }
+      if (Math.abs(targetY + targetH / 2 - c.pos) < threshold) {
+        snappedY = c.pos - targetH / 2;
+        smartGuides.push({ type: 'horizontal', position: c.pos, label: c.label });
+        break;
+      }
+      if (Math.abs(targetY + targetH - c.pos) < threshold) {
+        snappedY = c.pos - targetH;
+        smartGuides.push({ type: 'horizontal', position: c.pos, label: c.label });
+        break;
+      }
+    }
+
+    // Snap to Photoshop grid if enabled and not already snapped
+    if (globalStyles.showGrid) {
+      const gSize = globalStyles.gridSize || 20;
+      if (snappedX === targetX) {
+        const nearestGridX = Math.round(targetX / gSize) * gSize;
+        if (Math.abs(targetX - nearestGridX) < threshold) {
+          snappedX = nearestGridX;
+          smartGuides.push({ type: 'vertical', position: nearestGridX, label: `Grille ${nearestGridX}px`, color: '#0088cc' });
+        }
+      }
+      if (snappedY === targetY) {
+        const nearestGridY = Math.round(targetY / gSize) * gSize;
+        if (Math.abs(targetY - nearestGridY) < threshold) {
+          snappedY = nearestGridY;
+          smartGuides.push({ type: 'horizontal', position: nearestGridY, label: `Grille ${nearestGridY}px`, color: '#0088cc' });
+        }
+      }
+    }
+
+    return { snappedX: Math.round(snappedX), snappedY: Math.round(snappedY), smartGuides };
   };
 
   // Hit-test Callout parts: source target on screen or vignette bubble on left
@@ -575,6 +875,52 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
     setCanvasMousePos({ x: Math.round(cx), y: Math.round(cy) });
 
+    // Dragging Guide from Ruler or moving existing guide
+    if (draggingGuide) {
+      const newPos = draggingGuide.type === 'horizontal' ? Math.round(cy) : Math.round(cx);
+      setDraggingGuide((prev) => (prev ? { ...prev, position: newPos } : null));
+      setHudInfo({
+        x: cx,
+        y: cy,
+        text: draggingGuide.type === 'horizontal'
+          ? `Repère Y: ${newPos} px (${newPos - bounds.bgY >= 0 ? '+' : ''}${newPos - bounds.bgY} px)`
+          : `Repère X: ${newPos} px (${newPos - bounds.bgX >= 0 ? '+' : ''}${newPos - bounds.bgX} px)`,
+      });
+      return;
+    }
+
+    // Dragging Rotation Handle
+    if (dragRotateState) {
+      const { centerX, centerY, startAngle, initialRotation } = dragRotateState;
+      const curAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
+      let delta = curAngle - startAngle;
+      let targetRot = Math.round(initialRotation + delta);
+      while (targetRot > 180) targetRot -= 360;
+      while (targetRot <= -180) targetRot += 360;
+
+      // Magnetic angle snapping (0°, 45°, 90°, 135°, 180°, -45°, -90°, -135°)
+      const snapAngles = [0, 45, 90, 135, 180, -45, -90, -135];
+      for (const sa of snapAngles) {
+        if (Math.abs(targetRot - sa) <= (e.shiftKey ? 8 : 3.5)) {
+          targetRot = sa;
+          break;
+        }
+      }
+
+      if (dragRotateState.type === 'mask') {
+        onUpdateMask(dragRotateState.id, { rotation: targetRot });
+      } else {
+        onUpdateTriangle?.(dragRotateState.id, { rotation: targetRot });
+      }
+
+      setHudInfo({
+        x: cx,
+        y: cy,
+        text: `Angle : ${targetRot}°`,
+      });
+      return;
+    }
+
     // Dragging Callout Vignette (source target or vignette vertical position)
     if (dragCalloutState && onUpdateCallout && calloutVignette) {
       const dx = cx - dragCalloutState.startX;
@@ -594,13 +940,22 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // Dragging Triangle
+    // Dragging Triangle (with Photoshop smart snapping)
     if (dragTriangleState && onUpdateTriangle) {
       const dx = cx - dragTriangleState.startX;
       const dy = cy - dragTriangleState.startY;
+      const rawX = Math.round(dragTriangleState.initialX + dx);
+      const rawY = Math.round(dragTriangleState.initialY + dy);
+      const snap = calculateSmartSnaps(rawX, rawY, 15, 13, dragTriangleState.id);
+      setActiveSnapGuides(snap.smartGuides);
       onUpdateTriangle(dragTriangleState.id, {
-        x: Math.round(dragTriangleState.initialX + dx),
-        y: Math.round(dragTriangleState.initialY + dy),
+        x: snap.snappedX,
+        y: snap.snappedY,
+      });
+      setHudInfo({
+        x: cx,
+        y: cy,
+        text: `X: ${snap.snappedX} px  Y: ${snap.snappedY} px`,
       });
       return;
     }
@@ -627,15 +982,24 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         }
         onUpdateBlur(dragBlurState.id, { x: Math.round(newX), y: Math.round(newY), width: Math.round(newW), height: Math.round(newH) });
       } else {
+        const rawX = Math.round(dragBlurState.initialX + dx);
+        const rawY = Math.round(dragBlurState.initialY + dy);
+        const snap = calculateSmartSnaps(rawX, rawY, dragBlurState.initialW, dragBlurState.initialH, dragBlurState.id);
+        setActiveSnapGuides(snap.smartGuides);
         onUpdateBlur(dragBlurState.id, {
-          x: Math.round(dragBlurState.initialX + dx),
-          y: Math.round(dragBlurState.initialY + dy),
+          x: snap.snappedX,
+          y: snap.snappedY,
+        });
+        setHudInfo({
+          x: cx,
+          y: cy,
+          text: `Flou X: ${snap.snappedX} px  Y: ${snap.snappedY} px`,
         });
       }
       return;
     }
 
-    // Dragging Mask Shape
+    // Dragging Mask Shape (with Photoshop smart snapping)
     if (dragMaskState) {
       const dx = cx - dragMaskState.startX;
       const dy = cy - dragMaskState.startY;
@@ -656,10 +1020,24 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           newY = dragMaskState.initialY + dy;
         }
         onUpdateMask(dragMaskState.id, { x: Math.round(newX), y: Math.round(newY), width: Math.round(newW), height: Math.round(newH) });
+        setHudInfo({
+          x: cx,
+          y: cy,
+          text: `L: ${Math.round(newW)} px  H: ${Math.round(newH)} px`,
+        });
       } else {
+        const rawX = Math.round(dragMaskState.initialX + dx);
+        const rawY = Math.round(dragMaskState.initialY + dy);
+        const snap = calculateSmartSnaps(rawX, rawY, dragMaskState.initialW, dragMaskState.initialH, dragMaskState.id);
+        setActiveSnapGuides(snap.smartGuides);
         onUpdateMask(dragMaskState.id, {
-          x: Math.round(dragMaskState.initialX + dx),
-          y: Math.round(dragMaskState.initialY + dy),
+          x: snap.snappedX,
+          y: snap.snappedY,
+        });
+        setHudInfo({
+          x: cx,
+          y: cy,
+          text: `X: ${snap.snappedX} px  Y: ${snap.snappedY} px  L: ${dragMaskState.initialW} px  H: ${dragMaskState.initialH} px`,
         });
       }
       return;
@@ -772,6 +1150,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           });
         }
 
+        // Also snap to user-placed Photoshop guides and grid!
+        const snap = calculateSmartSnaps(newX, newY, init.width, init.height);
+        if (snap.smartGuides.length > 0) {
+          newX = snap.snappedX;
+          newY = snap.snappedY;
+          currentGuides.push(...snap.smartGuides);
+        }
+
         setActiveGuides(currentGuides);
 
         onUpdateFocus({
@@ -836,6 +1222,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       }
     }
     setHoveredHandle(null);
+
+    // Rotation handle hover
+    const rotHandle = getRotationHandleAtCoord(cx, cy);
+    setHoveredRotationHandle(rotHandle);
+
+    // Guide hover
+    const gHover = getGuideAtCoord(cx, cy);
+    setHoveredGuide(gHover);
 
     // FLUID HOVER DETECTION OVER ALL ELEMENTS (Strict layering: Callout -> Triangle -> Mask (Above) -> Focus -> Mask (Below) -> Blur)
     const hCallout = getCalloutPartAtCoord(cx, cy);
@@ -913,6 +1307,62 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     (document.activeElement as HTMLElement)?.blur?.();
 
     const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
+
+    // 0. Check if clicking rotation handle on selected mask or triangle
+    const clickedRotHandle = getRotationHandleAtCoord(cx, cy);
+    if (clickedRotHandle) {
+      if (clickedRotHandle.type === 'mask') {
+        const mask = maskShapes.find((m) => m.id === clickedRotHandle.id);
+        if (mask) {
+          const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 2) : 1;
+          const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 2) : 1;
+          const gapX = mask.multiplier?.gapX ?? 10;
+          const gapY = mask.multiplier?.gapY ?? 10;
+          const totalW = cols * mask.width + (cols - 1) * gapX;
+          const totalH = rows * mask.height + (rows - 1) * gapY;
+          const centerX = mask.x + totalW / 2;
+          const centerY = mask.y + totalH / 2;
+          const startAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
+          setDragRotateState({
+            id: mask.id,
+            type: 'mask',
+            centerX,
+            centerY,
+            startAngle,
+            initialRotation: mask.rotation || 0,
+          });
+          return;
+        }
+      } else {
+        const tri = triangles.find((t) => t.id === clickedRotHandle.id);
+        if (tri) {
+          const centerX = tri.x + (tri.width || 15) / 2;
+          const centerY = tri.y + (tri.height || 13) / 2;
+          const startAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
+          setDragRotateState({
+            id: tri.id,
+            type: 'triangle',
+            centerX,
+            centerY,
+            startAngle,
+            initialRotation: tri.rotation || 0,
+          });
+          return;
+        }
+      }
+    }
+
+    // 0.b. Check if clicking existing guide line on canvas
+    const clickedGuide = getGuideAtCoord(cx, cy);
+    if (clickedGuide) {
+      setDraggingGuide({
+        type: clickedGuide.type,
+        position: clickedGuide.position,
+        isNew: false,
+        guideId: clickedGuide.id,
+      });
+      return;
+    }
 
     // 1. Check if clicking handles on selected Blur Zone
     const selectedBlur = blurZones.find((b) => b.id === selectedBlurId);
@@ -1163,10 +1613,39 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (dragBlurState) setDragBlurState(null);
     if (dragMaskState) setDragMaskState(null);
     if (dragTriangleState) setDragTriangleState(null);
+
+    // Finalize guide dragging
+    if (draggingGuide) {
+      if (draggingGuide.isNew) {
+        onAddCustomGuide?.(draggingGuide.type, draggingGuide.position);
+      } else if (draggingGuide.guideId) {
+        // If dragged outside canvas or back onto ruler, delete guide!
+        const isOffscreen = draggingGuide.type === 'horizontal' 
+          ? (draggingGuide.position < 0 || draggingGuide.position > bounds.canvasHeight)
+          : (draggingGuide.position < 0 || draggingGuide.position > bounds.canvasWidth);
+        if (isOffscreen) {
+          onDeleteGuide?.(draggingGuide.guideId);
+        } else {
+          onUpdateGuide?.(draggingGuide.guideId, draggingGuide.position);
+        }
+      }
+      setDraggingGuide(null);
+    }
+
+    if (dragRotateState) setDragRotateState(null);
+    setActiveSnapGuides([]);
+    setHudInfo(null);
   };
 
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
+
+    // Double-click on existing guide -> delete it!
+    const clickedGuide = getGuideAtCoord(cx, cy);
+    if (clickedGuide && onDeleteGuide) {
+      onDeleteGuide(clickedGuide.id);
+      return;
+    }
 
     // Double-clic sur une zone focus : activer / quitter le mode recadrage interne
     const clickedFocus = getFocusAtCoord(cx, cy);
@@ -1256,6 +1735,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (activeTool === 'blur' || activeTool === 'mask' || activeTool === 'triangle') return 'crosshair';
     if (isPanMode) return 'grab';
     if (dragCalloutState) return 'grabbing';
+    if (draggingGuide) return draggingGuide.type === 'horizontal' ? 'ns-resize' : 'ew-resize';
+    if (hoveredGuide) return hoveredGuide.type === 'horizontal' ? 'ns-resize' : 'ew-resize';
+    if (dragRotateState || hoveredRotationHandle) return 'crosshair';
     if (dragState?.isDragging || dragBlurState || dragMaskState || dragTriangleState) return 'move';
     if (dragState?.isResizing && dragState.handle) {
       const h = dragState.handle;
@@ -1463,15 +1945,27 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               {/* Top Ruler Row */}
               <div className="flex items-stretch">
                 <div 
-                  className="w-2.5 h-2.5 bg-transparent border-t border-l border-r border-b border-slate-300/40 select-none shrink-0"
-                  title="Règles discrètes"
-                />
+                  className={`w-5 h-5 flex items-center justify-center text-[9px] font-mono select-none shrink-0 border-t border-l border-r border-b ${
+                    isDarkMode ? 'bg-[#1e1e1e] border-[#383838] text-[#888888]' : 'bg-[#e5e7eb] border-[#d1d5db] text-[#6b7280]'
+                  }`}
+                  title="Origine des règles Photoshop (en pixels)"
+                >
+                  px
+                </div>
                 <TopRuler
                   width={bounds.canvasWidth}
                   bgX={bounds.bgX}
                   bgWidth={bounds.bgWidth}
                   cursorX={canvasMousePos?.x}
                   onAddGuideH={onAddGuideH}
+                  onStartDragGuide={(type) => {
+                    setDraggingGuide({
+                      type: 'horizontal',
+                      position: bounds.bgY,
+                      isNew: true,
+                    });
+                  }}
+                  isDarkMode={isDarkMode}
                 />
               </div>
 
@@ -1483,6 +1977,14 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                   bgHeight={bounds.bgHeight}
                   cursorY={canvasMousePos?.y}
                   onAddGuideV={onAddGuideV}
+                  onStartDragGuide={(type) => {
+                    setDraggingGuide({
+                      type: 'vertical',
+                      position: bounds.bgX,
+                      isNew: true,
+                    });
+                  }}
+                  isDarkMode={isDarkMode}
                 />
                 <div 
                   className="relative photoshop-checkerboard border-b border-r border-slate-300"
@@ -1491,6 +1993,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                     height: `${bounds.canvasHeight}px`,
                   }}
                 >
+                  {/* Floating Photoshop Precision HUD badge */}
+                  {hudInfo && (
+                    <div 
+                      className="absolute pointer-events-none z-50 px-2 py-0.5 rounded-md bg-[#0f172a]/90 text-white font-mono text-[10px] shadow-lg border border-white/20 whitespace-nowrap -translate-x-1/2 -translate-y-8 select-none"
+                      style={{ left: `${hudInfo.x}px`, top: `${hudInfo.y}px` }}
+                    >
+                      {hudInfo.text}
+                    </div>
+                  )}
                   <canvas
                     ref={canvasRef}
                     width={bounds.canvasWidth}

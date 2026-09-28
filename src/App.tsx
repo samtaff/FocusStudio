@@ -892,7 +892,7 @@ export default function App() {
     const pos = selected ? selected.y + selected.height / 2 : bounds.bgY + bounds.bgHeight / 2;
     setUserGuides((prev) => [
       ...prev,
-      { id: `guide-h-${Date.now()}`, type: 'horizontal', position: pos }
+      { id: `guide-h-${Date.now()}`, type: 'horizontal', position: Math.round(pos) }
     ]);
   };
 
@@ -903,8 +903,27 @@ export default function App() {
     const pos = selected ? selected.x + selected.width / 2 : bounds.bgX + bounds.bgWidth / 2;
     setUserGuides((prev) => [
       ...prev,
-      { id: `guide-v-${Date.now()}`, type: 'vertical', position: pos }
+      { id: `guide-v-${Date.now()}`, type: 'vertical', position: Math.round(pos) }
     ]);
+  };
+
+  const handleAddCustomGuide = (type: 'horizontal' | 'vertical', position: number) => {
+    setUserGuides((prev) => [
+      ...prev,
+      { id: `guide-${type[0]}-${Date.now()}`, type, position: Math.round(position) }
+    ]);
+  };
+
+  const handleUpdateGuide = (id: string, position: number) => {
+    setUserGuides((prev) => prev.map((g) => (g.id === id ? { ...g, position: Math.round(position) } : g)));
+  };
+
+  const handleDeleteGuide = (id: string) => {
+    setUserGuides((prev) => prev.filter((g) => g.id !== id));
+  };
+
+  const handleClearAllGuides = () => {
+    setUserGuides([]);
   };
 
   // Reset to default settings
@@ -1461,6 +1480,10 @@ export default function App() {
           userGuides={userGuides}
           onAddGuideH={handleAddGuideH}
           onAddGuideV={handleAddGuideV}
+          onAddCustomGuide={handleAddCustomGuide}
+          onUpdateGuide={handleUpdateGuide}
+          onDeleteGuide={handleDeleteGuide}
+          onClearAllGuides={handleClearAllGuides}
           onUndo={handleUndo}
           onRedo={handleRedo}
           canUndo={historyIndex > 0}
@@ -1532,6 +1555,13 @@ export default function App() {
           onUpdatePanelWidth={setPanelWidth}
           isDarkMode={isDarkMode}
           onToggleDarkMode={handleToggleDarkMode}
+          userGuides={userGuides}
+          onAddGuideH={handleAddGuideH}
+          onAddGuideV={handleAddGuideV}
+          onAddCustomGuide={handleAddCustomGuide}
+          onUpdateGuide={handleUpdateGuide}
+          onDeleteGuide={handleDeleteGuide}
+          onClearAllGuides={handleClearAllGuides}
           sequentialImportNumbering={sequentialImportNumbering}
           onToggleSequentialImportNumbering={handleToggleSequentialImportNumbering}
           nextSequentialStep={nextSequentialStep}

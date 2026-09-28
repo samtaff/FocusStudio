@@ -104,6 +104,7 @@ export interface MaskShape {
   y: number;
   width: number;
   height: number;
+  rotation?: number; // rotation in degrees, e.g. -180 to 180 (default 0)
   color: string; // #25465F by default
   opacity?: number; // 0 to 1, default 1
   borderRadius?: number; // default 4
@@ -129,6 +130,7 @@ export interface TriangleShape {
   y: number;
   width: number; // default 15px
   height: number; // default 13px
+  rotation?: number; // custom angle in degrees (default 0)
   color: string; // default #25465F or #ffffff
   direction: 'down' | 'up' | 'left' | 'right'; // default 'down'
   borderWidth?: number;
@@ -186,6 +188,7 @@ export interface UserGuide {
   id: string;
   type: 'horizontal' | 'vertical';
   position: number; // pixel position along the axis
+  label?: string;
 }
 
 export interface GlobalStyleSettings {
@@ -197,6 +200,10 @@ export interface GlobalStyleSettings {
   showRulers: boolean;
   showHandles: boolean;
   showGuides: boolean;
+  snapToGuides?: boolean; // Snap to guides and screen borders (default: true)
+  showGrid?: boolean; // Grille de précision Photoshop
+  gridSize?: number; // Taille de la grille en pixels (ex: 10 ou 20px, défaut 20)
+  snapPrecision?: 'normal' | 'high'; // Sensibilité d'aimantation
   previewHD: boolean;
 }
 
