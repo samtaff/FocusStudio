@@ -1689,8 +1689,16 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             ? 'bg-[#333333] border border-[#484848] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
                             : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                       }`}
+                      title={b.layer === 'below' ? 'Flou positionné sous le focus (arrière-plan)' : 'Flou positionné sur le focus (premier plan)'}
                     >
-                      {b.name || `Flou ${idx + 1}`}
+                      <span className="flex items-center gap-1">
+                        <span>{b.name || `Flou ${idx + 1}`}</span>
+                        {b.layer === 'below' && (
+                          <span className="text-[8.5px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-500 font-bold">
+                            sous
+                          </span>
+                        )}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -1711,24 +1719,75 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </button>
                   </div>
 
-                  {/* 1. Sélecteur de Type de Flou (Dépoli, Gaussien, Mosaïque, Fumé) */}
-                  <div className="flex flex-col gap-1.5">
+                  {/* Ordre de superposition : Passe derrière ou devant la zone focus */}
+                  <div className="flex flex-col gap-1.5 pt-1 border-t border-[#eeeeee]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-[#0088cc]" />
+                        <label className="text-[10px] text-[#666666] font-medium">Position par rapport au focus</label>
+                      </div>
+                      <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-semibold ${
+                        activeBlur.layer === 'below'
+                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                          : 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30'
+                      }`}>
+                        {activeBlur.layer === 'below' ? 'Derrière le focus' : 'Sur le focus'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => onUpdateBlur(activeBlur.id, { layer: 'above' })}
+                        className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-[10px] font-medium transition-all ${
+                          (activeBlur.layer || 'above') === 'above'
+                            ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
+                            : isDarkMode
+                              ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                              : 'bg-white border border-[#e5e5e5] text-[#666666] hover:bg-[#f5f5f5]'
+                        }`}
+                        title="La zone de flou passe par-dessus la zone de focus (floute également le contenu du focus)"
+                      >
+                        <BringToFront className="w-3.5 h-3.5" />
+                        <span>Devant le focus</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onUpdateBlur(activeBlur.id, { layer: 'below' })}
+                        className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-[10px] font-medium transition-all ${
+                          activeBlur.layer === 'below'
+                            ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
+                            : isDarkMode
+                              ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                              : 'bg-white border border-[#e5e5e5] text-[#666666] hover:bg-[#f5f5f5]'
+                        }`}
+                        title="La zone de flou passe derrière la zone de focus (la zone de focus reste nette au-dessus)"
+                      >
+                        <SendToBack className="w-3.5 h-3.5" />
+                        <span>Derrière le focus</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 1. Sélecteur de Type de Flou (Gaussien par défaut, Dépoli, Mosaïque, Fumé) */}
+                  <div className="flex flex-col gap-1.5 pt-1 border-t border-[#eeeeee]">
                     <span className="text-[10px] uppercase font-semibold text-[#666666] tracking-wider">
-                      Style de rendu
+                      Style de rendu (Gaussien par défaut)
                     </span>
                     <div className="grid grid-cols-2 gap-1.5">
                       {[
+                        { 
+                          id: 'gaussian', 
+                          label: 'Gaussien', 
+                          desc: 'Optique doux (défaut)', 
+                          icon: <Droplet className="w-3.5 h-3.5" /> 
+                        },
                         { 
                           id: 'frosted', 
                           label: 'Dépoli', 
                           desc: 'Verre givré laiteux', 
                           icon: <Sparkles className="w-3.5 h-3.5" /> 
-                        },
-                        { 
-                          id: 'gaussian', 
-                          label: 'Gaussien', 
-                          desc: 'Optique doux', 
-                          icon: <Droplet className="w-3.5 h-3.5" /> 
                         },
                         { 
                           id: 'pixelate', 
@@ -1743,7 +1802,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           icon: <Layers className="w-3.5 h-3.5" /> 
                         },
                       ].map((style) => {
-                        const isCurrent = (activeBlur.blurType || 'frosted') === style.id;
+                        const isCurrent = (activeBlur.blurType || 'gaussian') === style.id;
                         return (
                           <button
                             key={style.id}
@@ -1771,7 +1830,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   <div className="flex flex-col gap-1 pt-1">
                     <div className="flex justify-between items-center text-[11px]">
                       <span className="text-[#666666] font-medium">
-                        {(activeBlur.blurType || 'frosted') === 'pixelate' ? 'Taille des pavés (pixels)' : 'Intensité du flou'}
+                        {(activeBlur.blurType || 'gaussian') === 'pixelate' ? 'Taille des pavés (pixels)' : 'Intensité du flou'}
                       </span>
                       <div className="w-16">
                         <NumericInput

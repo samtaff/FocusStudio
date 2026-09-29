@@ -625,9 +625,10 @@ export default function App() {
       width: 100,
       height: 40,
       blurRadius: 12,
-      blurType: 'frosted',
+      blurType: 'gaussian',
       opacity: 1,
       borderRadius: 4,
+      layer: 'above',
     };
     setBlurZones((prev) => [...prev, newBlur]);
     handleSelectBlur(newBlur.id);

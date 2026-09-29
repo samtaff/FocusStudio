@@ -341,10 +341,12 @@ export function drawComposition(
   ctx.strokeRect(bgX + 0.5, bgY + 0.5, bgWidth - 1, bgHeight - 1);
   ctx.restore();
 
-  // 4. Draw Blur zones: MUST ALWAYS BE UNDERNEATH ALL OTHER OBJECTS (Focus zones, Masks, Triangles, Vignette, Badges)
+  // 4. Draw Blur zones positioned BEHIND focus zones (layer === 'below')
   if (blurZones.length > 0) {
     blurZones.forEach((blur) => {
-      drawSingleBlurZone(ctx, blur, interactive && !options.previewMode && blur.id === selectedBlurId);
+      if (blur.layer === 'below') {
+        drawSingleBlurZone(ctx, blur, interactive && !options.previewMode && blur.id === selectedBlurId);
+      }
     });
   }
 
@@ -357,11 +359,20 @@ export function drawComposition(
     });
   }
 
-  // 5. Draw Focus zones content & borders (renders on top of blur zones and behind-masks)
+  // 5. Draw Focus zones content & borders (renders on top of behind-blur zones and behind-masks)
   // When Callout option is chosen, the focus zone disappears!
   if (!isCalloutMode) {
     focuses.forEach((focus) => {
       drawSingleFocusContentAndBorder(ctx, image, focus, { bgX, bgY, bgWidth, bgHeight, scale });
+    });
+  }
+
+  // 5.5. Draw Blur zones positioned ABOVE focus zones (layer !== 'below', default)
+  if (blurZones.length > 0) {
+    blurZones.forEach((blur) => {
+      if (blur.layer !== 'below') {
+        drawSingleBlurZone(ctx, blur, interactive && !options.previewMode && blur.id === selectedBlurId);
+      }
     });
   }
 
@@ -737,7 +748,7 @@ function drawSingleBlurZone(
   const radius = blur.borderRadius ?? 4;
   const userRadius = Math.max(2, Math.min(50, blur.blurRadius || 12));
   const opacity = Math.max(0.05, Math.min(1.0, blur.opacity ?? 1.0));
-  const blurType = blur.blurType || 'frosted';
+  const blurType = blur.blurType || 'gaussian';
 
   // For pixelate, we sample exactly the bounding area; for blurs, we add a padding
   const pad = blurType === 'pixelate' ? 0 : Math.ceil(userRadius * 0.75);

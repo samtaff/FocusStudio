@@ -84,9 +84,10 @@ export interface BlurZone {
   height: number;
   blurRadius: number; // in pixels (intensity), e.g. 12
   borderRadius?: number; // e.g. 4
-  blurType?: BlurType; // 'gaussian' | 'frosted' | 'pixelate' | 'smoked' (default 'frosted')
+  blurType?: BlurType; // 'gaussian' | 'frosted' | 'pixelate' | 'smoked' (default 'gaussian')
   opacity?: number; // 0 to 1, default 1.0 (100%)
   pixelSize?: number; // for pixelate mode
+  layer?: 'above' | 'below'; // 'above' = au-dessus de la zone focus (défaut), 'below' = derrière la zone focus
 }
 
 export interface MaskMultiplier {

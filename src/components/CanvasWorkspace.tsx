@@ -585,9 +585,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   };
 
   // Hit-test blur zones
-  const getBlurAtCoord = (cx: number, cy: number): BlurZone | null => {
+  const getBlurAtCoord = (cx: number, cy: number, layerFilter?: 'above' | 'below'): BlurZone | null => {
     for (let i = blurZones.length - 1; i >= 0; i--) {
       const b = blurZones[i];
+      const bLayer = b.layer === 'below' ? 'below' : 'above';
+      if (layerFilter && bLayer !== layerFilter) continue;
       if (cx >= b.x && cx <= b.x + b.width && cy >= b.y && cy <= b.y + b.height) {
         return b;
       }
@@ -1239,17 +1241,24 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     setHoveredTriangleId(hTri ? hTri.id : null);
 
     const hMaskAbove = getMaskAtCoord(cx, cy, 'above');
-    const hFocus = getFocusAtCoord(cx, cy);
-    const hMaskBelow = hFocus ? null : getMaskAtCoord(cx, cy, 'below');
+    const hBlurAbove = getBlurAtCoord(cx, cy, 'above');
+    const hasAboveObject = Boolean(hCallout || hTri || hMaskAbove || hBlurAbove);
+
+    const hFocus = hasAboveObject ? null : getFocusAtCoord(cx, cy);
+    const hasFocusOrAbove = Boolean(hasAboveObject || hFocus);
+
+    const hMaskBelow = hasFocusOrAbove ? null : getMaskAtCoord(cx, cy, 'below');
+    const hasBelowMaskOrAbove = Boolean(hasFocusOrAbove || hMaskBelow);
+
+    const hBlurBelow = hasBelowMaskOrAbove ? null : getBlurAtCoord(cx, cy, 'below');
 
     const hMask = hMaskAbove || hMaskBelow;
     setHoveredMaskId(hMask ? hMask.id : null);
-    setHoveredFocusId(hMaskAbove ? null : (hFocus ? hFocus.id : null));
 
-    // Blur is strictly underneath all other elements (Callout, Triangle, Mask, Focus)
-    const hasElementAbove = Boolean(hCallout || hTri || hMaskAbove || hFocus || hMaskBelow);
-    const hBlur = hasElementAbove ? null : getBlurAtCoord(cx, cy);
+    const hBlur = hBlurAbove || hBlurBelow;
     setHoveredBlurId(hBlur ? hBlur.id : null);
+
+    setHoveredFocusId(hFocus ? hFocus.id : null);
   };
 
   // Mouse Down
@@ -1496,6 +1505,27 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
+    // 5.5. PRIORITY SELECTION: Check clicked Blur Zone positioned ABOVE focus zones
+    const clickedBlurAbove = getBlurAtCoord(cx, cy, 'above');
+    if (clickedBlurAbove) {
+      updateSelectedCallout(null);
+      onSelectBlur(clickedBlurAbove.id);
+      onSelectFocus(null);
+      onSelectMask(null);
+      onSelectTriangle?.(null);
+      setDragBlurState({
+        id: clickedBlurAbove.id,
+        startX: cx,
+        startY: cy,
+        initialX: clickedBlurAbove.x,
+        initialY: clickedBlurAbove.y,
+        initialW: clickedBlurAbove.width,
+        initialH: clickedBlurAbove.height,
+        handle: null,
+      });
+      return;
+    }
+
     // 6. PRIORITY SELECTION: Check clicked Focus Zone (Focus is strictly above blur zones and below-masks)
     const clickedFocus = getFocusAtCoord(cx, cy);
     if (clickedFocus) {
@@ -1554,8 +1584,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 7. PRIORITY SELECTION: Check clicked Blur Zone (Underneath all objects)
-    const clickedBlur = getBlurAtCoord(cx, cy);
+    // 7. PRIORITY SELECTION: Check clicked Blur Zone positioned BEHIND focus zones (or fallback)
+    const clickedBlur = getBlurAtCoord(cx, cy, 'below') || getBlurAtCoord(cx, cy);
     if (clickedBlur) {
       updateSelectedCallout(null);
       onSelectBlur(clickedBlur.id);
