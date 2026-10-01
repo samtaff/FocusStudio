@@ -79,6 +79,15 @@ interface StudioSettingsPanelProps {
   onUpdateMask: (id: string, updated: Partial<MaskShape>) => void;
   onDeleteMask: (id: string) => void;
   onSplitMaskMultiplier?: (id: string) => void;
+  // Multi-Selection Props
+  selectedFocusIds?: string[];
+  selectedBlurIds?: string[];
+  selectedMaskIds?: string[];
+  selectedTriangleIds?: string[];
+  onSelectMultiple?: (selection: { focusIds?: string[]; blurIds?: string[]; maskIds?: string[]; triangleIds?: string[] }, isAdditive?: boolean) => void;
+  onClearSelection?: () => void;
+  onBatchDelete?: () => void;
+  onBatchDuplicate?: () => void;
   // Triangle Shapes (15x13px)
   triangles?: TriangleShape[];
   selectedTriangleId?: string | null;
@@ -156,6 +165,14 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   onUpdateMask,
   onDeleteMask,
   onSplitMaskMultiplier,
+  selectedFocusIds = [],
+  selectedBlurIds = [],
+  selectedMaskIds = [],
+  selectedTriangleIds = [],
+  onSelectMultiple,
+  onClearSelection,
+  onBatchDelete,
+  onBatchDuplicate,
   triangles = [],
   selectedTriangleId = null,
   onSelectTriangle,
@@ -298,6 +315,107 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
           <span>Réinitialiser</span>
         </button>
       </div>
+
+      {/* Multi-Selection Banner Card */}
+      {(() => {
+        const totalSelectedCount = 
+          selectedFocusIds.length +
+          selectedBlurIds.length +
+          selectedMaskIds.length +
+          selectedTriangleIds.length;
+
+        if (totalSelectedCount <= 1) return null;
+
+        return (
+          <div className={`m-3 p-3.5 rounded-2xl border flex flex-col gap-2.5 transition-all shadow-md ${
+            isDarkMode 
+              ? 'bg-[#0088cc]/15 border-[#0088cc]/40 text-white' 
+              : 'bg-sky-50 border-sky-200 text-[#000000]'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#0088cc] animate-pulse" />
+                <span className="font-bold text-xs uppercase tracking-wider text-[#0088cc]">
+                  Sélection Multiple
+                </span>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0088cc] text-white">
+                {totalSelectedCount} éléments
+              </span>
+            </div>
+
+            {/* List chips */}
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
+              {focuses.filter((f) => selectedFocusIds.includes(f.id)).map((f) => (
+                <span key={f.id} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+                  isDarkMode ? 'bg-[#2a2a2a] border-[#0088cc]/40 text-white' : 'bg-white border-[#0088cc]/30 text-slate-800'
+                }`}>
+                  🎯 {f.name || `Focus ${f.stepNumber}`}
+                </span>
+              ))}
+              {blurZones.filter((b) => selectedBlurIds.includes(b.id)).map((b) => (
+                <span key={b.id} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+                  isDarkMode ? 'bg-[#2a2a2a] border-[#0088cc]/40 text-white' : 'bg-white border-[#0088cc]/30 text-slate-800'
+                }`}>
+                  💧 {b.name || 'Zone de flou'}
+                </span>
+              ))}
+              {maskShapes.filter((m) => selectedMaskIds.includes(m.id)).map((m) => (
+                <span key={m.id} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+                  isDarkMode ? 'bg-[#2a2a2a] border-[#0088cc]/40 text-white' : 'bg-white border-[#0088cc]/30 text-slate-800'
+                }`}>
+                  ⬛ {m.name || 'Forme masque'}
+                </span>
+              ))}
+              {triangles.filter((t) => selectedTriangleIds.includes(t.id)).map((t) => (
+                <span key={t.id} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+                  isDarkMode ? 'bg-[#2a2a2a] border-[#0088cc]/40 text-white' : 'bg-white border-[#0088cc]/30 text-slate-800'
+                }`}>
+                  ▲ {t.name || 'Triangle'}
+                </span>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-1.5 pt-1">
+              {onBatchDuplicate && (
+                <button
+                  onClick={onBatchDuplicate}
+                  className="flex-1 py-1.5 px-2 rounded-full bg-[#0088cc] hover:bg-[#0077b3] text-white font-medium text-[11px] transition-all flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                  title="Dupliquer tous les éléments sélectionnés (Ctrl+D)"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Dupliquer</span>
+                </button>
+              )}
+              {onBatchDelete && (
+                <button
+                  onClick={onBatchDelete}
+                  className="flex-1 py-1.5 px-2 rounded-full bg-rose-500 hover:bg-rose-600 text-white font-medium text-[11px] transition-all flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                  title="Supprimer tous les éléments sélectionnés (Suppr)"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Supprimer</span>
+                </button>
+              )}
+              {onClearSelection && (
+                <button
+                  onClick={onClearSelection}
+                  className={`py-1.5 px-2.5 rounded-full text-[11px] font-medium transition-all cursor-pointer ${
+                    isDarkMode ? 'bg-[#333333] hover:bg-[#404040] text-slate-200' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                  }`}
+                  title="Désélectionner tout (Échap)"
+                >
+                  Désélect.
+                </button>
+              )}
+            </div>
+            <div className="text-[9.5px] text-slate-500 dark:text-slate-400 text-center font-mono">
+              Déplacez-les ensemble avec les flèches du clavier (Shift = 10px)
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Accordion Sections - All folded by default */}
       <div className={`flex-1 divide-y transition-colors ${
@@ -2248,26 +2366,75 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   </div>
 
                   {/* Dimensions & Arrondis */}
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#eeeeee]">
-                    <div>
-                      <label className="text-[10px] text-[#666666]">Largeur</label>
-                      <NumericInput
-                        value={Math.round(activeMask.width)}
-                        onChange={(w) => onUpdateMask(activeMask.id, { width: Math.max(10, w) })}
-                        min={10}
-                        max={500}
-                        unit="px"
-                      />
+                  <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee] dark:border-[#333333]">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] text-[#666666] dark:text-[#aaaaaa] font-medium">Largeur</label>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateMask(activeMask.id, { width: 40 })}
+                            className="text-[9px] text-[#0088cc] hover:underline font-semibold"
+                            title="40px par défaut"
+                          >
+                            40px
+                          </button>
+                        </div>
+                        <NumericInput
+                          value={Math.round(activeMask.width)}
+                          onChange={(w) => onUpdateMask(activeMask.id, { width: Math.max(1, w) })}
+                          min={1}
+                          max={9999}
+                          unit="px"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] text-[#666666] dark:text-[#aaaaaa] font-medium">Hauteur</label>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateMask(activeMask.id, { height: 40 })}
+                            className="text-[9px] text-[#0088cc] hover:underline font-semibold"
+                            title="40px par défaut"
+                          >
+                            40px
+                          </button>
+                        </div>
+                        <NumericInput
+                          value={Math.round(activeMask.height)}
+                          onChange={(h) => onUpdateMask(activeMask.id, { height: Math.max(1, h) })}
+                          min={1}
+                          max={9999}
+                          unit="px"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-[10px] text-[#666666]">Hauteur</label>
-                      <NumericInput
-                        value={Math.round(activeMask.height)}
-                        onChange={(h) => onUpdateMask(activeMask.id, { height: Math.max(10, h) })}
-                        min={10}
-                        max={400}
-                        unit="px"
-                      />
+
+                    {/* Presets rapides de dimensions (40x40 par défaut) */}
+                    <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
+                      <span className="text-[10px] text-[#666666] dark:text-[#aaaaaa]">Presets :</span>
+                      {[
+                        { label: '40 × 40 (Défaut)', w: 40, h: 40 },
+                        { label: '50 × 50', w: 50, h: 50 },
+                        { label: '80 × 40', w: 80, h: 40 },
+                        { label: '100 × 50', w: 100, h: 50 },
+                        { label: '240 × 50', w: 240, h: 50 },
+                      ].map((p) => (
+                        <button
+                          key={p.label}
+                          type="button"
+                          onClick={() => onUpdateMask(activeMask.id, { width: p.w, height: p.h })}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all ${
+                            Math.round(activeMask.width) === p.w && Math.round(activeMask.height) === p.h
+                              ? 'bg-[#0088cc] text-white font-semibold shadow-2xs'
+                              : isDarkMode
+                                ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040] hover:text-white'
+                                : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
@@ -2405,15 +2572,15 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       ))}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-1.5 pt-2 border-t border-[#eeeeee]">
+                  <div className="flex flex-col gap-1.5 pt-2 border-t border-[#eeeeee] dark:border-[#333333]">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-[#666666] font-medium">Angles de la forme (arrondi)</span>
+                      <span className="text-[#666666] dark:text-[#aaaaaa] font-medium">Coins arrondis</span>
                       <div className="w-18">
                         <NumericInput
-                          value={activeMask.borderRadius ?? 4}
+                          value={activeMask.borderRadius ?? 10}
                           onChange={(r) => onUpdateMask(activeMask.id, { borderRadius: Math.max(0, r) })}
                           min={0}
-                          max={40}
+                          max={200}
                           unit="px"
                         />
                       </div>
@@ -2422,27 +2589,31 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       <input
                         type="range"
                         min="0"
-                        max="30"
-                        value={activeMask.borderRadius ?? 4}
+                        max="50"
+                        value={activeMask.borderRadius ?? 10}
                         onChange={(e) => onUpdateMask(activeMask.id, { borderRadius: parseInt(e.target.value) })}
                         className="flex-1 accent-[#0088cc]"
                       />
                     </div>
-                    {/* Presets rapides d'angles */}
+                    {/* Presets rapides d'angles (10px par défaut) */}
                     <div className="flex gap-1.5 mt-0.5">
                       {[
                         { label: 'Droit (0px)', val: 0 },
                         { label: '4px', val: 4 },
-                        { label: '8px', val: 8 },
+                        { label: '10px (Défaut)', val: 10 },
                         { label: '16px', val: 16 },
+                        { label: '20px', val: 20 },
                       ].map((preset) => (
                         <button
                           key={preset.val}
+                          type="button"
                           onClick={() => onUpdateMask(activeMask.id, { borderRadius: preset.val })}
                           className={`flex-1 py-1 px-1.5 rounded-full text-[10px] font-medium transition-all ${
-                            (activeMask.borderRadius ?? 4) === preset.val
-                              ? 'bg-[#000000] text-white shadow-2xs font-semibold'
-                              : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                            (activeMask.borderRadius ?? 10) === preset.val
+                              ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
+                              : isDarkMode
+                                ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                                : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                           }`}
                         >
                           {preset.label}

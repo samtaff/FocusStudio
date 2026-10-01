@@ -108,7 +108,7 @@ export interface MaskShape {
   rotation?: number; // rotation in degrees, e.g. -180 to 180 (default 0)
   color: string; // #25465F by default
   opacity?: number; // 0 to 1, default 1
-  borderRadius?: number; // default 4
+  borderRadius?: number; // default 10 (coins arrondis de 10px)
   borderWidth?: number; // 0, 1, 2, etc.
   borderColor?: string;
   borderStyle?: 'solid' | 'dashed' | 'dotted';
@@ -253,3 +253,20 @@ export interface DragState {
   initialFocus: FocusZone;
   initialArrow?: AnnotationArrow;
 }
+
+export interface MultiSelectionState {
+  focusIds: string[];
+  blurIds: string[];
+  maskIds: string[];
+  triangleIds: string[];
+}
+
+export interface MultiDragState {
+  startX: number;
+  startY: number;
+  focuses: { id: string; initialX: number; initialY: number }[];
+  blurs: { id: string; initialX: number; initialY: number }[];
+  masks: { id: string; initialX: number; initialY: number }[];
+  triangles: { id: string; initialX: number; initialY: number }[];
+}
+

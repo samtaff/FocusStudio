@@ -24,25 +24,33 @@ export const NumericInput: React.FC<NumericInputProps> = ({
   placeholder,
 }) => {
   const [text, setText] = useState<string>(String(value ?? ''));
+  const [isFocused, setIsFocused] = useState<boolean>(false);
 
   useEffect(() => {
-    setText(String(value ?? ''));
-  }, [value]);
+    if (!isFocused) {
+      setText(String(value ?? ''));
+    }
+  }, [value, isFocused]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setText(val);
 
-    // If it's a valid integer or float, propagate
+    // If it's a valid integer or float, propagate without aggressive clamping during typing
     if (val !== '' && !isNaN(Number(val))) {
       const parsed = parseFloat(val);
       onChange(parsed);
     }
   };
 
+  const handleFocus = () => {
+    setIsFocused(true);
+  };
+
   const handleBlur = () => {
+    setIsFocused(false);
     if (text === '' || isNaN(Number(text))) {
-      setText(String(value));
+      setText(String(value ?? 0));
       return;
     }
     let parsed = parseFloat(text);
@@ -66,6 +74,7 @@ export const NumericInput: React.FC<NumericInputProps> = ({
         step={step}
         value={text}
         onChange={handleChange}
+        onFocus={handleFocus}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}

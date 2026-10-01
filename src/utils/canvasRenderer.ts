@@ -35,6 +35,7 @@ export const MAX_WORKSPACE_WIDTH = 500; // Cap at 500px max per requirement
 export interface RenderOptions {
   interactive?: boolean;
   selectedFocusId?: string | null;
+  selectedFocusIds?: string[];
   hoveredFocusId?: string | null;
   hoveredHandle?: ResizeHandle | null;
   internalFramingFocusId?: string | null;
@@ -47,17 +48,23 @@ export interface RenderOptions {
   skipClear?: boolean;
   blurZones?: BlurZone[];
   selectedBlurId?: string | null;
+  selectedBlurIds?: string[];
   hoveredBlurId?: string | null;
   maskShapes?: MaskShape[];
   selectedMaskId?: string | null;
+  selectedMaskIds?: string[];
   hoveredMaskId?: string | null;
   triangles?: TriangleShape[];
   selectedTriangleId?: string | null;
+  selectedTriangleIds?: string[];
   hoveredTriangleId?: string | null;
   calloutVignette?: CalloutVignette | null;
   selectedCalloutPart?: 'source' | 'vignette' | null;
   hoveredCalloutPart?: 'source' | 'vignette' | null;
   previewMode?: boolean;
+  marqueeRect?: { x: number; y: number; width: number; height: number } | null;
+  hoveredRotationCorner?: { type: 'mask' | 'triangle'; id: string; corner: string } | null;
+  isRotating?: boolean;
 }
 
 /**
@@ -283,6 +290,7 @@ export function drawComposition(
   const { 
     interactive = false, 
     selectedFocusId = null, 
+    selectedFocusIds = [],
     hoveredFocusId = null,
     internalFramingFocusId = null,
     smartGuides = [],
@@ -293,16 +301,21 @@ export function drawComposition(
     skipClear = false,
     blurZones = [],
     selectedBlurId = null,
+    selectedBlurIds = [],
     hoveredBlurId = null,
     maskShapes = [],
     selectedMaskId = null,
+    selectedMaskIds = [],
     hoveredMaskId = null,
     triangles = [],
     selectedTriangleId = null,
+    selectedTriangleIds = [],
     hoveredTriangleId = null,
     calloutVignette = null,
     selectedCalloutPart = null,
     hoveredCalloutPart = null,
+    marqueeRect = null,
+    hoveredRotationCorner = null,
   } = options;
 
   if (!skipClear) {
@@ -443,10 +456,19 @@ export function drawComposition(
 
   // 11. If interactive, draw hover highlight & selection handles
   if (interactive && globalStyles.showHandles !== false) {
+    // Total selected count across all types
+    const totalSelectedCount = 
+      (selectedFocusIds.length > 0 ? selectedFocusIds.length : (selectedFocusId ? 1 : 0)) +
+      (selectedBlurIds.length > 0 ? selectedBlurIds.length : (selectedBlurId ? 1 : 0)) +
+      (selectedMaskIds.length > 0 ? selectedMaskIds.length : (selectedMaskId ? 1 : 0)) +
+      (selectedTriangleIds.length > 0 ? selectedTriangleIds.length : (selectedTriangleId ? 1 : 0));
+
     // Focus hover & selection (hidden when in Callout mode)
     if (!isCalloutMode) {
       focuses.forEach((focus) => {
-        const isSelected = focus.id === selectedFocusId;
+        const isSelected = selectedFocusIds.length > 0 
+          ? selectedFocusIds.includes(focus.id) 
+          : (focus.id === selectedFocusId);
         const isHovered = focus.id === hoveredFocusId && !isSelected;
 
         if (isHovered) {
@@ -459,7 +481,9 @@ export function drawComposition(
 
     // Blur hover & selection
     blurZones.forEach((blur) => {
-      const isSelected = blur.id === selectedBlurId;
+      const isSelected = selectedBlurIds.length > 0 
+        ? selectedBlurIds.includes(blur.id) 
+        : (blur.id === selectedBlurId);
       const isHovered = blur.id === hoveredBlurId && !isSelected;
 
       if (isHovered) {
@@ -471,7 +495,9 @@ export function drawComposition(
 
     // Mask hover & selection
     maskShapes.forEach((mask) => {
-      const isSelected = mask.id === selectedMaskId;
+      const isSelected = selectedMaskIds.length > 0 
+        ? selectedMaskIds.includes(mask.id) 
+        : (mask.id === selectedMaskId);
       const isHovered = mask.id === hoveredMaskId && !isSelected;
 
       if (isHovered) {
@@ -485,7 +511,6 @@ export function drawComposition(
           const totalW = cols * mask.width + (cols - 1) * gapX;
           const totalH = rows * mask.height + (rows - 1) * gapY;
           
-          // Subtle frame around individual replicated items in the grid
           ctx.save();
           ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
           ctx.lineWidth = 1;
@@ -507,8 +532,7 @@ export function drawComposition(
             totalH, 
             '#38bdf8', 
             `${mask.name || 'Forme'} (${cols * rows}x)`,
-            mask.rotation || 0,
-            true
+            mask.rotation || 0
           );
         } else {
           drawGenericSelectionHandles(
@@ -519,34 +543,140 @@ export function drawComposition(
             mask.height, 
             '#38bdf8', 
             mask.name || 'Forme',
-            mask.rotation || 0,
-            true
+            mask.rotation || 0
           );
         }
       }
     });
 
-    // Triangle hover & selection
+    // Triangle hover & selection (discreet micro handles, no bulky clutter)
     triangles.forEach((triangle) => {
-      const isSelected = triangle.id === selectedTriangleId;
+      const isSelected = selectedTriangleIds.length > 0 
+        ? selectedTriangleIds.includes(triangle.id) 
+        : (triangle.id === selectedTriangleId);
       const isHovered = triangle.id === hoveredTriangleId && !isSelected;
 
       if (isHovered) {
         drawTriangleHoverHighlight(ctx, triangle);
       } else if (isSelected) {
-        drawGenericSelectionHandles(
+        drawTriangleSelectionHandles(
           ctx, 
-          triangle.x, 
-          triangle.y, 
-          triangle.width, 
-          triangle.height, 
-          '#f59e0b', 
-          'Triangle',
-          triangle.rotation || 0,
-          true
+          triangle, 
+          totalSelectedCount > 1
         );
       }
     });
+
+    // Collective multi-selection bounding box when > 1 elements are selected
+    if (totalSelectedCount > 1) {
+      let bMinX = Infinity;
+      let bMinY = Infinity;
+      let bMaxX = -Infinity;
+      let bMaxY = -Infinity;
+
+      const activeFocusIds = selectedFocusIds.length > 0 ? selectedFocusIds : (selectedFocusId ? [selectedFocusId] : []);
+      const activeBlurIds = selectedBlurIds.length > 0 ? selectedBlurIds : (selectedBlurId ? [selectedBlurId] : []);
+      const activeMaskIds = selectedMaskIds.length > 0 ? selectedMaskIds : (selectedMaskId ? [selectedMaskId] : []);
+      const activeTriangleIds = selectedTriangleIds.length > 0 ? selectedTriangleIds : (selectedTriangleId ? [selectedTriangleId] : []);
+
+      focuses.filter(f => activeFocusIds.includes(f.id)).forEach(f => {
+        bMinX = Math.min(bMinX, f.x);
+        bMinY = Math.min(bMinY, f.y);
+        bMaxX = Math.max(bMaxX, f.x + f.width);
+        bMaxY = Math.max(bMaxY, f.y + f.height);
+      });
+
+      blurZones.filter(b => activeBlurIds.includes(b.id)).forEach(b => {
+        bMinX = Math.min(bMinX, b.x);
+        bMinY = Math.min(bMinY, b.y);
+        bMaxX = Math.max(bMaxX, b.x + b.width);
+        bMaxY = Math.max(bMaxY, b.y + b.height);
+      });
+
+      maskShapes.filter(m => activeMaskIds.includes(m.id)).forEach(m => {
+        const mw = m.multiplier?.enabled ? (m.multiplier.cols || 2) * m.width + ((m.multiplier.cols || 2) - 1) * (m.multiplier.gapX ?? 10) : m.width;
+        const mh = m.multiplier?.enabled ? (m.multiplier.rows || 2) * m.height + ((m.multiplier.rows || 2) - 1) * (m.multiplier.gapY ?? 10) : m.height;
+        bMinX = Math.min(bMinX, m.x);
+        bMinY = Math.min(bMinY, m.y);
+        bMaxX = Math.max(bMaxX, m.x + mw);
+        bMaxY = Math.max(bMaxY, m.y + mh);
+      });
+
+      triangles.filter(t => activeTriangleIds.includes(t.id)).forEach(t => {
+        bMinX = Math.min(bMinX, t.x);
+        bMinY = Math.min(bMinY, t.y);
+        bMaxX = Math.max(bMaxX, t.x + (t.width || 15));
+        bMaxY = Math.max(bMaxY, t.y + (t.height || 13));
+      });
+
+      if (bMinX !== Infinity && bMaxX !== -Infinity) {
+        ctx.save();
+        ctx.strokeStyle = '#0088cc';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(bMinX - 4, bMinY - 4, bMaxX - bMinX + 8, bMaxY - bMinY + 8);
+        ctx.setLineDash([]);
+
+        // Small indicator badge
+        const badgeText = `${totalSelectedCount} éléments`;
+        ctx.font = 'bold 8.5px system-ui, sans-serif';
+        const tw = ctx.measureText(badgeText).width;
+        const bx = bMinX - 4;
+        const by = Math.max(4, bMinY - 4 - 15);
+        ctx.fillStyle = '#0088cc';
+        ctx.beginPath();
+        ctx.roundRect(bx, by, tw + 10, 13, 3);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(badgeText, bx + 5, by + 9.5);
+        ctx.restore();
+      }
+    }
+
+    // Photoshop Corner Rotation Arc Indicator
+    if (hoveredRotationCorner) {
+      let rect: { x: number; y: number; width: number; height: number; rotation?: number } | null = null;
+      if (hoveredRotationCorner.type === 'mask') {
+        const m = maskShapes.find(s => s.id === hoveredRotationCorner.id);
+        if (m) rect = { x: m.x, y: m.y, width: m.width, height: m.height, rotation: m.rotation };
+      } else if (hoveredRotationCorner.type === 'triangle') {
+        const t = triangles.find(s => s.id === hoveredRotationCorner.id);
+        if (t) rect = { x: t.x, y: t.y, width: t.width || 15, height: t.height || 13, rotation: t.rotation };
+      }
+
+      if (rect) {
+        const corner = hoveredRotationCorner.corner as 'nw' | 'ne' | 'se' | 'sw';
+        const rot = rect.rotation || 0;
+        const centerX = rect.x + rect.width / 2;
+        const centerY = rect.y + rect.height / 2;
+        let localCx = rect.x;
+        let localCy = rect.y;
+        if (corner === 'ne') localCx = rect.x + rect.width;
+        if (corner === 'se') { localCx = rect.x + rect.width; localCy = rect.y + rect.height; }
+        if (corner === 'sw') { localCy = rect.y + rect.height; }
+
+        // Rotate corner to canvas coordinates
+        const rad = (rot * Math.PI) / 180;
+        const dx = localCx - centerX;
+        const dy = localCy - centerY;
+        const worldCornerX = centerX + dx * Math.cos(rad) - dy * Math.sin(rad);
+        const worldCornerY = centerY + dx * Math.sin(rad) + dy * Math.cos(rad);
+
+        drawPhotoshopRotationIndicator(ctx, worldCornerX, worldCornerY, corner, rot);
+      }
+    }
+
+    // Marquee Selection Rectangle (Lasso / Drag selection)
+    if (marqueeRect && (marqueeRect.width > 2 || marqueeRect.height > 2)) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 136, 204, 0.12)';
+      ctx.strokeStyle = '#0088cc';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.fillRect(marqueeRect.x, marqueeRect.y, marqueeRect.width, marqueeRect.height);
+      ctx.strokeRect(marqueeRect.x, marqueeRect.y, marqueeRect.width, marqueeRect.height);
+      ctx.restore();
+    }
   }
 }
 
@@ -863,7 +993,7 @@ function drawSingleMaskShape(
   ctx: CanvasRenderingContext2D,
   mask: MaskShape
 ) {
-  const radius = mask.borderRadius ?? 4;
+  const radius = Math.min(mask.borderRadius ?? 10, mask.width / 2, mask.height / 2);
   const color = mask.color || BASE_COLOR;
   const opacity = mask.opacity ?? 1.0;
 
@@ -1113,7 +1243,137 @@ function drawTriangleHoverHighlight(ctx: CanvasRenderingContext2D, triangle: Tri
 }
 
 /**
- * Generic selection handles for blur, mask or triangle shapes (discreet, 8 handles + rotation stem)
+ * Draws a discreet Photoshop-style rotation arc indicator near the corner being rotated/hovered
+ */
+export function drawPhotoshopRotationIndicator(
+  ctx: CanvasRenderingContext2D,
+  cornerX: number,
+  cornerY: number,
+  corner: 'nw' | 'ne' | 'se' | 'sw',
+  rotation = 0
+) {
+  ctx.save();
+  ctx.translate(cornerX, cornerY);
+  if (rotation !== 0) {
+    ctx.rotate((rotation * Math.PI) / 180);
+  }
+
+  // Offset arc slightly outside the corner (8px offset)
+  const offset = 9;
+  let arcCenterX = 0;
+  let arcCenterY = 0;
+  let startAngle = 0;
+  let endAngle = 0;
+
+  if (corner === 'nw') {
+    arcCenterX = -offset;
+    arcCenterY = -offset;
+    startAngle = Math.PI * 0.9;
+    endAngle = Math.PI * 1.6;
+  } else if (corner === 'ne') {
+    arcCenterX = offset;
+    arcCenterY = -offset;
+    startAngle = Math.PI * 1.4;
+    endAngle = Math.PI * 2.1;
+  } else if (corner === 'se') {
+    arcCenterX = offset;
+    arcCenterY = offset;
+    startAngle = Math.PI * -0.1;
+    endAngle = Math.PI * 0.6;
+  } else {
+    arcCenterX = -offset;
+    arcCenterY = offset;
+    startAngle = Math.PI * 0.4;
+    endAngle = Math.PI * 1.1;
+  }
+
+  // Draw curved arc
+  ctx.strokeStyle = '#0088cc';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(arcCenterX, arcCenterY, 8, startAngle, endAngle);
+  ctx.stroke();
+
+  // Subtle directional arrowhead
+  ctx.fillStyle = '#0088cc';
+  ctx.beginPath();
+  const tipX = arcCenterX + 8 * Math.cos(endAngle);
+  const tipY = arcCenterY + 8 * Math.sin(endAngle);
+  ctx.arc(tipX, tipY, 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Sleek, ultra-discreet selection handles for Triangles (15x13px).
+ * - Ultra-fine 0.75px dotted boundary
+ * - Micro corner points (radius: 1.2px)
+ * - Absolutely NO protruding stem or oversized clutter
+ */
+function drawTriangleSelectionHandles(
+  ctx: CanvasRenderingContext2D,
+  triangle: TriangleShape,
+  isMultiSelected = false
+) {
+  const { x, y, width: w, height: h, rotation = 0 } = triangle;
+  const centerX = x + w / 2;
+  const centerY = y + h / 2;
+
+  ctx.save();
+  if (rotation !== 0) {
+    ctx.translate(centerX, centerY);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-centerX, -centerY);
+  }
+
+  // 1. Ultra-fine discreet bounding outline
+  ctx.strokeStyle = isMultiSelected ? '#0088cc' : '#f59e0b';
+  ctx.lineWidth = 0.75;
+  ctx.setLineDash([2, 2]);
+  ctx.strokeRect(x - 0.5, y - 0.5, w + 1, h + 1);
+  ctx.setLineDash([]);
+
+  // 2. Micro handles: only 4 discreet points at corners, radius 1.2px
+  const radius = 1.2;
+  const corners = [
+    { cx: x - 0.5, cy: y - 0.5 },
+    { cx: x + w + 0.5, cy: y - 0.5 },
+    { cx: x - 0.5, cy: y + h + 0.5 },
+    { cx: x + w + 0.5, cy: y + h + 0.5 },
+  ];
+
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = isMultiSelected ? '#0088cc' : '#f59e0b';
+  ctx.lineWidth = 0.6;
+  corners.forEach(({ cx, cy }) => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  // 3. Subtle rotation angle indicator if rotated
+  if (Math.abs(rotation) > 0.5) {
+    ctx.save();
+    ctx.font = 'bold 7.5px system-ui, sans-serif';
+    const angleStr = `${Math.round(rotation)}°`;
+    const tw = ctx.measureText(angleStr).width;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(centerX - tw / 2 - 3, y - 13, tw + 6, 10, 2.5);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(angleStr, centerX, y - 5.5);
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Generic selection handles for blur or mask shapes (discreet, 8 micro-handles, no bulky stem)
  */
 function drawGenericSelectionHandles(
   ctx: CanvasRenderingContext2D,
@@ -1122,9 +1382,8 @@ function drawGenericSelectionHandles(
   w: number,
   h: number,
   color = '#38bdf8',
-  label?: string,
-  rotation = 0,
-  showRotationHandle = false
+  _label?: string,
+  rotation = 0
 ) {
   const centerX = x + w / 2;
   const centerY = y + h / 2;
@@ -1137,53 +1396,14 @@ function drawGenericSelectionHandles(
   }
 
   ctx.strokeStyle = color;
-  ctx.globalAlpha = 0.75;
+  ctx.globalAlpha = 0.8;
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 3]);
   ctx.strokeRect(x, y, w, h);
   ctx.setLineDash([]);
 
-  // Photoshop Rotation Handle: vertical stem + circular anchor at top
-  if (showRotationHandle) {
-    const stemLength = 20;
-    const rotY = y - stemLength;
-
-    // Stem line
-    ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1;
-    ctx.moveTo(centerX, y);
-    ctx.lineTo(centerX, rotY);
-    ctx.stroke();
-
-    // Circular rotation anchor handle
-    ctx.beginPath();
-    ctx.arc(centerX, rotY, 4, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Subtle angle label if rotated
-    if (Math.abs(rotation) > 0.5) {
-      ctx.save();
-      ctx.font = 'bold 8px system-ui, sans-serif';
-      const angleStr = `${Math.round(rotation)}°`;
-      const tw = ctx.measureText(angleStr).width;
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-      ctx.beginPath();
-      ctx.roundRect(centerX - tw / 2 - 3, rotY - 14, tw + 6, 11, 3);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.textAlign = 'center';
-      ctx.fillText(angleStr, centerX, rotY - 5);
-      ctx.restore();
-    }
-  }
-
-  // 8 micro-handles (corners + midpoints)
-  const radius = 2.25;
+  // 8 sleek micro-handles (corners + midpoints) - reduced from 2.25 to 1.7px for refinement
+  const radius = 1.7;
   const corners = [
     { cx: x, cy: y },
     { cx: x + w / 2, cy: y },
@@ -1197,7 +1417,7 @@ function drawGenericSelectionHandles(
 
   ctx.fillStyle = '#ffffff';
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 0.8;
   ctx.globalAlpha = 0.95;
   corners.forEach(({ cx, cy }) => {
     ctx.beginPath();
@@ -1205,6 +1425,23 @@ function drawGenericSelectionHandles(
     ctx.fill();
     ctx.stroke();
   });
+
+  // Subtle rotation angle tooltip if rotated
+  if (Math.abs(rotation) > 0.5) {
+    ctx.save();
+    ctx.font = 'bold 8px system-ui, sans-serif';
+    const angleStr = `${Math.round(rotation)}°`;
+    const tw = ctx.measureText(angleStr).width;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(centerX - tw / 2 - 3, y - 14, tw + 6, 11, 3);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(angleStr, centerX, y - 5.5);
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 

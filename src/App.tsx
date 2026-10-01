@@ -30,19 +30,23 @@ import {
 export default function App() {
   const [image, setImage] = useState<LoadedImage | null>(null);
   const [focuses, setFocuses] = useState<FocusZone[]>([]);
-  const [selectedFocusId, setSelectedFocusId] = useState<string | null>(null);
+  const [selectedFocusIds, setSelectedFocusIds] = useState<string[]>([]);
+  const selectedFocusId = selectedFocusIds[0] || null;
 
   // Blur Zones (Flou Gaussien sur n'importe quelle zone)
   const [blurZones, setBlurZones] = useState<BlurZone[]>([]);
-  const [selectedBlurId, setSelectedBlurId] = useState<string | null>(null);
+  const [selectedBlurIds, setSelectedBlurIds] = useState<string[]>([]);
+  const selectedBlurId = selectedBlurIds[0] || null;
 
   // Mask Shapes (Formes bleues pour masquer des zones)
   const [maskShapes, setMaskShapes] = useState<MaskShape[]>([]);
-  const [selectedMaskId, setSelectedMaskId] = useState<string | null>(null);
+  const [selectedMaskIds, setSelectedMaskIds] = useState<string[]>([]);
+  const selectedMaskId = selectedMaskIds[0] || null;
 
   // Triangle Shapes (Outil triangle 15x13px en #25465F ou blanc)
   const [triangles, setTriangles] = useState<TriangleShape[]>([]);
-  const [selectedTriangleId, setSelectedTriangleId] = useState<string | null>(null);
+  const [selectedTriangleIds, setSelectedTriangleIds] = useState<string[]>([]);
+  const selectedTriangleId = selectedTriangleIds[0] || null;
 
   // Callout / Zoom Détaché (Vignette à 5px du screen, zoomée sur une zone ou icône)
   const [calloutVignette, setCalloutVignette] = useState<CalloutVignette | null>(null);
@@ -86,47 +90,103 @@ export default function App() {
     setInternalFramingFocusId((prev) => (prev === id ? null : id));
   }, []);
 
-  // Mutually exclusive selection handlers so arrow keys and panels target the exact active object
-  const handleSelectFocus = useCallback((id: string | null) => {
-    setSelectedFocusId(id);
-    if (id) {
-      setSelectedBlurId(null);
-      setSelectedMaskId(null);
-      setSelectedTriangleId(null);
-      setSelectedCalloutPart(null);
+  // Multi-selection enabled handlers
+  const handleSelectFocus = useCallback((id: string | null, isMulti = false) => {
+    if (!id) {
+      setSelectedFocusIds([]);
+      setInternalFramingFocusId(null);
+      return;
+    }
+    if (isMulti) {
+      setSelectedFocusIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
     } else {
-      setInternalFramingFocusId(null);
+      setSelectedFocusIds([id]);
+      setSelectedBlurIds([]);
+      setSelectedMaskIds([]);
+      setSelectedTriangleIds([]);
+      setSelectedCalloutPart(null);
     }
   }, []);
 
-  const handleSelectBlur = useCallback((id: string | null) => {
-    setSelectedBlurId(id);
-    if (id) {
-      setSelectedFocusId(null);
-      setSelectedMaskId(null);
-      setSelectedTriangleId(null);
+  const handleSelectBlur = useCallback((id: string | null, isMulti = false) => {
+    if (!id) {
+      setSelectedBlurIds([]);
+      return;
+    }
+    if (isMulti) {
+      setSelectedBlurIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    } else {
+      setSelectedBlurIds([id]);
+      setSelectedFocusIds([]);
+      setSelectedMaskIds([]);
+      setSelectedTriangleIds([]);
       setSelectedCalloutPart(null);
       setInternalFramingFocusId(null);
     }
   }, []);
 
-  const handleSelectMask = useCallback((id: string | null) => {
-    setSelectedMaskId(id);
-    if (id) {
-      setSelectedFocusId(null);
-      setSelectedBlurId(null);
-      setSelectedTriangleId(null);
+  const handleSelectMask = useCallback((id: string | null, isMulti = false) => {
+    if (!id) {
+      setSelectedMaskIds([]);
+      return;
+    }
+    if (isMulti) {
+      setSelectedMaskIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    } else {
+      setSelectedMaskIds([id]);
+      setSelectedFocusIds([]);
+      setSelectedBlurIds([]);
+      setSelectedTriangleIds([]);
       setSelectedCalloutPart(null);
       setInternalFramingFocusId(null);
     }
   }, []);
 
-  const handleSelectTriangle = useCallback((id: string | null) => {
-    setSelectedTriangleId(id);
-    if (id) {
-      setSelectedFocusId(null);
-      setSelectedBlurId(null);
-      setSelectedMaskId(null);
+  const handleSelectTriangle = useCallback((id: string | null, isMulti = false) => {
+    if (!id) {
+      setSelectedTriangleIds([]);
+      return;
+    }
+    if (isMulti) {
+      setSelectedTriangleIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    } else {
+      setSelectedTriangleIds([id]);
+      setSelectedFocusIds([]);
+      setSelectedBlurIds([]);
+      setSelectedMaskIds([]);
+      setSelectedCalloutPart(null);
+      setInternalFramingFocusId(null);
+    }
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedFocusIds([]);
+    setSelectedBlurIds([]);
+    setSelectedMaskIds([]);
+    setSelectedTriangleIds([]);
+    setSelectedCalloutPart(null);
+    setInternalFramingFocusId(null);
+  }, []);
+
+  const handleSelectMultiple = useCallback((
+    selection: { focusIds?: string[]; blurIds?: string[]; maskIds?: string[]; triangleIds?: string[] },
+    isAdditive = false
+  ) => {
+    const fIds = selection.focusIds || [];
+    const bIds = selection.blurIds || [];
+    const mIds = selection.maskIds || [];
+    const tIds = selection.triangleIds || [];
+
+    if (isAdditive) {
+      setSelectedFocusIds((prev) => Array.from(new Set([...prev, ...fIds])));
+      setSelectedBlurIds((prev) => Array.from(new Set([...prev, ...bIds])));
+      setSelectedMaskIds((prev) => Array.from(new Set([...prev, ...mIds])));
+      setSelectedTriangleIds((prev) => Array.from(new Set([...prev, ...tIds])));
+    } else {
+      setSelectedFocusIds(fIds);
+      setSelectedBlurIds(bIds);
+      setSelectedMaskIds(mIds);
+      setSelectedTriangleIds(tIds);
       setSelectedCalloutPart(null);
       setInternalFramingFocusId(null);
     }
@@ -135,10 +195,10 @@ export default function App() {
   const handleSelectCalloutPart = useCallback((part: 'source' | 'vignette' | null) => {
     setSelectedCalloutPart(part);
     if (part) {
-      setSelectedFocusId(null);
-      setSelectedBlurId(null);
-      setSelectedMaskId(null);
-      setSelectedTriangleId(null);
+      setSelectedFocusIds([]);
+      setSelectedBlurIds([]);
+      setSelectedMaskIds([]);
+      setSelectedTriangleIds([]);
       setInternalFramingFocusId(null);
     }
   }, []);
@@ -369,7 +429,7 @@ export default function App() {
       setHistoryIndex(newIndex);
       setFocuses(targetFocuses);
       if (targetFocuses.length > 0 && !targetFocuses.find((f) => f.id === selectedFocusId)) {
-        setSelectedFocusId(targetFocuses[0].id);
+        setSelectedFocusIds([targetFocuses[0].id]);
       }
     }
   };
@@ -382,7 +442,7 @@ export default function App() {
       setHistoryIndex(newIndex);
       setFocuses(targetFocuses);
       if (targetFocuses.length > 0 && !targetFocuses.find((f) => f.id === selectedFocusId)) {
-        setSelectedFocusId(targetFocuses[0].id);
+        setSelectedFocusIds([targetFocuses[0].id]);
       }
     }
   };
@@ -573,7 +633,7 @@ export default function App() {
     }));
     setFocuses(updated);
     if (selectedFocusId === id) {
-      setSelectedFocusId(updated[0]?.id || null);
+      setSelectedFocusIds(updated[0]?.id ? [updated[0].id] : []);
     }
     recordHistory(updated);
   };
@@ -608,7 +668,7 @@ export default function App() {
 
     const updated = [...focuses, duplicated];
     setFocuses(updated);
-    setSelectedFocusId(duplicated.id);
+    setSelectedFocusIds([duplicated.id]);
     recordHistory(updated);
   };
 
@@ -640,7 +700,7 @@ export default function App() {
 
   const handleDeleteBlurZone = (id: string) => {
     setBlurZones((prev) => prev.filter((b) => b.id !== id));
-    if (selectedBlurId === id) setSelectedBlurId(null);
+    setSelectedBlurIds((prev) => prev.filter((x) => x !== id));
   };
 
   const handleDuplicateBlurZone = (id: string) => {
@@ -657,7 +717,7 @@ export default function App() {
     handleSelectBlur(duplicated.id);
   };
 
-  // Mask Shape Management (Blue forms)
+  // Mask Shape Management (Blue forms: default 40x40px, rounded corners 10px, #25465F)
   const handleAddMaskShape = (x?: number, y?: number) => {
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
     const posX = x !== undefined ? x : bounds.bgX + 20;
@@ -667,11 +727,11 @@ export default function App() {
       name: `Masque ${maskShapes.length + 1}`,
       x: posX,
       y: posY,
-      width: 120,
-      height: 35,
+      width: 40,
+      height: 40,
       color: '#25465F', // Corporate blue mask #25465F
       opacity: 1,
-      borderRadius: 4,
+      borderRadius: 10,
     };
     setMaskShapes((prev) => [...prev, newMask]);
     handleSelectMask(newMask.id);
@@ -683,7 +743,7 @@ export default function App() {
 
   const handleDeleteMaskShape = (id: string) => {
     setMaskShapes((prev) => prev.filter((m) => m.id !== id));
-    if (selectedMaskId === id) setSelectedMaskId(null);
+    setSelectedMaskIds((prev) => prev.filter((x) => x !== id));
   };
 
   const handleDuplicateMaskShape = (id: string) => {
@@ -753,7 +813,7 @@ export default function App() {
 
   const handleDeleteTriangle = (id: string) => {
     setTriangles((prev) => prev.filter((t) => t.id !== id));
-    if (selectedTriangleId === id) setSelectedTriangleId(null);
+    setSelectedTriangleIds((prev) => prev.filter((x) => x !== id));
   };
 
   const handleDuplicateTriangle = (id: string) => {
@@ -769,6 +829,176 @@ export default function App() {
     setTriangles((prev) => [...prev, duplicated]);
     handleSelectTriangle(duplicated.id);
   };
+
+  // Batch Multi-Selection Operations (Moving, Deleting, Duplicating across all element types together)
+  const handleBatchMove = useCallback((
+    dx: number,
+    dy: number,
+    snapshot?: {
+      focuses?: Array<{ id: string; x: number; y: number }>;
+      blurs?: Array<{ id: string; x: number; y: number }>;
+      masks?: Array<{ id: string; x: number; y: number }>;
+      triangles?: Array<{ id: string; x: number; y: number }>;
+    }
+  ) => {
+    // 1. Snapshot-based move (used for smooth, non-accumulating mouse dragging)
+    if (snapshot) {
+      if (snapshot.focuses && snapshot.focuses.length > 0) {
+        const snapMap = new Map(snapshot.focuses.map((f) => [f.id, f]));
+        setFocuses((prev) => prev.map((f) => {
+          const s = snapMap.get(f.id);
+          return s ? { ...f, x: Math.round(s.x + dx), y: Math.round(s.y + dy) } : f;
+        }));
+      }
+      if (snapshot.blurs && snapshot.blurs.length > 0) {
+        const snapMap = new Map(snapshot.blurs.map((b) => [b.id, b]));
+        setBlurZones((prev) => prev.map((b) => {
+          const s = snapMap.get(b.id);
+          return s ? { ...b, x: Math.round(s.x + dx), y: Math.round(s.y + dy) } : b;
+        }));
+      }
+      if (snapshot.masks && snapshot.masks.length > 0) {
+        const snapMap = new Map(snapshot.masks.map((m) => [m.id, m]));
+        setMaskShapes((prev) => prev.map((m) => {
+          const s = snapMap.get(m.id);
+          return s ? { ...m, x: Math.round(s.x + dx), y: Math.round(s.y + dy) } : m;
+        }));
+      }
+      if (snapshot.triangles && snapshot.triangles.length > 0) {
+        const snapMap = new Map(snapshot.triangles.map((t) => [t.id, t]));
+        setTriangles((prev) => prev.map((t) => {
+          const s = snapMap.get(t.id);
+          return s ? { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy) } : t;
+        }));
+      }
+      return;
+    }
+
+    // 2. Incremental step delta fallback (used for keyboard arrow key nudges)
+    if (dx === 0 && dy === 0) return;
+    if (selectedFocusIds.length > 0) {
+      setFocuses((prev) => prev.map((f) => selectedFocusIds.includes(f.id) ? { ...f, x: Math.round(f.x + dx), y: Math.round(f.y + dy) } : f));
+    }
+    if (selectedBlurIds.length > 0) {
+      setBlurZones((prev) => prev.map((b) => selectedBlurIds.includes(b.id) ? { ...b, x: Math.round(b.x + dx), y: Math.round(b.y + dy) } : b));
+    }
+    if (selectedMaskIds.length > 0) {
+      setMaskShapes((prev) => prev.map((m) => selectedMaskIds.includes(m.id) ? { ...m, x: Math.round(m.x + dx), y: Math.round(m.y + dy) } : m));
+    }
+    if (selectedTriangleIds.length > 0) {
+      setTriangles((prev) => prev.map((t) => selectedTriangleIds.includes(t.id) ? { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy) } : t));
+    }
+  }, [selectedFocusIds, selectedBlurIds, selectedMaskIds, selectedTriangleIds]);
+
+  const handleBatchMoveEnd = useCallback(() => {
+    recordHistory(focuses);
+  }, [focuses, recordHistory]);
+
+  const handleBatchDelete = useCallback(() => {
+    if (selectedFocusIds.length > 0) {
+      const remaining = focuses.filter((f) => !selectedFocusIds.includes(f.id));
+      const renumbered = remaining.map((f, i) => ({
+        ...f,
+        name: f.name.startsWith('Zone ') ? `Zone ${i + 1}` : f.name,
+        stepNumber: i + 1,
+      }));
+      setFocuses(renumbered);
+      recordHistory(renumbered);
+      setSelectedFocusIds([]);
+    }
+    if (selectedBlurIds.length > 0) {
+      setBlurZones((prev) => prev.filter((b) => !selectedBlurIds.includes(b.id)));
+      setSelectedBlurIds([]);
+    }
+    if (selectedMaskIds.length > 0) {
+      setMaskShapes((prev) => prev.filter((m) => !selectedMaskIds.includes(m.id)));
+      setSelectedMaskIds([]);
+    }
+    if (selectedTriangleIds.length > 0) {
+      setTriangles((prev) => prev.filter((t) => !selectedTriangleIds.includes(t.id)));
+      setSelectedTriangleIds([]);
+    }
+  }, [selectedFocusIds, selectedBlurIds, selectedMaskIds, selectedTriangleIds, focuses, recordHistory]);
+
+  const handleBatchDuplicate = useCallback(() => {
+    const newFocusIds: string[] = [];
+    const newBlurIds: string[] = [];
+    const newMaskIds: string[] = [];
+    const newTriangleIds: string[] = [];
+
+    if (selectedFocusIds.length > 0) {
+      const clones: FocusZone[] = [];
+      let nextStep = focuses.reduce((max, f) => Math.max(max, f.stepNumber || 0), 0) + 1;
+      focuses.filter((f) => selectedFocusIds.includes(f.id)).forEach((f) => {
+        const id = `focus-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        newFocusIds.push(id);
+        clones.push({
+          ...f,
+          id,
+          name: `${f.name} (copie)`,
+          x: f.x + 15,
+          y: f.y + 15,
+          stepNumber: nextStep++,
+        });
+      });
+      const updated = [...focuses, ...clones];
+      setFocuses(updated);
+      recordHistory(updated);
+    }
+
+    if (selectedBlurIds.length > 0) {
+      const clones: BlurZone[] = [];
+      blurZones.filter((b) => selectedBlurIds.includes(b.id)).forEach((b) => {
+        const id = `blur-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        newBlurIds.push(id);
+        clones.push({
+          ...b,
+          id,
+          name: `${b.name} (copie)`,
+          x: b.x + 15,
+          y: b.y + 15,
+        });
+      });
+      setBlurZones((prev) => [...prev, ...clones]);
+    }
+
+    if (selectedMaskIds.length > 0) {
+      const clones: MaskShape[] = [];
+      maskShapes.filter((m) => selectedMaskIds.includes(m.id)).forEach((m) => {
+        const id = `mask-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        newMaskIds.push(id);
+        clones.push({
+          ...m,
+          id,
+          name: `${m.name} (copie)`,
+          x: m.x + 15,
+          y: m.y + 15,
+        });
+      });
+      setMaskShapes((prev) => [...prev, ...clones]);
+    }
+
+    if (selectedTriangleIds.length > 0) {
+      const clones: TriangleShape[] = [];
+      triangles.filter((t) => selectedTriangleIds.includes(t.id)).forEach((t) => {
+        const id = `triangle-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        newTriangleIds.push(id);
+        clones.push({
+          ...t,
+          id,
+          name: `${t.name} (copie)`,
+          x: t.x + 15,
+          y: t.y + 15,
+        });
+      });
+      setTriangles((prev) => [...prev, ...clones]);
+    }
+
+    setSelectedFocusIds(newFocusIds);
+    setSelectedBlurIds(newBlurIds);
+    setSelectedMaskIds(newMaskIds);
+    setSelectedTriangleIds(newTriangleIds);
+  }, [selectedFocusIds, selectedBlurIds, selectedMaskIds, selectedTriangleIds, focuses, blurZones, maskShapes, triangles, recordHistory]);
 
   // Callout / Vignette zoom détaché management
   const handleToggleCallout = () => {
@@ -1176,24 +1406,14 @@ export default function App() {
       // Duplicate: Ctrl+D / Cmd+D
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
-        if (selectedFocusId) {
-          handleDuplicateFocus(selectedFocusId);
-        }
+        handleBatchDuplicate();
         return;
       }
 
       // Delete: Delete or Backspace
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        if (selectedFocusId) {
-          handleDeleteFocus(selectedFocusId);
-        } else if (selectedBlurId) {
-          handleDeleteBlurZone(selectedBlurId);
-        } else if (selectedMaskId) {
-          handleDeleteMaskShape(selectedMaskId);
-        } else if (selectedTriangleId) {
-          handleDeleteTriangle(selectedTriangleId);
-        }
+        handleBatchDelete();
         return;
       }
 
@@ -1207,10 +1427,7 @@ export default function App() {
           setIsPreviewMode(false);
           return;
         }
-        setSelectedFocusId(null);
-        setSelectedBlurId(null);
-        setSelectedMaskId(null);
-        setSelectedTriangleId(null);
+        handleClearSelection();
         setActiveTool('select');
         return;
       }
@@ -1269,7 +1486,7 @@ export default function App() {
         return;
       }
 
-      // Arrow keys to nudge selected object (Photoshop style: 1px by default, 10px with Shift)
+      // Arrow keys to nudge selected object(s) (Photoshop style: 1px by default, 10px with Shift)
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         const step = e.shiftKey ? 10 : 1;
         let dx = 0;
@@ -1283,7 +1500,6 @@ export default function App() {
 
         // En mode Callout, les flèches permettent de déplacer autant qu'on veut la "Cible loupe"
         if (calloutVignette && calloutVignette.enabled) {
-          // Déplacement au demi-pixel près (0.5px par appui, 5px avec Shift)
           const calloutStep = e.shiftKey ? 5 : 0.5;
           let cdx = 0;
           let cdy = 0;
@@ -1299,56 +1515,25 @@ export default function App() {
             });
             handled = true;
           } else {
-            // Déplacement libre au demi-pixel près de la Cible loupe
             handleUpdateCallout({
               sourceX: Math.round(((calloutVignette.sourceX ?? 0) + cdx) * 10) / 10,
               sourceY: Math.round(((calloutVignette.sourceY ?? 0) + cdy) * 10) / 10,
             });
             handled = true;
           }
-        } else if (selectedFocusId) {
+        } else if (internalFramingFocusId && selectedFocusId) {
           const current = focuses.find((f) => f.id === selectedFocusId);
           if (current) {
-            // Si Alt est maintenu ou si le mode recadrage interne est actif :
-            // Déplacer le screenshot dans la zone focus sans altérer la capture d'origine
-            if (e.altKey || internalFramingFocusId === selectedFocusId) {
-              handleUpdateFocus({
-                sourceOffsetX: Math.round((current.sourceOffsetX || 0) + dx),
-                sourceOffsetY: Math.round((current.sourceOffsetY || 0) + dy),
-              });
-            } else {
-              handleUpdateFocus({
-                x: current.x + dx,
-                y: current.y + dy,
-              });
-            }
-            handled = true;
-          }
-        } else if (selectedBlurId) {
-          const current = blurZones.find((b) => b.id === selectedBlurId);
-          if (current) {
-            handleUpdateBlurZone(selectedBlurId, {
-              x: current.x + dx,
-              y: current.y + dy,
+            handleUpdateFocus({
+              sourceOffsetX: Math.round((current.sourceOffsetX || 0) + dx),
+              sourceOffsetY: Math.round((current.sourceOffsetY || 0) + dy),
             });
             handled = true;
           }
-        } else if (selectedMaskId) {
-          const current = maskShapes.find((m) => m.id === selectedMaskId);
-          if (current) {
-            handleUpdateMaskShape(selectedMaskId, {
-              x: current.x + dx,
-              y: current.y + dy,
-            });
-            handled = true;
-          }
-        } else if (selectedTriangleId) {
-          const current = triangles.find((t) => t.id === selectedTriangleId);
-          if (current) {
-            handleUpdateTriangle(selectedTriangleId, {
-              x: current.x + dx,
-              y: current.y + dy,
-            });
+        } else {
+          const totalSel = selectedFocusIds.length + selectedBlurIds.length + selectedMaskIds.length + selectedTriangleIds.length;
+          if (totalSel > 0) {
+            handleBatchMove(dx, dy);
             handled = true;
           }
         }
@@ -1388,6 +1573,10 @@ export default function App() {
     maskShapes,
     triangles,
     selectedFocusId,
+    selectedFocusIds,
+    selectedBlurIds,
+    selectedMaskIds,
+    selectedTriangleIds,
     internalFramingFocusId,
     selectedBlurId,
     selectedMaskId,
@@ -1397,6 +1586,10 @@ export default function App() {
     history,
     calloutVignette,
     selectedCalloutPart,
+    handleBatchMove,
+    handleBatchDelete,
+    handleBatchDuplicate,
+    handleClearSelection,
   ]);
 
   const selectedFocus = focuses.find((f) => f.id === selectedFocusId) || null;
@@ -1427,6 +1620,10 @@ export default function App() {
           image={image}
           focuses={focuses}
           selectedFocusId={selectedFocusId}
+          selectedFocusIds={selectedFocusIds}
+          selectedBlurIds={selectedBlurIds}
+          selectedMaskIds={selectedMaskIds}
+          selectedTriangleIds={selectedTriangleIds}
           onSelectFocus={handleSelectFocus}
           onUpdateFocus={handleUpdateFocus}
           onRenumberFocuses={handleAutoRenumberFocuses}
@@ -1460,6 +1657,12 @@ export default function App() {
           onUpdateTriangle={handleUpdateTriangle}
           onDeleteTriangle={handleDeleteTriangle}
           onDuplicateTriangle={handleDuplicateTriangle}
+          onSelectMultiple={handleSelectMultiple}
+          onClearSelection={handleClearSelection}
+          onBatchMove={handleBatchMove}
+          onBatchMoveEnd={handleBatchMoveEnd}
+          onBatchDelete={handleBatchDelete}
+          onBatchDuplicate={handleBatchDuplicate}
           calloutVignette={calloutVignette}
           selectedCalloutPart={selectedCalloutPart}
           onSelectCalloutPart={handleSelectCalloutPart}
@@ -1505,6 +1708,14 @@ export default function App() {
           image={image}
           focuses={focuses}
           selectedFocus={selectedFocus}
+          selectedFocusIds={selectedFocusIds}
+          selectedBlurIds={selectedBlurIds}
+          selectedMaskIds={selectedMaskIds}
+          selectedTriangleIds={selectedTriangleIds}
+          onSelectMultiple={handleSelectMultiple}
+          onClearSelection={handleClearSelection}
+          onBatchDelete={handleBatchDelete}
+          onBatchDuplicate={handleBatchDuplicate}
           onSelectFocus={handleSelectFocus}
           onAddFocus={handleAddFocus}
           onUpdateFocus={handleUpdateFocus}

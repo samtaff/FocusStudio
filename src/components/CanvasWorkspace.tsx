@@ -28,7 +28,8 @@ interface CanvasWorkspaceProps {
   image: LoadedImage | null;
   focuses: FocusZone[];
   selectedFocusId: string | null;
-  onSelectFocus: (id: string | null) => void;
+  selectedFocusIds?: string[];
+  onSelectFocus: (id: string | null, isMulti?: boolean) => void;
   onUpdateFocus: (updated: Partial<FocusZone>) => void;
   onRenumberFocuses?: () => void;
   onAddFocus: (orientation?: 'horizontal' | 'vertical') => void;
@@ -38,7 +39,8 @@ interface CanvasWorkspaceProps {
   // Blur Zones
   blurZones: BlurZone[];
   selectedBlurId: string | null;
-  onSelectBlur: (id: string | null) => void;
+  selectedBlurIds?: string[];
+  onSelectBlur: (id: string | null, isMulti?: boolean) => void;
   onAddBlur: () => void;
   onAddBlurAt: (x: number, y: number) => void;
   onUpdateBlur: (id: string, updated: Partial<BlurZone>) => void;
@@ -47,7 +49,8 @@ interface CanvasWorkspaceProps {
   // Mask Shapes
   maskShapes: MaskShape[];
   selectedMaskId: string | null;
-  onSelectMask: (id: string | null) => void;
+  selectedMaskIds?: string[];
+  onSelectMask: (id: string | null, isMulti?: boolean) => void;
   onAddMask: () => void;
   onAddMaskAt: (x: number, y: number) => void;
   onUpdateMask: (id: string, updated: Partial<MaskShape>) => void;
@@ -56,12 +59,29 @@ interface CanvasWorkspaceProps {
   // Triangle Shapes (15x13px)
   triangles?: TriangleShape[];
   selectedTriangleId?: string | null;
-  onSelectTriangle?: (id: string | null) => void;
+  selectedTriangleIds?: string[];
+  onSelectTriangle?: (id: string | null, isMulti?: boolean) => void;
   onAddTriangle?: () => void;
   onAddTriangleAt?: (x: number, y: number) => void;
   onUpdateTriangle?: (id: string, updated: Partial<TriangleShape>) => void;
   onDeleteTriangle?: (id: string) => void;
   onDuplicateTriangle?: (id: string) => void;
+  // Multi-Selection Operations
+  onSelectMultiple?: (selection: { focusIds?: string[]; blurIds?: string[]; maskIds?: string[]; triangleIds?: string[] }, isAdditive?: boolean) => void;
+  onClearSelection?: () => void;
+  onBatchMove?: (
+    dx: number,
+    dy: number,
+    snapshot?: {
+      focuses?: Array<{ id: string; x: number; y: number }>;
+      blurs?: Array<{ id: string; x: number; y: number }>;
+      masks?: Array<{ id: string; x: number; y: number }>;
+      triangles?: Array<{ id: string; x: number; y: number }>;
+    }
+  ) => void;
+  onBatchMoveEnd?: () => void;
+  onBatchDelete?: () => void;
+  onBatchDuplicate?: () => void;
   // Callout Vignette
   calloutVignette?: CalloutVignette | null;
   selectedCalloutPart?: 'source' | 'vignette' | null;
@@ -113,6 +133,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   image,
   focuses,
   selectedFocusId,
+  selectedFocusIds = [],
   onSelectFocus,
   onUpdateFocus,
   onRenumberFocuses,
@@ -122,6 +143,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onAddFocusAt,
   blurZones,
   selectedBlurId,
+  selectedBlurIds = [],
   onSelectBlur,
   onAddBlur,
   onAddBlurAt,
@@ -130,6 +152,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onDuplicateBlur,
   maskShapes,
   selectedMaskId,
+  selectedMaskIds = [],
   onSelectMask,
   onAddMask,
   onAddMaskAt,
@@ -138,12 +161,19 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onDuplicateMask,
   triangles = [],
   selectedTriangleId = null,
+  selectedTriangleIds = [],
   onSelectTriangle,
   onAddTriangle,
   onAddTriangleAt,
   onUpdateTriangle,
   onDeleteTriangle,
   onDuplicateTriangle,
+  onSelectMultiple,
+  onClearSelection,
+  onBatchMove,
+  onBatchMoveEnd,
+  onBatchDelete,
+  onBatchDuplicate,
   calloutVignette,
   selectedCalloutPart = null,
   onSelectCalloutPart,
@@ -265,9 +295,21 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const [draggingGuide, setDraggingGuide] = useState<{ type: 'horizontal' | 'vertical'; position: number; isNew: boolean; guideId?: string } | null>(null);
   const [hoveredGuide, setHoveredGuide] = useState<UserGuide | null>(null);
 
-  // Shape Rotation state
-  const [hoveredRotationHandle, setHoveredRotationHandle] = useState<{ type: 'mask' | 'triangle'; id: string } | null>(null);
+  // Photoshop-Style Corner Rotation state (no pin stem, 4 corner zones with arc)
+  const [hoveredRotationCorner, setHoveredRotationCorner] = useState<{ type: 'mask' | 'triangle'; id: string; corner: 'nw' | 'ne' | 'se' | 'sw' } | null>(null);
   const [dragRotateState, setDragRotateState] = useState<{ id: string; type: 'mask' | 'triangle'; centerX: number; centerY: number; startAngle: number; initialRotation: number } | null>(null);
+
+  // Multi-Selection State: Marquee rectangle & Multi-Drag
+  const [marqueeState, setMarqueeState] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
+  const [multiDragState, setMultiDragState] = useState<{
+    startX: number;
+    startY: number;
+    hasMoved?: boolean;
+    initialFocuses: { id: string; x: number; y: number }[];
+    initialBlurs: { id: string; x: number; y: number }[];
+    initialMasks: { id: string; x: number; y: number }[];
+    initialTriangles: { id: string; x: number; y: number }[];
+  } | null>(null);
 
   // Smart Snap guides & HUD info badge
   const [activeSnapGuides, setActiveSnapGuides] = useState<SmartGuide[]>([]);
@@ -478,9 +520,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const activeFocusIds = selectedFocusIds.length > 0 ? selectedFocusIds : (selectedFocusId ? [selectedFocusId] : []);
+    const activeBlurIds = selectedBlurIds.length > 0 ? selectedBlurIds : (selectedBlurId ? [selectedBlurId] : []);
+    const activeMaskIds = selectedMaskIds.length > 0 ? selectedMaskIds : (selectedMaskId ? [selectedMaskId] : []);
+    const activeTriangleIds = selectedTriangleIds.length > 0 ? selectedTriangleIds : (selectedTriangleId ? [selectedTriangleId] : []);
+
     drawComposition(ctx, image, focuses, {
       interactive: !isPreviewMode,
       selectedFocusId: isPreviewMode ? null : selectedFocusId,
+      selectedFocusIds: isPreviewMode ? [] : activeFocusIds,
       hoveredFocusId: isPreviewMode ? null : hoveredFocusId,
       hoveredHandle: isPreviewMode ? null : hoveredHandle,
       internalFramingFocusId: isPreviewMode ? null : internalFramingFocusId,
@@ -495,13 +543,23 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       showRulers: !isPreviewMode && globalStyles.showRulers !== false,
       blurZones,
       selectedBlurId: isPreviewMode ? null : selectedBlurId,
+      selectedBlurIds: isPreviewMode ? [] : activeBlurIds,
       hoveredBlurId: isPreviewMode ? null : hoveredBlurId,
       maskShapes,
       selectedMaskId: isPreviewMode ? null : selectedMaskId,
+      selectedMaskIds: isPreviewMode ? [] : activeMaskIds,
       hoveredMaskId: isPreviewMode ? null : hoveredMaskId,
       triangles,
       selectedTriangleId: isPreviewMode ? null : selectedTriangleId,
+      selectedTriangleIds: isPreviewMode ? [] : activeTriangleIds,
       hoveredTriangleId: isPreviewMode ? null : hoveredTriangleId,
+      hoveredRotationCorner: isPreviewMode ? null : hoveredRotationCorner,
+      marqueeRect: marqueeState ? {
+        x: Math.min(marqueeState.startX, marqueeState.currentX),
+        y: Math.min(marqueeState.startY, marqueeState.currentY),
+        width: Math.abs(marqueeState.currentX - marqueeState.startX),
+        height: Math.abs(marqueeState.currentY - marqueeState.startY),
+      } : undefined,
       calloutVignette,
       selectedCalloutPart: isPreviewMode ? null : activeSelectedCalloutPart,
       hoveredCalloutPart: isPreviewMode ? null : hoveredCalloutPart,
@@ -511,24 +569,30 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     image, 
     focuses, 
     selectedFocusId, 
+    selectedFocusIds,
     hoveredFocusId, 
     hoveredHandle, 
     bounds, 
     activeGuides, 
     userGuides, 
     globalStyles,
-    blurZones,
-    selectedBlurId,
-    hoveredBlurId,
-    maskShapes,
-    selectedMaskId,
-    hoveredMaskId,
-    triangles,
-    selectedTriangleId,
-    hoveredTriangleId,
-    calloutVignette,
-    activeSelectedCalloutPart,
-    hoveredCalloutPart,
+    blurZones, 
+    selectedBlurId, 
+    selectedBlurIds,
+    hoveredBlurId, 
+    maskShapes, 
+    selectedMaskId, 
+    selectedMaskIds,
+    hoveredMaskId, 
+    triangles, 
+    selectedTriangleId, 
+    selectedTriangleIds,
+    hoveredTriangleId, 
+    hoveredRotationCorner,
+    marqueeState,
+    calloutVignette, 
+    activeSelectedCalloutPart, 
+    hoveredCalloutPart, 
     isPreviewMode
   ]);
 
@@ -664,54 +728,106 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     return null;
   };
 
-  // Hit-test Photoshop Rotation Handle for selected mask or triangle
-  const getRotationHandleAtCoord = (cx: number, cy: number): { type: 'mask' | 'triangle'; id: string } | null => {
-    if (selectedMaskId) {
-      const mask = maskShapes.find((m) => m.id === selectedMaskId);
-      if (mask) {
-        const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 2) : 1;
-        const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 2) : 1;
-        const gapX = mask.multiplier?.gapX ?? 10;
-        const gapY = mask.multiplier?.gapY ?? 10;
-        const totalW = cols * mask.width + (cols - 1) * gapX;
-        const totalH = rows * mask.height + (rows - 1) * gapY;
-        const centerX = mask.x + totalW / 2;
-        const centerY = mask.y + totalH / 2;
-        const rot = mask.rotation || 0;
+  // Hit-test Photoshop-style Corner Rotation: check outer corner regions of selected mask or triangle
+  const getPhotoshopRotationCornerAtCoord = (cx: number, cy: number): { 
+    type: 'mask' | 'triangle'; 
+    id: string; 
+    corner: 'nw' | 'ne' | 'se' | 'sw';
+    centerX: number;
+    centerY: number;
+    initialRotation: number;
+  } | null => {
+    // 1. Check selected masks
+    const activeMaskIds = selectedMaskIds.length > 0 ? selectedMaskIds : (selectedMaskId ? [selectedMaskId] : []);
+    for (const mId of activeMaskIds) {
+      const mask = maskShapes.find((m) => m.id === mId);
+      if (!mask) continue;
+      const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 2) : 1;
+      const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 2) : 1;
+      const gapX = mask.multiplier?.gapX ?? 10;
+      const gapY = mask.multiplier?.gapY ?? 10;
+      const totalW = cols * mask.width + (cols - 1) * gapX;
+      const totalH = rows * mask.height + (rows - 1) * gapY;
+      const centerX = mask.x + totalW / 2;
+      const centerY = mask.y + totalH / 2;
+      const rot = mask.rotation || 0;
 
-        const rotRad = -((rot * Math.PI) / 180);
-        const dx = cx - centerX;
-        const dy = cy - centerY;
-        const lx = centerX + dx * Math.cos(rotRad) - dy * Math.sin(rotRad);
-        const ly = centerY + dx * Math.sin(rotRad) + dy * Math.cos(rotRad);
+      const rotRad = -((rot * Math.PI) / 180);
+      const dx = cx - centerX;
+      const dy = cy - centerY;
+      const lx = dx * Math.cos(rotRad) - dy * Math.sin(rotRad);
+      const ly = dx * Math.sin(rotRad) + dy * Math.cos(rotRad);
 
-        const targetX = centerX;
-        const targetY = mask.y - 20;
-        if ((lx - targetX) ** 2 + (ly - targetY) ** 2 <= 64) {
-          return { type: 'mask', id: mask.id };
+      const halfW = totalW / 2;
+      const halfH = totalH / 2;
+
+      const corners: { corner: 'nw' | 'ne' | 'se' | 'sw'; x: number; y: number }[] = [
+        { corner: 'nw', x: -halfW, y: -halfH },
+        { corner: 'ne', x: halfW, y: -halfH },
+        { corner: 'se', x: halfW, y: halfH },
+        { corner: 'sw', x: -halfW, y: halfH },
+      ];
+
+      for (const c of corners) {
+        const dist = Math.hypot(lx - c.x, ly - c.y);
+        // Photoshop-style: cursor just outside the corner (between 3px and 18px)
+        if (dist >= 3 && dist <= 20) {
+          const isOutside = Math.abs(lx) >= halfW - 2 || Math.abs(ly) >= halfH - 2;
+          if (isOutside) {
+            return {
+              type: 'mask',
+              id: mask.id,
+              corner: c.corner,
+              centerX,
+              centerY,
+              initialRotation: rot,
+            };
+          }
         }
       }
     }
 
-    if (selectedTriangleId) {
-      const tri = triangles.find((t) => t.id === selectedTriangleId);
-      if (tri) {
-        const w = tri.width || 15;
-        const h = tri.height || 13;
-        const centerX = tri.x + w / 2;
-        const centerY = tri.y + h / 2;
-        const rot = tri.rotation || 0;
+    // 2. Check selected triangles (15x13px or custom size)
+    const activeTriangleIds = selectedTriangleIds.length > 0 ? selectedTriangleIds : (selectedTriangleId ? [selectedTriangleId] : []);
+    for (const tId of activeTriangleIds) {
+      const tri = triangles.find((t) => t.id === tId);
+      if (!tri) continue;
+      const w = tri.width || 15;
+      const h = tri.height || 13;
+      const centerX = tri.x + w / 2;
+      const centerY = tri.y + h / 2;
+      const rot = tri.rotation || 0;
 
-        const rotRad = -((rot * Math.PI) / 180);
-        const dx = cx - centerX;
-        const dy = cy - centerY;
-        const lx = centerX + dx * Math.cos(rotRad) - dy * Math.sin(rotRad);
-        const ly = centerY + dx * Math.sin(rotRad) + dy * Math.cos(rotRad);
+      const rotRad = -((rot * Math.PI) / 180);
+      const dx = cx - centerX;
+      const dy = cy - centerY;
+      const lx = dx * Math.cos(rotRad) - dy * Math.sin(rotRad);
+      const ly = dx * Math.sin(rotRad) + dy * Math.cos(rotRad);
 
-        const targetX = centerX;
-        const targetY = tri.y - 20;
-        if ((lx - targetX) ** 2 + (ly - targetY) ** 2 <= 64) {
-          return { type: 'triangle', id: tri.id };
+      const halfW = w / 2;
+      const halfH = h / 2;
+
+      const corners: { corner: 'nw' | 'ne' | 'se' | 'sw'; x: number; y: number }[] = [
+        { corner: 'nw', x: -halfW, y: -halfH },
+        { corner: 'ne', x: halfW, y: -halfH },
+        { corner: 'se', x: halfW, y: halfH },
+        { corner: 'sw', x: -halfW, y: halfH },
+      ];
+
+      for (const c of corners) {
+        const dist = Math.hypot(lx - c.x, ly - c.y);
+        if (dist >= 3 && dist <= 20) {
+          const isOutside = Math.abs(lx) >= halfW - 2 || Math.abs(ly) >= halfH - 2;
+          if (isOutside) {
+            return {
+              type: 'triangle',
+              id: tri.id,
+              corner: c.corner,
+              centerX,
+              centerY,
+              initialRotation: rot,
+            };
+          }
         }
       }
     }
@@ -891,21 +1007,26 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // Dragging Rotation Handle
+    // Dragging Rotation (Photoshop-style corner rotation with Shift 15° snapping)
     if (dragRotateState) {
       const { centerX, centerY, startAngle, initialRotation } = dragRotateState;
       const curAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
-      let delta = curAngle - startAngle;
+      const delta = curAngle - startAngle;
       let targetRot = Math.round(initialRotation + delta);
       while (targetRot > 180) targetRot -= 360;
       while (targetRot <= -180) targetRot += 360;
 
-      // Magnetic angle snapping (0°, 45°, 90°, 135°, 180°, -45°, -90°, -135°)
-      const snapAngles = [0, 45, 90, 135, 180, -45, -90, -135];
-      for (const sa of snapAngles) {
-        if (Math.abs(targetRot - sa) <= (e.shiftKey ? 8 : 3.5)) {
-          targetRot = sa;
-          break;
+      // Photoshop Shift snap: 15° increments (0°, 15°, 30°, 45°, 60°, 75°, 90°...)
+      if (e.shiftKey) {
+        targetRot = Math.round(targetRot / 15) * 15;
+      } else {
+        // Subtle magnetic snap to cardinal angles
+        const snapAngles = [0, 45, 90, 135, 180, -45, -90, -135];
+        for (const sa of snapAngles) {
+          if (Math.abs(targetRot - sa) <= 3) {
+            targetRot = sa;
+            break;
+          }
         }
       }
 
@@ -918,8 +1039,42 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       setHudInfo({
         x: cx,
         y: cy,
-        text: `Angle : ${targetRot}°`,
+        text: `Angle : ${targetRot}°${e.shiftKey ? ' (Shift: 15°)' : ''}`,
       });
+      return;
+    }
+
+    // Dragging Multi-Selection (Moving all selected elements together smoothly without drift)
+    if (multiDragState) {
+      const dx = cx - multiDragState.startX;
+      const dy = cy - multiDragState.startY;
+      multiDragState.hasMoved = true;
+
+      if (onBatchMove) {
+        onBatchMove(dx, dy, {
+          focuses: multiDragState.initialFocuses,
+          blurs: multiDragState.initialBlurs,
+          masks: multiDragState.initialMasks,
+          triangles: multiDragState.initialTriangles,
+        });
+      } else {
+        multiDragState.initialFocuses.forEach((f) => onUpdateFocus({ x: Math.round(f.x + dx), y: Math.round(f.y + dy) }));
+        multiDragState.initialBlurs.forEach((b) => onUpdateBlur(b.id, { x: Math.round(b.x + dx), y: Math.round(b.y + dy) }));
+        multiDragState.initialMasks.forEach((m) => onUpdateMask(m.id, { x: Math.round(m.x + dx), y: Math.round(m.y + dy) }));
+        multiDragState.initialTriangles.forEach((t) => onUpdateTriangle?.(t.id, { x: Math.round(t.x + dx), y: Math.round(t.y + dy) }));
+      }
+
+      setHudInfo({
+        x: cx,
+        y: cy,
+        text: `Déplacement multiple : ΔX: ${dx >= 0 ? '+' : ''}${Math.round(dx)} px  ΔY: ${dy >= 0 ? '+' : ''}${Math.round(dy)} px`,
+      });
+      return;
+    }
+
+    // Dragging Marquee Box Selection
+    if (marqueeState) {
+      setMarqueeState((prev) => (prev ? { ...prev, currentX: cx, currentY: cy } : null));
       return;
     }
 
@@ -1228,9 +1383,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     }
     setHoveredHandle(null);
 
-    // Rotation handle hover
-    const rotHandle = getRotationHandleAtCoord(cx, cy);
-    setHoveredRotationHandle(rotHandle);
+    // Photoshop-style corner rotation hover
+    const rotCorner = getPhotoshopRotationCornerAtCoord(cx, cy);
+    setHoveredRotationCorner(rotCorner ? { type: rotCorner.type, id: rotCorner.id, corner: rotCorner.corner } : null);
 
     // Guide hover
     const gHover = getGuideAtCoord(cx, cy);
@@ -1320,48 +1475,20 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
     const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
 
-    // 0. Check if clicking rotation handle on selected mask or triangle
-    const clickedRotHandle = getRotationHandleAtCoord(cx, cy);
-    if (clickedRotHandle) {
-      if (clickedRotHandle.type === 'mask') {
-        const mask = maskShapes.find((m) => m.id === clickedRotHandle.id);
-        if (mask) {
-          const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 2) : 1;
-          const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 2) : 1;
-          const gapX = mask.multiplier?.gapX ?? 10;
-          const gapY = mask.multiplier?.gapY ?? 10;
-          const totalW = cols * mask.width + (cols - 1) * gapX;
-          const totalH = rows * mask.height + (rows - 1) * gapY;
-          const centerX = mask.x + totalW / 2;
-          const centerY = mask.y + totalH / 2;
-          const startAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
-          setDragRotateState({
-            id: mask.id,
-            type: 'mask',
-            centerX,
-            centerY,
-            startAngle,
-            initialRotation: mask.rotation || 0,
-          });
-          return;
-        }
-      } else {
-        const tri = triangles.find((t) => t.id === clickedRotHandle.id);
-        if (tri) {
-          const centerX = tri.x + (tri.width || 15) / 2;
-          const centerY = tri.y + (tri.height || 13) / 2;
-          const startAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
-          setDragRotateState({
-            id: tri.id,
-            type: 'triangle',
-            centerX,
-            centerY,
-            startAngle,
-            initialRotation: tri.rotation || 0,
-          });
-          return;
-        }
-      }
+    // 0. Check if clicking Photoshop-style Corner Rotation on selected mask or triangle
+    const clickedRotCorner = getPhotoshopRotationCornerAtCoord(cx, cy);
+    if (clickedRotCorner) {
+      const { centerX, centerY, id, type, initialRotation } = clickedRotCorner;
+      const startAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
+      setDragRotateState({
+        id,
+        type,
+        centerX,
+        centerY,
+        startAngle,
+        initialRotation,
+      });
+      return;
     }
 
     // 0.b. Check if clicking existing guide line on canvas
@@ -1376,9 +1503,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 1. Check if clicking handles on selected Blur Zone
+    // 1. Check if clicking handles on selected Blur Zone (only when single blur is selected)
     const selectedBlur = blurZones.find((b) => b.id === selectedBlurId);
-    if (selectedBlur) {
+    if (selectedBlur && selectedBlurIds.length <= 1 && selectedFocusIds.length === 0 && selectedMaskIds.length === 0 && selectedTriangleIds.length === 0) {
       const handle = getGenericHandleAtCoord(cx, cy, selectedBlur);
       if (handle) {
         setDragBlurState({
@@ -1395,9 +1522,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       }
     }
 
-    // 2. Check if clicking handles on selected Mask Shape
+    // 2. Check if clicking handles on selected Mask Shape (only when single mask is selected)
     const selectedMask = maskShapes.find((m) => m.id === selectedMaskId);
-    if (selectedMask) {
+    if (selectedMask && selectedMaskIds.length <= 1 && selectedFocusIds.length === 0 && selectedBlurIds.length === 0 && selectedTriangleIds.length === 0) {
       let handleRect = selectedMask;
       if (selectedMask.multiplier?.enabled) {
         const cols = Math.max(1, selectedMask.multiplier.cols || 2);
@@ -1424,9 +1551,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       }
     }
 
-    // 3. Check if clicking handles of selected focus
+    // 3. Check if clicking handles of selected focus (only when single focus is selected)
     const selected = focuses.find((f) => f.id === selectedFocusId);
-    if (selected && globalStyles.showHandles !== false) {
+    if (selected && globalStyles.showHandles !== false && selectedFocusIds.length <= 1 && selectedBlurIds.length === 0 && selectedMaskIds.length === 0 && selectedTriangleIds.length === 0) {
       const handle = getHandleAtCoord(cx, cy, selected);
       if (handle) {
         setDragState({
@@ -1441,6 +1568,26 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         return;
       }
     }
+
+    // Multi-Selection State Helpers
+    const isShiftHolding = e.shiftKey;
+    const activeFIds = selectedFocusIds.length > 0 ? selectedFocusIds : (selectedFocusId ? [selectedFocusId] : []);
+    const activeBIds = selectedBlurIds.length > 0 ? selectedBlurIds : (selectedBlurId ? [selectedBlurId] : []);
+    const activeMIds = selectedMaskIds.length > 0 ? selectedMaskIds : (selectedMaskId ? [selectedMaskId] : []);
+    const activeTIds = selectedTriangleIds.length > 0 ? selectedTriangleIds : (selectedTriangleId ? [selectedTriangleId] : []);
+    const totalSelectedCount = activeFIds.length + activeBIds.length + activeMIds.length + activeTIds.length;
+
+    const startMultiDrag = () => {
+      setMultiDragState({
+        startX: cx,
+        startY: cy,
+        hasMoved: false,
+        initialFocuses: focuses.filter((f) => activeFIds.includes(f.id)).map((f) => ({ id: f.id, x: f.x, y: f.y })),
+        initialBlurs: blurZones.filter((b) => activeBIds.includes(b.id)).map((b) => ({ id: b.id, x: b.x, y: b.y })),
+        initialMasks: maskShapes.filter((m) => activeMIds.includes(m.id)).map((m) => ({ id: m.id, x: m.x, y: m.y })),
+        initialTriangles: triangles.filter((t) => activeTIds.includes(t.id)).map((t) => ({ id: t.id, x: t.x, y: t.y })),
+      });
+    };
 
     // 4. PRIORITY SELECTION: Check clicked Callout part (source target or vignette bubble)
     const clickedCallout = getCalloutPartAtCoord(cx, cy);
@@ -1458,6 +1605,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       onSelectBlur(null);
       onSelectMask(null);
       onSelectTriangle?.(null);
+      onClearSelection?.();
       setDragCalloutState({
         part: clickedCallout,
         startX: cx,
@@ -1469,14 +1617,22 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 5. PRIORITY SELECTION: Check clicked Triangle FIRST
+    // 5. PRIORITY SELECTION: Check clicked Triangle
     const clickedTriangle = getTriangleAtCoord(cx, cy);
     if (clickedTriangle) {
       updateSelectedCallout(null);
-      onSelectTriangle?.(clickedTriangle.id);
-      onSelectFocus(null);
-      onSelectBlur(null);
-      onSelectMask(null);
+
+      if (isShiftHolding) {
+        onSelectTriangle?.(clickedTriangle.id, true);
+        return;
+      }
+
+      if (activeTIds.includes(clickedTriangle.id) && totalSelectedCount > 1) {
+        startMultiDrag();
+        return;
+      }
+
+      onSelectTriangle?.(clickedTriangle.id, false);
       setDragTriangleState({
         id: clickedTriangle.id,
         startX: cx,
@@ -1487,14 +1643,22 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 5. PRIORITY SELECTION: Check clicked Mask Shape positioned ABOVE focus zones
+    // 5.b. PRIORITY SELECTION: Check clicked Mask Shape positioned ABOVE focus zones
     const clickedMaskAbove = getMaskAtCoord(cx, cy, 'above');
     if (clickedMaskAbove) {
       updateSelectedCallout(null);
-      onSelectMask(clickedMaskAbove.id);
-      onSelectFocus(null);
-      onSelectBlur(null);
-      onSelectTriangle?.(null);
+
+      if (isShiftHolding) {
+        onSelectMask(clickedMaskAbove.id, true);
+        return;
+      }
+
+      if (activeMIds.includes(clickedMaskAbove.id) && totalSelectedCount > 1) {
+        startMultiDrag();
+        return;
+      }
+
+      onSelectMask(clickedMaskAbove.id, false);
       setDragMaskState({
         id: clickedMaskAbove.id,
         startX: cx,
@@ -1512,10 +1676,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const clickedBlurAbove = getBlurAtCoord(cx, cy, 'above');
     if (clickedBlurAbove) {
       updateSelectedCallout(null);
-      onSelectBlur(clickedBlurAbove.id);
-      onSelectFocus(null);
-      onSelectMask(null);
-      onSelectTriangle?.(null);
+
+      if (isShiftHolding) {
+        onSelectBlur(clickedBlurAbove.id, true);
+        return;
+      }
+
+      if (activeBIds.includes(clickedBlurAbove.id) && totalSelectedCount > 1) {
+        startMultiDrag();
+        return;
+      }
+
+      onSelectBlur(clickedBlurAbove.id, false);
       setDragBlurState({
         id: clickedBlurAbove.id,
         startX: cx,
@@ -1529,14 +1701,22 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 6. PRIORITY SELECTION: Check clicked Focus Zone (Focus is strictly above blur zones and below-masks)
+    // 6. PRIORITY SELECTION: Check clicked Focus Zone
     const clickedFocus = getFocusAtCoord(cx, cy);
     if (clickedFocus) {
       updateSelectedCallout(null);
-      onSelectFocus(clickedFocus.id);
-      onSelectBlur(null);
-      onSelectMask(null);
-      onSelectTriangle?.(null);
+
+      if (isShiftHolding) {
+        onSelectFocus(clickedFocus.id, true);
+        return;
+      }
+
+      if (activeFIds.includes(clickedFocus.id) && totalSelectedCount > 1) {
+        startMultiDrag();
+        return;
+      }
+
+      onSelectFocus(clickedFocus.id, false);
 
       // Si la touche Alt est maintenue ou si la zone est en mode recadrage interne :
       // -> Déplacer le screenshot dans la zone focus sans altérer la capture d'origine
@@ -1570,10 +1750,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const clickedMaskBelow = getMaskAtCoord(cx, cy, 'below');
     if (clickedMaskBelow) {
       updateSelectedCallout(null);
-      onSelectMask(clickedMaskBelow.id);
-      onSelectFocus(null);
-      onSelectBlur(null);
-      onSelectTriangle?.(null);
+
+      if (isShiftHolding) {
+        onSelectMask(clickedMaskBelow.id, true);
+        return;
+      }
+
+      if (activeMIds.includes(clickedMaskBelow.id) && totalSelectedCount > 1) {
+        startMultiDrag();
+        return;
+      }
+
+      onSelectMask(clickedMaskBelow.id, false);
       setDragMaskState({
         id: clickedMaskBelow.id,
         startX: cx,
@@ -1591,10 +1779,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const clickedBlur = getBlurAtCoord(cx, cy, 'below') || getBlurAtCoord(cx, cy);
     if (clickedBlur) {
       updateSelectedCallout(null);
-      onSelectBlur(clickedBlur.id);
-      onSelectFocus(null);
-      onSelectMask(null);
-      onSelectTriangle?.(null);
+
+      if (isShiftHolding) {
+        onSelectBlur(clickedBlur.id, true);
+        return;
+      }
+
+      if (activeBIds.includes(clickedBlur.id) && totalSelectedCount > 1) {
+        startMultiDrag();
+        return;
+      }
+
+      onSelectBlur(clickedBlur.id, false);
       setDragBlurState({
         id: clickedBlur.id,
         startX: cx,
@@ -1608,34 +1804,33 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 8. Main active sur le screenshot : se déplacer librement comme souhaité
-    const isInsideScreenshot =
-      cx >= bounds.bgX &&
-      cx <= bounds.bgX + bounds.bgWidth &&
-      cy >= bounds.bgY &&
-      cy <= bounds.bgY + bounds.bgHeight;
-
-    if (isInsideScreenshot && (!clickedFocus || calloutVignette?.enabled)) {
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
-      return;
-    }
-
-    // 9. Clicked empty background
+    // 8. Pan mode explicitly active
     if (isPanMode) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
       return;
     }
 
-    updateSelectedCallout(null);
-    onSelectFocus(null);
-    onSelectBlur(null);
-    onSelectMask(null);
-    onSelectTriangle?.(null);
+    // 9. Clicked empty background: clear selection unless Shift is held, and start Marquee Selection
+    if (!isShiftHolding) {
+      updateSelectedCallout(null);
+      onSelectFocus(null);
+      onSelectBlur(null);
+      onSelectMask(null);
+      onSelectTriangle?.(null);
+      onClearSelection?.();
+    }
+
+    // Start Marquee Selection Box
+    setMarqueeState({
+      startX: cx,
+      startY: cy,
+      currentX: cx,
+      currentY: cy,
+    });
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e?: React.MouseEvent<HTMLCanvasElement>) => {
     if (isPanning) setIsPanning(false);
     if (dragCalloutState) setDragCalloutState(null);
     if (dragFramingState) setDragFramingState(null);
@@ -1646,6 +1841,52 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (dragBlurState) setDragBlurState(null);
     if (dragMaskState) setDragMaskState(null);
     if (dragTriangleState) setDragTriangleState(null);
+    if (multiDragState) {
+      if (multiDragState.hasMoved) {
+        onBatchMoveEnd?.();
+      }
+      setMultiDragState(null);
+    }
+
+    // Finalize Marquee Selection Box
+    if (marqueeState) {
+      const minX = Math.min(marqueeState.startX, marqueeState.currentX);
+      const maxX = Math.max(marqueeState.startX, marqueeState.currentX);
+      const minY = Math.min(marqueeState.startY, marqueeState.currentY);
+      const maxY = Math.max(marqueeState.startY, marqueeState.currentY);
+
+      if (maxX - minX > 4 || maxY - minY > 4) {
+        const hitFocusIds = focuses
+          .filter((f) => f.x + f.width >= minX && f.x <= maxX && f.y + f.height >= minY && f.y <= maxY)
+          .map((f) => f.id);
+        const hitBlurIds = blurZones
+          .filter((b) => b.x + b.width >= minX && b.x <= maxX && b.y + b.height >= minY && b.y <= maxY)
+          .map((b) => b.id);
+        const hitMaskIds = maskShapes
+          .filter((m) => {
+            const mw = m.multiplier?.enabled ? (m.multiplier.cols || 2) * m.width + ((m.multiplier.cols || 2) - 1) * (m.multiplier.gapX ?? 10) : m.width;
+            const mh = m.multiplier?.enabled ? (m.multiplier.rows || 2) * m.height + ((m.multiplier.rows || 2) - 1) * (m.multiplier.gapY ?? 10) : m.height;
+            return m.x + mw >= minX && m.x <= maxX && m.y + mh >= minY && m.y <= maxY;
+          })
+          .map((m) => m.id);
+        const hitTriangleIds = triangles
+          .filter((t) => t.x + (t.width || 15) >= minX && t.x <= maxX && t.y + (t.height || 13) >= minY && t.y <= maxY)
+          .map((t) => t.id);
+
+        if (hitFocusIds.length > 0 || hitBlurIds.length > 0 || hitMaskIds.length > 0 || hitTriangleIds.length > 0) {
+          onSelectMultiple?.(
+            {
+              focusIds: hitFocusIds,
+              blurIds: hitBlurIds,
+              maskIds: hitMaskIds,
+              triangleIds: hitTriangleIds,
+            },
+            e.shiftKey
+          );
+        }
+      }
+      setMarqueeState(null);
+    }
 
     // Finalize guide dragging
     if (draggingGuide) {
@@ -1770,7 +2011,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (dragCalloutState) return 'grabbing';
     if (draggingGuide) return draggingGuide.type === 'horizontal' ? 'ns-resize' : 'ew-resize';
     if (hoveredGuide) return hoveredGuide.type === 'horizontal' ? 'ns-resize' : 'ew-resize';
-    if (dragRotateState || hoveredRotationHandle) return 'crosshair';
+    if (dragRotateState || hoveredRotationCorner) {
+      return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 4C7.58 4 4 7.58 4 12' stroke='%23000' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M12 4C7.58 4 4 7.58 4 12' stroke='%23fff' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M14 2L11 4.5L14 7' fill='%23000'/%3E%3Cpath d='M14 2L11 4.5L14 7' stroke='%23fff' stroke-width='0.75' fill='%23000'/%3E%3Cpath d='M12 20C16.42 20 20 16.42 20 12' stroke='%23000' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M12 20C16.42 20 20 16.42 20 12' stroke='%23fff' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M10 22L13 19.5L10 17' fill='%23000'/%3E%3Cpath d='M10 22L13 19.5L10 17' stroke='%23fff' stroke-width='0.75' fill='%23000'/%3E%3C/svg%3E") 12 12, crosshair`;
+    }
+    if (multiDragState) return 'move';
+    if (marqueeState) return 'crosshair';
     if (dragState?.isDragging || dragBlurState || dragMaskState || dragTriangleState) return 'move';
     if (dragState?.isResizing && dragState.handle) {
       const h = dragState.handle;
@@ -1785,6 +2030,19 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       if (hoveredHandle === 'n' || hoveredHandle === 's') return 'ns-resize';
       if (hoveredHandle === 'w' || hoveredHandle === 'e') return 'ew-resize';
     }
+
+    const activeF = selectedFocusIds.length > 0 ? selectedFocusIds : (selectedFocusId ? [selectedFocusId] : []);
+    const activeB = selectedBlurIds.length > 0 ? selectedBlurIds : (selectedBlurId ? [selectedBlurId] : []);
+    const activeM = selectedMaskIds.length > 0 ? selectedMaskIds : (selectedMaskId ? [selectedMaskId] : []);
+    const activeT = selectedTriangleIds.length > 0 ? selectedTriangleIds : (selectedTriangleId ? [selectedTriangleId] : []);
+
+    if (
+      (hoveredTriangleId && activeT.includes(hoveredTriangleId)) ||
+      (hoveredMaskId && activeM.includes(hoveredMaskId)) ||
+      (hoveredBlurId && activeB.includes(hoveredBlurId))
+    ) {
+      return 'move';
+    }
     if (hoveredTriangleId || hoveredMaskId || hoveredBlurId) {
       return 'pointer';
     }
@@ -1798,7 +2056,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       if (isAltPressed || internalFramingFocusId === hoveredFocusId) {
         return 'all-scroll';
       }
-      return hoveredFocusId === selectedFocusId ? 'move' : 'pointer';
+      return activeF.includes(hoveredFocusId) ? 'move' : 'pointer';
     }
 
     // Lorsque je survole le screenshot la main doit être active pour que je puisse me déplacer comme je le souhaite
