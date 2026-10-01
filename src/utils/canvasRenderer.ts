@@ -422,8 +422,10 @@ export function drawComposition(
 
   // 10. If interactive, draw smart alignment guides & user guides (ultra-discreet & small)
   if (interactive && showGuides) {
-    const phoneCenterX = bgX + bgWidth / 2;
-    drawSymmetryAxis(ctx, phoneCenterX, bgY, bgHeight);
+    if (globalStyles.snapToGuides !== false) {
+      const phoneCenterX = bgX + bgWidth / 2;
+      drawSymmetryAxis(ctx, phoneCenterX, bgY, bgHeight);
+    }
 
     // Photoshop precision grid (if enabled)
     if (globalStyles.showGrid) {

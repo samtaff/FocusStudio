@@ -1068,96 +1068,99 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
         // Alignment guides
         const currentGuides: SmartGuide[] = [];
-        const isVertical = init.orientation === 'vertical' || init.height > init.width;
-        const focusCenterX = newX + init.width / 2;
-        const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
-        const phoneLeft = bounds.bgX;
-        const phoneRight = bounds.bgX + bounds.bgWidth;
-        const snapDist = 8;
 
-        if (isVertical) {
-          // Le magnétisme en mode vertical se base sur le CENTRE de la zone focus
-          let snappedX = false;
+        if (globalStyles.snapToGuides !== false) {
+          const isVertical = init.orientation === 'vertical' || init.height > init.width;
+          const focusCenterX = newX + init.width / 2;
+          const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
+          const phoneLeft = bounds.bgX;
+          const phoneRight = bounds.bgX + bounds.bgWidth;
+          const snapDist = 8;
 
-          // 1. Bord gauche du screenshot original : aligner le CENTRE du focus sur le bord gauche
-          if (Math.abs(focusCenterX - phoneLeft) <= snapDist) {
-            newX = Math.round(phoneLeft - init.width / 2);
-            currentGuides.push({
-              type: 'vertical',
-              position: phoneLeft,
-              label: 'Bord gauche (Centré)',
-              color: '#0088cc',
-            });
-            snappedX = true;
-          }
-          // 2. Bord droit du screenshot original : aligner le CENTRE du focus sur le bord droit
-          else if (Math.abs(focusCenterX - phoneRight) <= snapDist) {
-            newX = Math.round(phoneRight - init.width / 2);
-            currentGuides.push({
-              type: 'vertical',
-              position: phoneRight,
-              label: 'Bord droit (Centré)',
-              color: '#0088cc',
-            });
-            snappedX = true;
-          }
-          // 3. Centre horizontal du screenshot original : aligner le CENTRE du focus sur le centre du screenshot
-          else if (Math.abs(focusCenterX - phoneCenterX) <= snapDist) {
-            newX = Math.round(phoneCenterX - init.width / 2);
-            currentGuides.push({
-              type: 'vertical',
-              position: phoneCenterX,
-              label: 'Centre Screenshot',
-              color: '#38bdf8',
-            });
-            snappedX = true;
-          }
+          if (isVertical) {
+            // Le magnétisme en mode vertical se base sur le CENTRE de la zone focus
+            let snappedX = false;
 
-          // Magnétisme vertical (Haut / Bas du screenshot)
-          const phoneTop = bounds.bgY;
-          const phoneBottom = bounds.bgY + bounds.bgHeight;
-          if (Math.abs(newY - phoneTop) <= snapDist) {
-            newY = Math.round(phoneTop);
+            // 1. Bord gauche du screenshot original : aligner le CENTRE du focus sur le bord gauche
+            if (Math.abs(focusCenterX - phoneLeft) <= snapDist) {
+              newX = Math.round(phoneLeft - init.width / 2);
+              currentGuides.push({
+                type: 'vertical',
+                position: phoneLeft,
+                label: 'Bord gauche (Centré)',
+                color: '#0088cc',
+              });
+              snappedX = true;
+            }
+            // 2. Bord droit du screenshot original : aligner le CENTRE du focus sur le bord droit
+            else if (Math.abs(focusCenterX - phoneRight) <= snapDist) {
+              newX = Math.round(phoneRight - init.width / 2);
+              currentGuides.push({
+                type: 'vertical',
+                position: phoneRight,
+                label: 'Bord droit (Centré)',
+                color: '#0088cc',
+              });
+              snappedX = true;
+            }
+            // 3. Centre horizontal du screenshot original : aligner le CENTRE du focus sur le centre du screenshot
+            else if (Math.abs(focusCenterX - phoneCenterX) <= snapDist) {
+              newX = Math.round(phoneCenterX - init.width / 2);
+              currentGuides.push({
+                type: 'vertical',
+                position: phoneCenterX,
+                label: 'Centre Screenshot',
+                color: '#38bdf8',
+              });
+              snappedX = true;
+            }
+
+            // Magnétisme vertical (Haut / Bas du screenshot)
+            const phoneTop = bounds.bgY;
+            const phoneBottom = bounds.bgY + bounds.bgHeight;
+            if (Math.abs(newY - phoneTop) <= snapDist) {
+              newY = Math.round(phoneTop);
+              currentGuides.push({
+                type: 'horizontal',
+                position: phoneTop,
+                label: 'Haut Screenshot',
+                color: '#10b981',
+              });
+            } else if (Math.abs((newY + init.height) - phoneBottom) <= snapDist) {
+              newY = Math.round(phoneBottom - init.height);
+              currentGuides.push({
+                type: 'horizontal',
+                position: phoneBottom,
+                label: 'Bas Screenshot',
+                color: '#10b981',
+              });
+            }
+          } else {
+            // Focus horizontal standard : centre et ligne horizontale
+            if (Math.abs(focusCenterX - phoneCenterX) <= snapDist) {
+              newX = Math.round(phoneCenterX - init.width / 2);
+              currentGuides.push({
+                type: 'vertical',
+                position: phoneCenterX,
+                label: 'Centre',
+                color: '#38bdf8',
+              });
+            }
+
             currentGuides.push({
               type: 'horizontal',
-              position: phoneTop,
-              label: 'Haut Screenshot',
-              color: '#10b981',
-            });
-          } else if (Math.abs((newY + init.height) - phoneBottom) <= snapDist) {
-            newY = Math.round(phoneBottom - init.height);
-            currentGuides.push({
-              type: 'horizontal',
-              position: phoneBottom,
-              label: 'Bas Screenshot',
-              color: '#10b981',
-            });
-          }
-        } else {
-          // Focus horizontal standard : centre et ligne horizontale
-          if (Math.abs(focusCenterX - phoneCenterX) <= snapDist) {
-            newX = Math.round(phoneCenterX - init.width / 2);
-            currentGuides.push({
-              type: 'vertical',
-              position: phoneCenterX,
-              label: 'Centre',
-              color: '#38bdf8',
+              position: newY + init.height / 2,
+              color: 'rgba(16, 185, 129, 0.6)',
             });
           }
 
-          currentGuides.push({
-            type: 'horizontal',
-            position: newY + init.height / 2,
-            color: 'rgba(16, 185, 129, 0.6)',
-          });
-        }
-
-        // Also snap to user-placed Photoshop guides and grid!
-        const snap = calculateSmartSnaps(newX, newY, init.width, init.height);
-        if (snap.smartGuides.length > 0) {
-          newX = snap.snappedX;
-          newY = snap.snappedY;
-          currentGuides.push(...snap.smartGuides);
+          // Also snap to user-placed Photoshop guides and grid!
+          const snap = calculateSmartSnaps(newX, newY, init.width, init.height);
+          if (snap.smartGuides.length > 0) {
+            newX = snap.snappedX;
+            newY = snap.snappedY;
+            currentGuides.push(...snap.smartGuides);
+          }
         }
 
         setActiveGuides(currentGuides);
