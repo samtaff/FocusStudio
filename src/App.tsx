@@ -182,6 +182,7 @@ export default function App() {
       setSelectedBlurIds((prev) => Array.from(new Set([...prev, ...bIds])));
       setSelectedMaskIds((prev) => Array.from(new Set([...prev, ...mIds])));
       setSelectedTriangleIds((prev) => Array.from(new Set([...prev, ...tIds])));
+      setSelectedCalloutPart(null);
     } else {
       setSelectedFocusIds(fIds);
       setSelectedBlurIds(bIds);
@@ -235,10 +236,37 @@ export default function App() {
   // Annotation Arrows
   const [arrows, setArrows] = useState<AnnotationArrow[]>([]);
 
-  // Undo / Redo History
-  const [history, setHistory] = useState<FocusZone[][]>([]);
+  // Undo / Redo History: full scene snapshots (focuses, blurs, masks, triangles, callout, guides)
+  const [history, setHistory] = useState<Array<{
+    focuses: FocusZone[];
+    blurZones: BlurZone[];
+    maskShapes: MaskShape[];
+    triangles: TriangleShape[];
+    calloutVignette: CalloutVignette | null;
+    userGuides: UserGuide[];
+  }>>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const isUndoRedoAction = useRef(false);
+  const historyRef = useRef<Array<{
+    focuses: FocusZone[];
+    blurZones: BlurZone[];
+    maskShapes: MaskShape[];
+    triangles: TriangleShape[];
+    calloutVignette: CalloutVignette | null;
+    userGuides: UserGuide[];
+  }>>([]);
+  const historyIndexRef = useRef<number>(-1);
+  const debounceRecordTimerRef = useRef<any>(null);
+
+  // Synchronized state ref for instant snapshot access without stale closures
+  const appStateRef = useRef({
+    focuses: [] as FocusZone[],
+    blurZones: [] as BlurZone[],
+    maskShapes: [] as MaskShape[],
+    triangles: [] as TriangleShape[],
+    calloutVignette: null as CalloutVignette | null,
+    userGuides: [] as UserGuide[],
+  });
 
   // Detection
   const [detectedElements, setDetectedElements] = useState<DetectedElement[]>([]);
@@ -255,18 +283,54 @@ export default function App() {
     setResetWorkspaceTrigger((prev) => prev + 1);
   }, []);
 
-  // Push new state to history stack
-  const recordHistory = useCallback((newFocuses: FocusZone[]) => {
-    if (isUndoRedoAction.current) {
-      isUndoRedoAction.current = false;
-      return;
+  // Push new snapshot to history stack
+  const recordHistory = useCallback((customSnapshot?: Partial<{
+    focuses: FocusZone[];
+    blurZones: BlurZone[];
+    maskShapes: MaskShape[];
+    triangles: TriangleShape[];
+    calloutVignette: CalloutVignette | null;
+    userGuides: UserGuide[];
+  }>) => {
+    if (isUndoRedoAction.current) return;
+
+    if (debounceRecordTimerRef.current) {
+      clearTimeout(debounceRecordTimerRef.current);
+      debounceRecordTimerRef.current = null;
     }
-    setHistory((prev) => {
-      const sliced = prev.slice(0, historyIndex + 1);
-      return [...sliced, newFocuses].slice(-30);
-    });
-    setHistoryIndex((prev) => Math.min(prev + 1, 29));
-  }, [historyIndex]);
+
+    const currentSnapshot = {
+      focuses: customSnapshot?.focuses ?? appStateRef.current.focuses,
+      blurZones: customSnapshot?.blurZones ?? appStateRef.current.blurZones,
+      maskShapes: customSnapshot?.maskShapes ?? appStateRef.current.maskShapes,
+      triangles: customSnapshot?.triangles ?? appStateRef.current.triangles,
+      calloutVignette: customSnapshot?.calloutVignette !== undefined ? customSnapshot.calloutVignette : appStateRef.current.calloutVignette,
+      userGuides: customSnapshot?.userGuides ?? appStateRef.current.userGuides,
+    };
+
+    const prevHistory = historyRef.current;
+    const curIdx = historyIndexRef.current;
+
+    const sliced = curIdx >= 0 ? prevHistory.slice(0, curIdx + 1) : [];
+    const nextHistory = [...sliced, currentSnapshot].slice(-50);
+    const nextIdx = nextHistory.length - 1;
+
+    historyRef.current = nextHistory;
+    historyIndexRef.current = nextIdx;
+    setHistory(nextHistory);
+    setHistoryIndex(nextIdx);
+  }, []);
+
+  // Debounced record history for continuous updates (e.g. typing, slider dragging)
+  const scheduleDebouncedRecordHistory = useCallback(() => {
+    if (isUndoRedoAction.current) return;
+    if (debounceRecordTimerRef.current) {
+      clearTimeout(debounceRecordTimerRef.current);
+    }
+    debounceRecordTimerRef.current = setTimeout(() => {
+      recordHistory();
+    }, 350);
+  }, [recordHistory]);
 
   // Option : Suite logique des pastilles lors de l'import de screenshots
   const [sequentialImportNumbering, setSequentialImportNumbering] = useState<boolean>(() => {
@@ -372,16 +436,45 @@ export default function App() {
       shadowOffsetY: 2,
     };
 
+    const initSnapshot = {
+      focuses: [initialFocus],
+      blurZones: [] as BlurZone[],
+      maskShapes: [] as MaskShape[],
+      triangles: [] as TriangleShape[],
+      calloutVignette: null as CalloutVignette | null,
+      userGuides: [] as UserGuide[],
+    };
+
     setFocuses([initialFocus]);
+    setBlurZones([]);
+    setMaskShapes([]);
+    setTriangles([]);
+    setCalloutVignette(null);
+    setUserGuides([]);
     handleSelectFocus(initialFocus.id);
-    setHistory([[initialFocus]]);
+
+    historyRef.current = [initSnapshot];
+    historyIndexRef.current = 0;
+    setHistory([initSnapshot]);
     setHistoryIndex(0);
 
     // Trigger smart detection asynchronously
     detectInterfaceElements(img, scaleFactor)
       .then((elements) => setDetectedElements(elements))
       .catch((err) => console.error(err));
-  }, [globalStyles.workspaceWidth]);
+  }, [globalStyles.workspaceWidth, handleSelectFocus]);
+
+  // Keep appStateRef synchronized with current state
+  useEffect(() => {
+    appStateRef.current = {
+      focuses,
+      blurZones,
+      maskShapes,
+      triangles,
+      calloutVignette,
+      userGuides,
+    };
+  }, [focuses, blurZones, maskShapes, triangles, calloutVignette, userGuides]);
 
   // Load initial preset image on mount
   useEffect(() => {
@@ -421,31 +514,73 @@ export default function App() {
   };
 
   // Undo / Redo
-  const handleUndo = () => {
-    if (historyIndex > 0) {
-      isUndoRedoAction.current = true;
-      const newIndex = historyIndex - 1;
-      const targetFocuses = history[newIndex];
-      setHistoryIndex(newIndex);
-      setFocuses(targetFocuses);
-      if (targetFocuses.length > 0 && !targetFocuses.find((f) => f.id === selectedFocusId)) {
-        setSelectedFocusIds([targetFocuses[0].id]);
-      }
-    }
-  };
+  const handleUndo = useCallback(() => {
+    const curIdx = historyIndexRef.current;
+    const prevHistory = historyRef.current;
+    if (curIdx <= 0 || prevHistory.length === 0) return;
 
-  const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      isUndoRedoAction.current = true;
-      const newIndex = historyIndex + 1;
-      const targetFocuses = history[newIndex];
-      setHistoryIndex(newIndex);
-      setFocuses(targetFocuses);
-      if (targetFocuses.length > 0 && !targetFocuses.find((f) => f.id === selectedFocusId)) {
-        setSelectedFocusIds([targetFocuses[0].id]);
-      }
+    if (debounceRecordTimerRef.current) {
+      clearTimeout(debounceRecordTimerRef.current);
+      debounceRecordTimerRef.current = null;
     }
-  };
+
+    const targetIdx = curIdx - 1;
+    const snapshot = prevHistory[targetIdx];
+    if (!snapshot) return;
+
+    isUndoRedoAction.current = true;
+    historyIndexRef.current = targetIdx;
+    setHistoryIndex(targetIdx);
+
+    setFocuses(snapshot.focuses);
+    setBlurZones(snapshot.blurZones);
+    setMaskShapes(snapshot.maskShapes);
+    setTriangles(snapshot.triangles);
+    setCalloutVignette(snapshot.calloutVignette);
+    setUserGuides(snapshot.userGuides);
+
+    if (snapshot.focuses.length > 0 && !snapshot.focuses.find((f) => f.id === selectedFocusId)) {
+      setSelectedFocusIds([snapshot.focuses[0].id]);
+    }
+
+    setTimeout(() => {
+      isUndoRedoAction.current = false;
+    }, 50);
+  }, [selectedFocusId]);
+
+  const handleRedo = useCallback(() => {
+    const curIdx = historyIndexRef.current;
+    const prevHistory = historyRef.current;
+    if (curIdx < 0 || curIdx >= prevHistory.length - 1) return;
+
+    if (debounceRecordTimerRef.current) {
+      clearTimeout(debounceRecordTimerRef.current);
+      debounceRecordTimerRef.current = null;
+    }
+
+    const targetIdx = curIdx + 1;
+    const snapshot = prevHistory[targetIdx];
+    if (!snapshot) return;
+
+    isUndoRedoAction.current = true;
+    historyIndexRef.current = targetIdx;
+    setHistoryIndex(targetIdx);
+
+    setFocuses(snapshot.focuses);
+    setBlurZones(snapshot.blurZones);
+    setMaskShapes(snapshot.maskShapes);
+    setTriangles(snapshot.triangles);
+    setCalloutVignette(snapshot.calloutVignette);
+    setUserGuides(snapshot.userGuides);
+
+    if (snapshot.focuses.length > 0 && !snapshot.focuses.find((f) => f.id === selectedFocusId)) {
+      setSelectedFocusIds([snapshot.focuses[0].id]);
+    }
+
+    setTimeout(() => {
+      isUndoRedoAction.current = false;
+    }, 50);
+  }, [selectedFocusId]);
 
   // Add Focus Zone:
   // - Horizontal par défaut : width = 240px, height = 50px
@@ -525,7 +660,7 @@ export default function App() {
     const updated = [...focuses, newFocus];
     setFocuses(updated);
     handleSelectFocus(newFocus.id);
-    recordHistory(updated);
+    recordHistory({ focuses: updated });
 
     if (sequentialImportNumberingRef.current) {
       setNextSequentialStep((prev) => Math.max(prev, nextStep + 1));
@@ -582,7 +717,7 @@ export default function App() {
     const updated = [...focuses, newFocus];
     setFocuses(updated);
     handleSelectFocus(newFocus.id);
-    recordHistory(updated);
+    recordHistory({ focuses: updated });
 
     if (sequentialImportNumberingRef.current) {
       setNextSequentialStep((prev) => Math.max(prev, nextStep + 1));
@@ -607,20 +742,21 @@ export default function App() {
     });
 
     setFocuses(updated);
-    recordHistory(updated);
+    recordHistory({ focuses: updated });
   };
 
   // Update selected focus
   const handleUpdateFocus = (updatedFields: Partial<FocusZone>) => {
     if (!selectedFocusId) return;
-    const updated = focuses.map((f) => {
-      if (f.id === selectedFocusId) {
-        return { ...f, ...updatedFields };
-      }
-      return f;
+    setFocuses((prev) => {
+      return prev.map((f) => {
+        if (f.id === selectedFocusId) {
+          return { ...f, ...updatedFields };
+        }
+        return f;
+      });
     });
-    setFocuses(updated);
-    recordHistory(updated);
+    scheduleDebouncedRecordHistory();
   };
 
   // Delete focus and auto-renumber sequentially
@@ -635,7 +771,7 @@ export default function App() {
     if (selectedFocusId === id) {
       setSelectedFocusIds(updated[0]?.id ? [updated[0].id] : []);
     }
-    recordHistory(updated);
+    recordHistory({ focuses: updated });
   };
 
   // Renumber all focuses sequentially (1, 2, 3...) sorted from top to bottom
@@ -647,7 +783,7 @@ export default function App() {
       stepNumber: idx + 1,
     }));
     setFocuses(updated);
-    recordHistory(updated);
+    recordHistory({ focuses: updated });
   };
 
   // Duplicate focus
@@ -669,7 +805,7 @@ export default function App() {
     const updated = [...focuses, duplicated];
     setFocuses(updated);
     setSelectedFocusIds([duplicated.id]);
-    recordHistory(updated);
+    recordHistory({ focuses: updated });
   };
 
   // Blur Zone Management
@@ -690,17 +826,22 @@ export default function App() {
       borderRadius: 4,
       layer: 'above',
     };
-    setBlurZones((prev) => [...prev, newBlur]);
+    const updated = [...blurZones, newBlur];
+    setBlurZones(updated);
     handleSelectBlur(newBlur.id);
+    recordHistory({ blurZones: updated });
   };
 
   const handleUpdateBlurZone = (id: string, updated: Partial<BlurZone>) => {
     setBlurZones((prev) => prev.map((b) => (b.id === id ? { ...b, ...updated } : b)));
+    scheduleDebouncedRecordHistory();
   };
 
   const handleDeleteBlurZone = (id: string) => {
-    setBlurZones((prev) => prev.filter((b) => b.id !== id));
+    const updated = blurZones.filter((b) => b.id !== id);
+    setBlurZones(updated);
     setSelectedBlurIds((prev) => prev.filter((x) => x !== id));
+    recordHistory({ blurZones: updated });
   };
 
   const handleDuplicateBlurZone = (id: string) => {
@@ -713,8 +854,10 @@ export default function App() {
       x: target.x + 15,
       y: target.y + 15,
     };
-    setBlurZones((prev) => [...prev, duplicated]);
+    const updated = [...blurZones, duplicated];
+    setBlurZones(updated);
     handleSelectBlur(duplicated.id);
+    recordHistory({ blurZones: updated });
   };
 
   // Mask Shape Management (Blue forms: default 40x40px, rounded corners 10px, #25465F)
@@ -733,17 +876,22 @@ export default function App() {
       opacity: 1,
       borderRadius: 10,
     };
-    setMaskShapes((prev) => [...prev, newMask]);
+    const updated = [...maskShapes, newMask];
+    setMaskShapes(updated);
     handleSelectMask(newMask.id);
+    recordHistory({ maskShapes: updated });
   };
 
   const handleUpdateMaskShape = (id: string, updated: Partial<MaskShape>) => {
     setMaskShapes((prev) => prev.map((m) => (m.id === id ? { ...m, ...updated } : m)));
+    scheduleDebouncedRecordHistory();
   };
 
   const handleDeleteMaskShape = (id: string) => {
-    setMaskShapes((prev) => prev.filter((m) => m.id !== id));
+    const updated = maskShapes.filter((m) => m.id !== id);
+    setMaskShapes(updated);
     setSelectedMaskIds((prev) => prev.filter((x) => x !== id));
+    recordHistory({ maskShapes: updated });
   };
 
   const handleDuplicateMaskShape = (id: string) => {
@@ -756,8 +904,10 @@ export default function App() {
       x: target.x + 15,
       y: target.y + 15,
     };
-    setMaskShapes((prev) => [...prev, duplicated]);
+    const updated = [...maskShapes, duplicated];
+    setMaskShapes(updated);
     handleSelectMask(duplicated.id);
+    recordHistory({ maskShapes: updated });
   };
 
   const handleSplitMaskMultiplier = (id: string) => {
@@ -783,8 +933,10 @@ export default function App() {
         });
       }
     }
-    setMaskShapes((prev) => [...prev.filter((m) => m.id !== id), ...newShapes]);
+    const updated = [...maskShapes.filter((m) => m.id !== id), ...newShapes];
+    setMaskShapes(updated);
     if (newShapes[0]) handleSelectMask(newShapes[0].id);
+    recordHistory({ maskShapes: updated });
   };
 
   // Triangle Shape Management (15x13px, #25465F ou blanc)
@@ -803,17 +955,22 @@ export default function App() {
       direction: 'down',
       opacity: 1,
     };
-    setTriangles((prev) => [...prev, newTriangle]);
+    const updated = [...triangles, newTriangle];
+    setTriangles(updated);
     handleSelectTriangle(newTriangle.id);
+    recordHistory({ triangles: updated });
   };
 
   const handleUpdateTriangle = (id: string, updated: Partial<TriangleShape>) => {
     setTriangles((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
+    scheduleDebouncedRecordHistory();
   };
 
   const handleDeleteTriangle = (id: string) => {
-    setTriangles((prev) => prev.filter((t) => t.id !== id));
+    const updated = triangles.filter((t) => t.id !== id);
+    setTriangles(updated);
     setSelectedTriangleIds((prev) => prev.filter((x) => x !== id));
+    recordHistory({ triangles: updated });
   };
 
   const handleDuplicateTriangle = (id: string) => {
@@ -826,8 +983,10 @@ export default function App() {
       x: target.x + 15,
       y: target.y + 15,
     };
-    setTriangles((prev) => [...prev, duplicated]);
+    const updated = [...triangles, duplicated];
+    setTriangles(updated);
     handleSelectTriangle(duplicated.id);
+    recordHistory({ triangles: updated });
   };
 
   // Batch Multi-Selection Operations (Moving, Deleting, Duplicating across all element types together)
@@ -876,60 +1035,94 @@ export default function App() {
 
     // 2. Incremental step delta fallback (used for keyboard arrow key nudges)
     if (dx === 0 && dy === 0) return;
-    if (selectedFocusIds.length > 0) {
-      setFocuses((prev) => prev.map((f) => selectedFocusIds.includes(f.id) ? { ...f, x: Math.round(f.x + dx), y: Math.round(f.y + dy) } : f));
+    const fIds = selectedFocusIds.length > 0 ? selectedFocusIds : (selectedFocusId ? [selectedFocusId] : []);
+    const bIds = selectedBlurIds.length > 0 ? selectedBlurIds : (selectedBlurId ? [selectedBlurId] : []);
+    const mIds = selectedMaskIds.length > 0 ? selectedMaskIds : (selectedMaskId ? [selectedMaskId] : []);
+    const tIds = selectedTriangleIds.length > 0 ? selectedTriangleIds : (selectedTriangleId ? [selectedTriangleId] : []);
+
+    if (fIds.length > 0) {
+      setFocuses((prev) => prev.map((f) => fIds.includes(f.id) ? { ...f, x: Math.round(f.x + dx), y: Math.round(f.y + dy) } : f));
     }
-    if (selectedBlurIds.length > 0) {
-      setBlurZones((prev) => prev.map((b) => selectedBlurIds.includes(b.id) ? { ...b, x: Math.round(b.x + dx), y: Math.round(b.y + dy) } : b));
+    if (bIds.length > 0) {
+      setBlurZones((prev) => prev.map((b) => bIds.includes(b.id) ? { ...b, x: Math.round(b.x + dx), y: Math.round(b.y + dy) } : b));
     }
-    if (selectedMaskIds.length > 0) {
-      setMaskShapes((prev) => prev.map((m) => selectedMaskIds.includes(m.id) ? { ...m, x: Math.round(m.x + dx), y: Math.round(m.y + dy) } : m));
+    if (mIds.length > 0) {
+      setMaskShapes((prev) => prev.map((m) => mIds.includes(m.id) ? { ...m, x: Math.round(m.x + dx), y: Math.round(m.y + dy) } : m));
     }
-    if (selectedTriangleIds.length > 0) {
-      setTriangles((prev) => prev.map((t) => selectedTriangleIds.includes(t.id) ? { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy) } : t));
+    if (tIds.length > 0) {
+      setTriangles((prev) => prev.map((t) => tIds.includes(t.id) ? { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy) } : t));
     }
-  }, [selectedFocusIds, selectedBlurIds, selectedMaskIds, selectedTriangleIds]);
+  }, [selectedFocusIds, selectedFocusId, selectedBlurIds, selectedBlurId, selectedMaskIds, selectedMaskId, selectedTriangleIds, selectedTriangleId]);
 
   const handleBatchMoveEnd = useCallback(() => {
-    recordHistory(focuses);
-  }, [focuses, recordHistory]);
+    recordHistory();
+  }, [recordHistory]);
 
   const handleBatchDelete = useCallback(() => {
-    if (selectedFocusIds.length > 0) {
-      const remaining = focuses.filter((f) => !selectedFocusIds.includes(f.id));
-      const renumbered = remaining.map((f, i) => ({
+    const fIds = selectedFocusIds.length > 0 ? selectedFocusIds : (selectedFocusId ? [selectedFocusId] : []);
+    const bIds = selectedBlurIds.length > 0 ? selectedBlurIds : (selectedBlurId ? [selectedBlurId] : []);
+    const mIds = selectedMaskIds.length > 0 ? selectedMaskIds : (selectedMaskId ? [selectedMaskId] : []);
+    const tIds = selectedTriangleIds.length > 0 ? selectedTriangleIds : (selectedTriangleId ? [selectedTriangleId] : []);
+
+    let newFocuses = focuses;
+    let newBlurs = blurZones;
+    let newMasks = maskShapes;
+    let newTriangles = triangles;
+
+    if (fIds.length > 0) {
+      const remaining = focuses.filter((f) => !fIds.includes(f.id));
+      newFocuses = remaining.map((f, i) => ({
         ...f,
         name: f.name.startsWith('Zone ') ? `Zone ${i + 1}` : f.name,
         stepNumber: i + 1,
       }));
-      setFocuses(renumbered);
-      recordHistory(renumbered);
+      setFocuses(newFocuses);
       setSelectedFocusIds([]);
     }
-    if (selectedBlurIds.length > 0) {
-      setBlurZones((prev) => prev.filter((b) => !selectedBlurIds.includes(b.id)));
+    if (bIds.length > 0) {
+      newBlurs = blurZones.filter((b) => !bIds.includes(b.id));
+      setBlurZones(newBlurs);
       setSelectedBlurIds([]);
     }
-    if (selectedMaskIds.length > 0) {
-      setMaskShapes((prev) => prev.filter((m) => !selectedMaskIds.includes(m.id)));
+    if (mIds.length > 0) {
+      newMasks = maskShapes.filter((m) => !mIds.includes(m.id));
+      setMaskShapes(newMasks);
       setSelectedMaskIds([]);
     }
-    if (selectedTriangleIds.length > 0) {
-      setTriangles((prev) => prev.filter((t) => !selectedTriangleIds.includes(t.id)));
+    if (tIds.length > 0) {
+      newTriangles = triangles.filter((t) => !tIds.includes(t.id));
+      setTriangles(newTriangles);
       setSelectedTriangleIds([]);
     }
-  }, [selectedFocusIds, selectedBlurIds, selectedMaskIds, selectedTriangleIds, focuses, recordHistory]);
+
+    recordHistory({
+      focuses: newFocuses,
+      blurZones: newBlurs,
+      maskShapes: newMasks,
+      triangles: newTriangles,
+    });
+  }, [selectedFocusIds, selectedFocusId, selectedBlurIds, selectedBlurId, selectedMaskIds, selectedMaskId, selectedTriangleIds, selectedTriangleId, focuses, blurZones, maskShapes, triangles, recordHistory]);
 
   const handleBatchDuplicate = useCallback(() => {
+    const fIds = selectedFocusIds.length > 0 ? selectedFocusIds : (selectedFocusId ? [selectedFocusId] : []);
+    const bIds = selectedBlurIds.length > 0 ? selectedBlurIds : (selectedBlurId ? [selectedBlurId] : []);
+    const mIds = selectedMaskIds.length > 0 ? selectedMaskIds : (selectedMaskId ? [selectedMaskId] : []);
+    const tIds = selectedTriangleIds.length > 0 ? selectedTriangleIds : (selectedTriangleId ? [selectedTriangleId] : []);
+
     const newFocusIds: string[] = [];
     const newBlurIds: string[] = [];
     const newMaskIds: string[] = [];
     const newTriangleIds: string[] = [];
 
-    if (selectedFocusIds.length > 0) {
+    let updatedFocuses = focuses;
+    let updatedBlurs = blurZones;
+    let updatedMasks = maskShapes;
+    let updatedTriangles = triangles;
+
+    if (fIds.length > 0) {
       const clones: FocusZone[] = [];
       let nextStep = focuses.reduce((max, f) => Math.max(max, f.stepNumber || 0), 0) + 1;
-      focuses.filter((f) => selectedFocusIds.includes(f.id)).forEach((f) => {
+      focuses.filter((f) => fIds.includes(f.id)).forEach((f) => {
         const id = `focus-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
         newFocusIds.push(id);
         clones.push({
@@ -941,14 +1134,13 @@ export default function App() {
           stepNumber: nextStep++,
         });
       });
-      const updated = [...focuses, ...clones];
-      setFocuses(updated);
-      recordHistory(updated);
+      updatedFocuses = [...focuses, ...clones];
+      setFocuses(updatedFocuses);
     }
 
-    if (selectedBlurIds.length > 0) {
+    if (bIds.length > 0) {
       const clones: BlurZone[] = [];
-      blurZones.filter((b) => selectedBlurIds.includes(b.id)).forEach((b) => {
+      blurZones.filter((b) => bIds.includes(b.id)).forEach((b) => {
         const id = `blur-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
         newBlurIds.push(id);
         clones.push({
@@ -959,12 +1151,13 @@ export default function App() {
           y: b.y + 15,
         });
       });
-      setBlurZones((prev) => [...prev, ...clones]);
+      updatedBlurs = [...blurZones, ...clones];
+      setBlurZones(updatedBlurs);
     }
 
-    if (selectedMaskIds.length > 0) {
+    if (mIds.length > 0) {
       const clones: MaskShape[] = [];
-      maskShapes.filter((m) => selectedMaskIds.includes(m.id)).forEach((m) => {
+      maskShapes.filter((m) => mIds.includes(m.id)).forEach((m) => {
         const id = `mask-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
         newMaskIds.push(id);
         clones.push({
@@ -975,12 +1168,13 @@ export default function App() {
           y: m.y + 15,
         });
       });
-      setMaskShapes((prev) => [...prev, ...clones]);
+      updatedMasks = [...maskShapes, ...clones];
+      setMaskShapes(updatedMasks);
     }
 
-    if (selectedTriangleIds.length > 0) {
+    if (tIds.length > 0) {
       const clones: TriangleShape[] = [];
-      triangles.filter((t) => selectedTriangleIds.includes(t.id)).forEach((t) => {
+      triangles.filter((t) => tIds.includes(t.id)).forEach((t) => {
         const id = `triangle-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
         newTriangleIds.push(id);
         clones.push({
@@ -991,14 +1185,22 @@ export default function App() {
           y: t.y + 15,
         });
       });
-      setTriangles((prev) => [...prev, ...clones]);
+      updatedTriangles = [...triangles, ...clones];
+      setTriangles(updatedTriangles);
     }
 
     setSelectedFocusIds(newFocusIds);
     setSelectedBlurIds(newBlurIds);
     setSelectedMaskIds(newMaskIds);
     setSelectedTriangleIds(newTriangleIds);
-  }, [selectedFocusIds, selectedBlurIds, selectedMaskIds, selectedTriangleIds, focuses, blurZones, maskShapes, triangles, recordHistory]);
+
+    recordHistory({
+      focuses: updatedFocuses,
+      blurZones: updatedBlurs,
+      maskShapes: updatedMasks,
+      triangles: updatedTriangles,
+    });
+  }, [selectedFocusIds, selectedFocusId, selectedBlurIds, selectedBlurId, selectedMaskIds, selectedMaskId, selectedTriangleIds, selectedTriangleId, focuses, blurZones, maskShapes, triangles, recordHistory]);
 
   // Callout / Vignette zoom détaché management
   const handleToggleCallout = () => {
@@ -1114,6 +1316,7 @@ export default function App() {
 
       return next;
     });
+    scheduleDebouncedRecordHistory();
   };
 
   // Add Horizontal Guide
@@ -1121,10 +1324,10 @@ export default function App() {
     const selected = focuses.find((f) => f.id === selectedFocusId);
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
     const pos = selected ? selected.y + selected.height / 2 : bounds.bgY + bounds.bgHeight / 2;
-    setUserGuides((prev) => [
-      ...prev,
-      { id: `guide-h-${Date.now()}`, type: 'horizontal', position: Math.round(pos) }
-    ]);
+    const newGuide: UserGuide = { id: `guide-h-${Date.now()}`, type: 'horizontal', position: Math.round(pos) };
+    const updated = [...userGuides, newGuide];
+    setUserGuides(updated);
+    recordHistory({ userGuides: updated });
   };
 
   // Add Vertical Guide
@@ -1132,29 +1335,36 @@ export default function App() {
     const selected = focuses.find((f) => f.id === selectedFocusId);
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
     const pos = selected ? selected.x + selected.width / 2 : bounds.bgX + bounds.bgWidth / 2;
-    setUserGuides((prev) => [
-      ...prev,
-      { id: `guide-v-${Date.now()}`, type: 'vertical', position: Math.round(pos) }
-    ]);
+    const newGuide: UserGuide = { id: `guide-v-${Date.now()}`, type: 'vertical', position: Math.round(pos) };
+    const updated = [...userGuides, newGuide];
+    setUserGuides(updated);
+    recordHistory({ userGuides: updated });
   };
 
   const handleAddCustomGuide = (type: 'horizontal' | 'vertical', position: number) => {
-    setUserGuides((prev) => [
-      ...prev,
-      { id: `guide-${type[0]}-${Date.now()}`, type, position: Math.round(position) }
-    ]);
+    const newGuide: UserGuide = { id: `guide-${type[0]}-${Date.now()}`, type, position: Math.round(position) };
+    const updated = [...userGuides, newGuide];
+    setUserGuides(updated);
+    recordHistory({ userGuides: updated });
   };
 
   const handleUpdateGuide = (id: string, position: number) => {
-    setUserGuides((prev) => prev.map((g) => (g.id === id ? { ...g, position: Math.round(position) } : g)));
+    setUserGuides((prev) => {
+      const updated = prev.map((g) => (g.id === id ? { ...g, position: Math.round(position) } : g));
+      return updated;
+    });
+    scheduleDebouncedRecordHistory();
   };
 
   const handleDeleteGuide = (id: string) => {
-    setUserGuides((prev) => prev.filter((g) => g.id !== id));
+    const updated = userGuides.filter((g) => g.id !== id);
+    setUserGuides(updated);
+    recordHistory({ userGuides: updated });
   };
 
   const handleClearAllGuides = () => {
     setUserGuides([]);
+    recordHistory({ userGuides: [] });
   };
 
   // Reset to default settings
@@ -1180,6 +1390,7 @@ export default function App() {
     setBlurZones([]);
     setMaskShapes([]);
     setIsPreviewMode(false);
+    recordHistory({ userGuides: [], blurZones: [], maskShapes: [] });
   };
 
   // Export visual strictly as PNG with genuine alpha transparency, prompting the user for destination folder
@@ -1498,8 +1709,24 @@ export default function App() {
 
         let handled = false;
 
-        // En mode Callout, les flèches permettent de déplacer autant qu'on veut la "Cible loupe"
-        if (calloutVignette && calloutVignette.enabled) {
+        const hasSelectedShape = Boolean(
+          selectedFocusIds.length > 0 ||
+          selectedBlurIds.length > 0 ||
+          selectedMaskIds.length > 0 ||
+          selectedTriangleIds.length > 0 ||
+          selectedBlurId ||
+          selectedMaskId ||
+          selectedTriangleId ||
+          (selectedFocusId && !calloutVignette?.enabled)
+        );
+
+        // Si une ou plusieurs formes sont sélectionnées (masque, triangle, flou, focus), les flèches déplacent ces formes !
+        if (hasSelectedShape) {
+          handleBatchMove(dx, dy);
+          handled = true;
+          scheduleDebouncedRecordHistory();
+        } else if (calloutVignette && calloutVignette.enabled && selectedCalloutPart) {
+          // En mode Callout, uniquement si la cible loupe ou la vignette est explicitement sélectionnée
           const calloutStep = e.shiftKey ? 5 : 0.5;
           let cdx = 0;
           let cdy = 0;
@@ -1528,12 +1755,6 @@ export default function App() {
               sourceOffsetX: Math.round((current.sourceOffsetX || 0) + dx),
               sourceOffsetY: Math.round((current.sourceOffsetY || 0) + dy),
             });
-            handled = true;
-          }
-        } else {
-          const totalSel = selectedFocusIds.length + selectedBlurIds.length + selectedMaskIds.length + selectedTriangleIds.length;
-          if (totalSel > 0) {
-            handleBatchMove(dx, dy);
             handled = true;
           }
         }

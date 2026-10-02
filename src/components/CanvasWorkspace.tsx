@@ -278,6 +278,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     initialOffsetY: number;
   } | null>(null);
 
+  // Drag tracking ref for committing history snapshot on drag end
+  const hasMovedRef = useRef<boolean>(false);
+
   // Hover states for fluid visual feedback
   const [hoveredFocusId, setHoveredFocusId] = useState<string | null>(null);
   const [hoveredBlurId, setHoveredBlurId] = useState<string | null>(null);
@@ -1044,6 +1047,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
+    // Track movement for history recording on drag release
+    if (multiDragState || dragCalloutState || dragTriangleState || dragBlurState || dragMaskState || dragFramingState || dragState || dragRotateState) {
+      hasMovedRef.current = true;
+    }
+
     // Dragging Multi-Selection (Moving all selected elements together smoothly without drift)
     if (multiDragState) {
       const dx = cx - multiDragState.startX;
@@ -1391,31 +1399,25 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const gHover = getGuideAtCoord(cx, cy);
     setHoveredGuide(gHover);
 
-    // FLUID HOVER DETECTION OVER ALL ELEMENTS (Strict layering: Callout -> Triangle -> Mask (Above) -> Focus -> Mask (Below) -> Blur)
-    const hCallout = getCalloutPartAtCoord(cx, cy);
-    setHoveredCalloutPart(hCallout);
-
+    // FLUID HOVER DETECTION OVER ALL ELEMENTS
     const hTri = getTriangleAtCoord(cx, cy);
     setHoveredTriangleId(hTri ? hTri.id : null);
 
-    const hMaskAbove = getMaskAtCoord(cx, cy, 'above');
-    const hBlurAbove = getBlurAtCoord(cx, cy, 'above');
-    const hasAboveObject = Boolean(hCallout || hTri || hMaskAbove || hBlurAbove);
-
-    const hFocus = hasAboveObject ? null : getFocusAtCoord(cx, cy);
-    const hasFocusOrAbove = Boolean(hasAboveObject || hFocus);
-
-    const hMaskBelow = hasFocusOrAbove ? null : getMaskAtCoord(cx, cy, 'below');
-    const hasBelowMaskOrAbove = Boolean(hasFocusOrAbove || hMaskBelow);
-
-    const hBlurBelow = hasBelowMaskOrAbove ? null : getBlurAtCoord(cx, cy, 'below');
-
-    const hMask = hMaskAbove || hMaskBelow;
+    const hMask = getMaskAtCoord(cx, cy, 'above') || getMaskAtCoord(cx, cy, 'below');
     setHoveredMaskId(hMask ? hMask.id : null);
 
-    const hBlur = hBlurAbove || hBlurBelow;
+    const hBlur = getBlurAtCoord(cx, cy, 'above') || getBlurAtCoord(cx, cy, 'below');
     setHoveredBlurId(hBlur ? hBlur.id : null);
 
+    const hasAnyShape = Boolean(hTri || hMask || hBlur);
+
+    // Callout parts: vignette bubble is on the left, source target is on the screenshot
+    const rawCallout = getCalloutPartAtCoord(cx, cy);
+    // If a shape is present under cursor, user is pointing at the shape, not the callout target
+    const hCallout = (rawCallout === 'vignette' || (!hasAnyShape && rawCallout === 'source')) ? rawCallout : null;
+    setHoveredCalloutPart(hCallout);
+
+    const hFocus = (hasAnyShape || hCallout) ? null : getFocusAtCoord(cx, cy);
     setHoveredFocusId(hFocus ? hFocus.id : null);
   };
 
@@ -1589,35 +1591,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       });
     };
 
-    // 4. PRIORITY SELECTION: Check clicked Callout part (source target or vignette bubble)
-    const clickedCallout = getCalloutPartAtCoord(cx, cy);
-    if (clickedCallout && calloutVignette) {
-      const vigH = calloutVignette.height || calloutVignette.width || 100;
-      const shadowDist = (calloutVignette.showShadow !== false)
-        ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
-        : 0;
-      const currentVigY = calloutVignette.alignBottom !== false 
-        ? (bounds.bgY + bounds.bgHeight - vigH - shadowDist) 
-        : calloutVignette.offsetY;
-
-      updateSelectedCallout(clickedCallout);
-      onSelectFocus(null);
-      onSelectBlur(null);
-      onSelectMask(null);
-      onSelectTriangle?.(null);
-      onClearSelection?.();
-      setDragCalloutState({
-        part: clickedCallout,
-        startX: cx,
-        startY: cy,
-        initialSourceX: calloutVignette.sourceX,
-        initialSourceY: calloutVignette.sourceY,
-        initialOffsetY: currentVigY,
-      });
-      return;
-    }
-
-    // 5. PRIORITY SELECTION: Check clicked Triangle
+    // 4. PRIORITY SELECTION: Check clicked Triangle (15x13px)
     const clickedTriangle = getTriangleAtCoord(cx, cy);
     if (clickedTriangle) {
       updateSelectedCallout(null);
@@ -1643,65 +1617,65 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 5.b. PRIORITY SELECTION: Check clicked Mask Shape positioned ABOVE focus zones
-    const clickedMaskAbove = getMaskAtCoord(cx, cy, 'above');
-    if (clickedMaskAbove) {
+    // 5. PRIORITY SELECTION: Check clicked Mask Shape (both above and below screenshot)
+    const clickedMask = getMaskAtCoord(cx, cy, 'above') || getMaskAtCoord(cx, cy, 'below');
+    if (clickedMask) {
       updateSelectedCallout(null);
 
       if (isShiftHolding) {
-        onSelectMask(clickedMaskAbove.id, true);
+        onSelectMask(clickedMask.id, true);
         return;
       }
 
-      if (activeMIds.includes(clickedMaskAbove.id) && totalSelectedCount > 1) {
+      if (activeMIds.includes(clickedMask.id) && totalSelectedCount > 1) {
         startMultiDrag();
         return;
       }
 
-      onSelectMask(clickedMaskAbove.id, false);
+      onSelectMask(clickedMask.id, false);
       setDragMaskState({
-        id: clickedMaskAbove.id,
+        id: clickedMask.id,
         startX: cx,
         startY: cy,
-        initialX: clickedMaskAbove.x,
-        initialY: clickedMaskAbove.y,
-        initialW: clickedMaskAbove.width,
-        initialH: clickedMaskAbove.height,
+        initialX: clickedMask.x,
+        initialY: clickedMask.y,
+        initialW: clickedMask.width,
+        initialH: clickedMask.height,
         handle: null,
       });
       return;
     }
 
-    // 5.5. PRIORITY SELECTION: Check clicked Blur Zone positioned ABOVE focus zones
-    const clickedBlurAbove = getBlurAtCoord(cx, cy, 'above');
-    if (clickedBlurAbove) {
+    // 5.5. PRIORITY SELECTION: Check clicked Blur Zone (both above and below screenshot)
+    const clickedBlur = getBlurAtCoord(cx, cy, 'above') || getBlurAtCoord(cx, cy, 'below') || getBlurAtCoord(cx, cy);
+    if (clickedBlur) {
       updateSelectedCallout(null);
 
       if (isShiftHolding) {
-        onSelectBlur(clickedBlurAbove.id, true);
+        onSelectBlur(clickedBlur.id, true);
         return;
       }
 
-      if (activeBIds.includes(clickedBlurAbove.id) && totalSelectedCount > 1) {
+      if (activeBIds.includes(clickedBlur.id) && totalSelectedCount > 1) {
         startMultiDrag();
         return;
       }
 
-      onSelectBlur(clickedBlurAbove.id, false);
+      onSelectBlur(clickedBlur.id, false);
       setDragBlurState({
-        id: clickedBlurAbove.id,
+        id: clickedBlur.id,
         startX: cx,
         startY: cy,
-        initialX: clickedBlurAbove.x,
-        initialY: clickedBlurAbove.y,
-        initialW: clickedBlurAbove.width,
-        initialH: clickedBlurAbove.height,
+        initialX: clickedBlur.x,
+        initialY: clickedBlur.y,
+        initialW: clickedBlur.width,
+        initialH: clickedBlur.height,
         handle: null,
       });
       return;
     }
 
-    // 6. PRIORITY SELECTION: Check clicked Focus Zone
+    // 6. PRIORITY SELECTION: Check clicked Focus Zone (only if no shape was clicked)
     const clickedFocus = getFocusAtCoord(cx, cy);
     if (clickedFocus) {
       updateSelectedCallout(null);
@@ -1746,60 +1720,30 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // 6.b. PRIORITY SELECTION: Check clicked Mask Shape positioned BEHIND focus zones
-    const clickedMaskBelow = getMaskAtCoord(cx, cy, 'below');
-    if (clickedMaskBelow) {
-      updateSelectedCallout(null);
+    // 7. Check clicked Callout part (source target or vignette bubble) - only if no shape was clicked!
+    const clickedCallout = getCalloutPartAtCoord(cx, cy);
+    if (clickedCallout && calloutVignette) {
+      const vigH = calloutVignette.height || calloutVignette.width || 100;
+      const shadowDist = (calloutVignette.showShadow !== false)
+        ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
+        : 0;
+      const currentVigY = calloutVignette.alignBottom !== false 
+        ? (bounds.bgY + bounds.bgHeight - vigH - shadowDist) 
+        : calloutVignette.offsetY;
 
-      if (isShiftHolding) {
-        onSelectMask(clickedMaskBelow.id, true);
-        return;
-      }
-
-      if (activeMIds.includes(clickedMaskBelow.id) && totalSelectedCount > 1) {
-        startMultiDrag();
-        return;
-      }
-
-      onSelectMask(clickedMaskBelow.id, false);
-      setDragMaskState({
-        id: clickedMaskBelow.id,
+      updateSelectedCallout(clickedCallout);
+      onSelectFocus(null);
+      onSelectBlur(null);
+      onSelectMask(null);
+      onSelectTriangle?.(null);
+      onClearSelection?.();
+      setDragCalloutState({
+        part: clickedCallout,
         startX: cx,
         startY: cy,
-        initialX: clickedMaskBelow.x,
-        initialY: clickedMaskBelow.y,
-        initialW: clickedMaskBelow.width,
-        initialH: clickedMaskBelow.height,
-        handle: null,
-      });
-      return;
-    }
-
-    // 7. PRIORITY SELECTION: Check clicked Blur Zone positioned BEHIND focus zones (or fallback)
-    const clickedBlur = getBlurAtCoord(cx, cy, 'below') || getBlurAtCoord(cx, cy);
-    if (clickedBlur) {
-      updateSelectedCallout(null);
-
-      if (isShiftHolding) {
-        onSelectBlur(clickedBlur.id, true);
-        return;
-      }
-
-      if (activeBIds.includes(clickedBlur.id) && totalSelectedCount > 1) {
-        startMultiDrag();
-        return;
-      }
-
-      onSelectBlur(clickedBlur.id, false);
-      setDragBlurState({
-        id: clickedBlur.id,
-        startX: cx,
-        startY: cy,
-        initialX: clickedBlur.x,
-        initialY: clickedBlur.y,
-        initialW: clickedBlur.width,
-        initialH: clickedBlur.height,
-        handle: null,
+        initialSourceX: calloutVignette.sourceX,
+        initialSourceY: calloutVignette.sourceY,
+        initialOffsetY: currentVigY,
       });
       return;
     }
@@ -1841,11 +1785,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (dragBlurState) setDragBlurState(null);
     if (dragMaskState) setDragMaskState(null);
     if (dragTriangleState) setDragTriangleState(null);
+    if (dragRotateState) setDragRotateState(null);
+
+    const didAnyMove = hasMovedRef.current || (multiDragState && multiDragState.hasMoved);
     if (multiDragState) {
-      if (multiDragState.hasMoved) {
-        onBatchMoveEnd?.();
-      }
       setMultiDragState(null);
+    }
+    if (didAnyMove) {
+      hasMovedRef.current = false;
+      onBatchMoveEnd?.();
     }
 
     // Finalize Marquee Selection Box
