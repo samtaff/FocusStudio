@@ -1490,36 +1490,40 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // Focus tool click to place a new focus zone
-    if (activeTool === 'focus') {
-      const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
-      onAddFocusAt(Math.round(cx - 120), Math.round(cy - 25));
-      onSelectTool('select');
-      return;
-    }
+    const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
 
-    // Blur tool click to place a new blur zone
-    if (activeTool === 'blur') {
-      const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
-      onAddBlurAt(Math.round(cx - 50), Math.round(cy - 20));
+    // If an element already exists under the mouse click, never create an unwanted new element: revert to 'select' and interact with it
+    const clickedExistingElement = getFocusAtCoord(cx, cy) || getBlurAtCoord(cx, cy) || getMaskAtCoord(cx, cy, 'above') || getTriangleAtCoord(cx, cy);
+    if (clickedExistingElement && activeTool !== 'select' && activeTool !== 'zoom') {
       onSelectTool('select');
-      return;
-    }
+    } else {
+      // Focus tool click to place a new focus zone on empty canvas
+      if (activeTool === 'focus') {
+        onAddFocusAt(Math.round(cx - 120), Math.round(cy - 25));
+        onSelectTool('select');
+        return;
+      }
 
-    // Mask tool click to place a new blue mask
-    if (activeTool === 'mask') {
-      const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
-      onAddMaskAt(Math.round(cx - 50), Math.round(cy - 20));
-      onSelectTool('select');
-      return;
-    }
+      // Blur tool click to place a new blur zone on empty canvas
+      if (activeTool === 'blur') {
+        onAddBlurAt(Math.round(cx - 50), Math.round(cy - 20));
+        onSelectTool('select');
+        return;
+      }
 
-    // Triangle tool click to place a new 15x13px triangle
-    if (activeTool === 'triangle' && onAddTriangleAt) {
-      const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
-      onAddTriangleAt(Math.round(cx - 7.5), Math.round(cy - 6.5));
-      onSelectTool('select');
-      return;
+      // Mask tool click to place a new blue mask on empty canvas
+      if (activeTool === 'mask') {
+        onAddMaskAt(Math.round(cx - 50), Math.round(cy - 20));
+        onSelectTool('select');
+        return;
+      }
+
+      // Triangle tool click to place a new 15x13px triangle on empty canvas
+      if (activeTool === 'triangle' && onAddTriangleAt) {
+        onAddTriangleAt(Math.round(cx - 7.5), Math.round(cy - 6.5));
+        onSelectTool('select');
+        return;
+      }
     }
 
     // Middle click OR holding Spacebar -> Pan workspace immediately
@@ -1532,8 +1536,6 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (e.button !== 0) return;
 
     (document.activeElement as HTMLElement)?.blur?.();
-
-    const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
 
     // 0. Check if clicking Photoshop-style Corner Rotation on selected mask or triangle
     const clickedRotCorner = getPhotoshopRotationCornerAtCoord(cx, cy);

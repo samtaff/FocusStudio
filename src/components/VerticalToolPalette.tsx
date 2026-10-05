@@ -501,11 +501,8 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
     }
     const nextMenu = activeMenu === menu ? null : menu;
     setActiveMenu(nextMenu);
-    if (nextMenu) {
-      onSelectTool(menu as ToolType);
-    } else {
-      onSelectTool('select');
-    }
+    // Opening or closing the radial options menus keeps the pointer in selection mode
+    onSelectTool('select');
   };
 
   const targetFocus = selectedFocus || (focuses.length > 0 ? focuses[0] : null);
@@ -515,7 +512,11 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
     const safeNum = Math.max(1, Math.min(99, Math.round(num)));
     if (targetFocus && onUpdateFocus) {
       onUpdateFocus(targetFocus.id, { stepNumber: safeNum });
+      if (onSelectFocus && targetFocus.id !== selectedFocus?.id) {
+        onSelectFocus(targetFocus.id);
+      }
     }
+    onSelectTool('select');
   };
 
   const activeZoneLabel = selectedFocus 
