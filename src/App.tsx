@@ -259,13 +259,20 @@ export default function App() {
   const debounceRecordTimerRef = useRef<any>(null);
 
   // Synchronized state ref for instant snapshot access without stale closures
-  const appStateRef = useRef({
-    focuses: [] as FocusZone[],
-    blurZones: [] as BlurZone[],
-    maskShapes: [] as MaskShape[],
-    triangles: [] as TriangleShape[],
-    calloutVignette: null as CalloutVignette | null,
-    userGuides: [] as UserGuide[],
+  const appStateRef = useRef<{
+    focuses: FocusZone[];
+    blurZones: BlurZone[];
+    maskShapes: MaskShape[];
+    triangles: TriangleShape[];
+    calloutVignette: CalloutVignette | null;
+    userGuides: UserGuide[];
+  }>({
+    focuses: [],
+    blurZones: [],
+    maskShapes: [],
+    triangles: [],
+    calloutVignette: null,
+    userGuides: [],
   });
 
   // Detection
@@ -283,7 +290,16 @@ export default function App() {
     setResetWorkspaceTrigger((prev) => prev + 1);
   }, []);
 
-  // Push new snapshot to history stack
+  // Deep clone helper to prevent object reference mutation across history snapshots
+  const cloneSnapshot = <T,>(val: T): T => {
+    try {
+      return JSON.parse(JSON.stringify(val));
+    } catch {
+      return val;
+    }
+  };
+
+  // Push new snapshot to history stack with deep cloning and duplicate prevention
   const recordHistory = useCallback((customSnapshot?: Partial<{
     focuses: FocusZone[];
     blurZones: BlurZone[];
@@ -299,17 +315,42 @@ export default function App() {
       debounceRecordTimerRef.current = null;
     }
 
+    const nextFocuses = customSnapshot?.focuses !== undefined ? cloneSnapshot(customSnapshot.focuses) : cloneSnapshot(appStateRef.current.focuses);
+    const nextBlurs = customSnapshot?.blurZones !== undefined ? cloneSnapshot(customSnapshot.blurZones) : cloneSnapshot(appStateRef.current.blurZones);
+    const nextMasks = customSnapshot?.maskShapes !== undefined ? cloneSnapshot(customSnapshot.maskShapes) : cloneSnapshot(appStateRef.current.maskShapes);
+    const nextTriangles = customSnapshot?.triangles !== undefined ? cloneSnapshot(customSnapshot.triangles) : cloneSnapshot(appStateRef.current.triangles);
+    const nextCallout = customSnapshot?.calloutVignette !== undefined ? cloneSnapshot(customSnapshot.calloutVignette) : cloneSnapshot(appStateRef.current.calloutVignette);
+    const nextGuides = customSnapshot?.userGuides !== undefined ? cloneSnapshot(customSnapshot.userGuides) : cloneSnapshot(appStateRef.current.userGuides);
+
     const currentSnapshot = {
-      focuses: customSnapshot?.focuses ?? appStateRef.current.focuses,
-      blurZones: customSnapshot?.blurZones ?? appStateRef.current.blurZones,
-      maskShapes: customSnapshot?.maskShapes ?? appStateRef.current.maskShapes,
-      triangles: customSnapshot?.triangles ?? appStateRef.current.triangles,
-      calloutVignette: customSnapshot?.calloutVignette !== undefined ? customSnapshot.calloutVignette : appStateRef.current.calloutVignette,
-      userGuides: customSnapshot?.userGuides ?? appStateRef.current.userGuides,
+      focuses: nextFocuses,
+      blurZones: nextBlurs,
+      maskShapes: nextMasks,
+      triangles: nextTriangles,
+      calloutVignette: nextCallout,
+      userGuides: nextGuides,
+    };
+
+    // Update appStateRef synchronously
+    appStateRef.current = {
+      focuses: currentSnapshot.focuses,
+      blurZones: currentSnapshot.blurZones,
+      maskShapes: currentSnapshot.maskShapes,
+      triangles: currentSnapshot.triangles,
+      calloutVignette: currentSnapshot.calloutVignette,
+      userGuides: currentSnapshot.userGuides,
     };
 
     const prevHistory = historyRef.current;
     const curIdx = historyIndexRef.current;
+
+    // Check if new snapshot is identical to previous snapshot at curIdx to prevent useless duplicates
+    if (curIdx >= 0 && prevHistory[curIdx]) {
+      const lastSnap = prevHistory[curIdx];
+      if (JSON.stringify(lastSnap) === JSON.stringify(currentSnapshot)) {
+        return;
+      }
+    }
 
     const sliced = curIdx >= 0 ? prevHistory.slice(0, curIdx + 1) : [];
     const nextHistory = [...sliced, currentSnapshot].slice(-50);
@@ -329,7 +370,7 @@ export default function App() {
     }
     debounceRecordTimerRef.current = setTimeout(() => {
       recordHistory();
-    }, 350);
+    }, 250);
   }, [recordHistory]);
 
   // Option : Suite logique des pastilles lors de l'import de screenshots
@@ -445,6 +486,8 @@ export default function App() {
       userGuides: [] as UserGuide[],
     };
 
+    appStateRef.current = cloneSnapshot(initSnapshot);
+
     setFocuses([initialFocus]);
     setBlurZones([]);
     setMaskShapes([]);
@@ -453,9 +496,9 @@ export default function App() {
     setUserGuides([]);
     handleSelectFocus(initialFocus.id);
 
-    historyRef.current = [initSnapshot];
+    historyRef.current = [cloneSnapshot(initSnapshot)];
     historyIndexRef.current = 0;
-    setHistory([initSnapshot]);
+    setHistory([cloneSnapshot(initSnapshot)]);
     setHistoryIndex(0);
 
     // Trigger smart detection asynchronously
@@ -525,12 +568,23 @@ export default function App() {
     }
 
     const targetIdx = curIdx - 1;
-    const snapshot = prevHistory[targetIdx];
-    if (!snapshot) return;
+    const rawSnapshot = prevHistory[targetIdx];
+    if (!rawSnapshot) return;
+
+    const snapshot = cloneSnapshot(rawSnapshot);
 
     isUndoRedoAction.current = true;
     historyIndexRef.current = targetIdx;
     setHistoryIndex(targetIdx);
+
+    appStateRef.current = {
+      focuses: snapshot.focuses,
+      blurZones: snapshot.blurZones,
+      maskShapes: snapshot.maskShapes,
+      triangles: snapshot.triangles,
+      calloutVignette: snapshot.calloutVignette,
+      userGuides: snapshot.userGuides,
+    };
 
     setFocuses(snapshot.focuses);
     setBlurZones(snapshot.blurZones);
@@ -539,14 +593,27 @@ export default function App() {
     setCalloutVignette(snapshot.calloutVignette);
     setUserGuides(snapshot.userGuides);
 
-    if (snapshot.focuses.length > 0 && !snapshot.focuses.find((f) => f.id === selectedFocusId)) {
-      setSelectedFocusIds([snapshot.focuses[0].id]);
+    if (snapshot.focuses.length > 0) {
+      if (!snapshot.focuses.find((f) => f.id === selectedFocusId)) {
+        setSelectedFocusIds([snapshot.focuses[0].id]);
+      }
+    } else {
+      setSelectedFocusIds([]);
+    }
+    if (selectedBlurId && !snapshot.blurZones.find((b) => b.id === selectedBlurId)) {
+      setSelectedBlurIds([]);
+    }
+    if (selectedMaskId && !snapshot.maskShapes.find((m) => m.id === selectedMaskId)) {
+      setSelectedMaskIds([]);
+    }
+    if (selectedTriangleId && !snapshot.triangles.find((t) => t.id === selectedTriangleId)) {
+      setSelectedTriangleIds([]);
     }
 
     setTimeout(() => {
       isUndoRedoAction.current = false;
-    }, 50);
-  }, [selectedFocusId]);
+    }, 80);
+  }, [selectedFocusId, selectedBlurId, selectedMaskId, selectedTriangleId]);
 
   const handleRedo = useCallback(() => {
     const curIdx = historyIndexRef.current;
@@ -559,12 +626,23 @@ export default function App() {
     }
 
     const targetIdx = curIdx + 1;
-    const snapshot = prevHistory[targetIdx];
-    if (!snapshot) return;
+    const rawSnapshot = prevHistory[targetIdx];
+    if (!rawSnapshot) return;
+
+    const snapshot = cloneSnapshot(rawSnapshot);
 
     isUndoRedoAction.current = true;
     historyIndexRef.current = targetIdx;
     setHistoryIndex(targetIdx);
+
+    appStateRef.current = {
+      focuses: snapshot.focuses,
+      blurZones: snapshot.blurZones,
+      maskShapes: snapshot.maskShapes,
+      triangles: snapshot.triangles,
+      calloutVignette: snapshot.calloutVignette,
+      userGuides: snapshot.userGuides,
+    };
 
     setFocuses(snapshot.focuses);
     setBlurZones(snapshot.blurZones);
@@ -573,14 +651,27 @@ export default function App() {
     setCalloutVignette(snapshot.calloutVignette);
     setUserGuides(snapshot.userGuides);
 
-    if (snapshot.focuses.length > 0 && !snapshot.focuses.find((f) => f.id === selectedFocusId)) {
-      setSelectedFocusIds([snapshot.focuses[0].id]);
+    if (snapshot.focuses.length > 0) {
+      if (!snapshot.focuses.find((f) => f.id === selectedFocusId)) {
+        setSelectedFocusIds([snapshot.focuses[0].id]);
+      }
+    } else {
+      setSelectedFocusIds([]);
+    }
+    if (selectedBlurId && !snapshot.blurZones.find((b) => b.id === selectedBlurId)) {
+      setSelectedBlurIds([]);
+    }
+    if (selectedMaskId && !snapshot.maskShapes.find((m) => m.id === selectedMaskId)) {
+      setSelectedMaskIds([]);
+    }
+    if (selectedTriangleId && !snapshot.triangles.find((t) => t.id === selectedTriangleId)) {
+      setSelectedTriangleIds([]);
     }
 
     setTimeout(() => {
       isUndoRedoAction.current = false;
-    }, 50);
-  }, [selectedFocusId]);
+    }, 80);
+  }, [selectedFocusId, selectedBlurId, selectedMaskId, selectedTriangleId]);
 
   // Add Focus Zone:
   // - Horizontal par défaut : width = 240px, height = 50px
@@ -749,12 +840,14 @@ export default function App() {
   const handleUpdateFocus = (updatedFields: Partial<FocusZone>) => {
     if (!selectedFocusId) return;
     setFocuses((prev) => {
-      return prev.map((f) => {
+      const next = prev.map((f) => {
         if (f.id === selectedFocusId) {
           return { ...f, ...updatedFields };
         }
         return f;
       });
+      appStateRef.current.focuses = next;
+      return next;
     });
     scheduleDebouncedRecordHistory();
   };
@@ -833,7 +926,11 @@ export default function App() {
   };
 
   const handleUpdateBlurZone = (id: string, updated: Partial<BlurZone>) => {
-    setBlurZones((prev) => prev.map((b) => (b.id === id ? { ...b, ...updated } : b)));
+    setBlurZones((prev) => {
+      const next = prev.map((b) => (b.id === id ? { ...b, ...updated } : b));
+      appStateRef.current.blurZones = next;
+      return next;
+    });
     scheduleDebouncedRecordHistory();
   };
 
@@ -883,7 +980,11 @@ export default function App() {
   };
 
   const handleUpdateMaskShape = (id: string, updated: Partial<MaskShape>) => {
-    setMaskShapes((prev) => prev.map((m) => (m.id === id ? { ...m, ...updated } : m)));
+    setMaskShapes((prev) => {
+      const next = prev.map((m) => (m.id === id ? { ...m, ...updated } : m));
+      appStateRef.current.maskShapes = next;
+      return next;
+    });
     scheduleDebouncedRecordHistory();
   };
 
@@ -962,7 +1063,11 @@ export default function App() {
   };
 
   const handleUpdateTriangle = (id: string, updated: Partial<TriangleShape>) => {
-    setTriangles((prev) => prev.map((t) => (t.id === id ? { ...t, ...updated } : t)));
+    setTriangles((prev) => {
+      const next = prev.map((t) => (t.id === id ? { ...t, ...updated } : t));
+      appStateRef.current.triangles = next;
+      return next;
+    });
     scheduleDebouncedRecordHistory();
   };
 
@@ -1004,31 +1109,47 @@ export default function App() {
     if (snapshot) {
       if (snapshot.focuses && snapshot.focuses.length > 0) {
         const snapMap = new Map(snapshot.focuses.map((f) => [f.id, f]));
-        setFocuses((prev) => prev.map((f) => {
-          const s = snapMap.get(f.id);
-          return s ? { ...f, x: Math.round(s.x + dx), y: Math.round(s.y + dy) } : f;
-        }));
+        setFocuses((prev) => {
+          const next = prev.map((f) => {
+            const s = snapMap.get(f.id);
+            return s ? { ...f, x: Math.round(s.x + dx), y: Math.round(s.y + dy) } : f;
+          });
+          appStateRef.current.focuses = next;
+          return next;
+        });
       }
       if (snapshot.blurs && snapshot.blurs.length > 0) {
         const snapMap = new Map(snapshot.blurs.map((b) => [b.id, b]));
-        setBlurZones((prev) => prev.map((b) => {
-          const s = snapMap.get(b.id);
-          return s ? { ...b, x: Math.round(s.x + dx), y: Math.round(s.y + dy) } : b;
-        }));
+        setBlurZones((prev) => {
+          const next = prev.map((b) => {
+            const s = snapMap.get(b.id);
+            return s ? { ...b, x: Math.round(s.x + dx), y: Math.round(s.y + dy) } : b;
+          });
+          appStateRef.current.blurZones = next;
+          return next;
+        });
       }
       if (snapshot.masks && snapshot.masks.length > 0) {
         const snapMap = new Map(snapshot.masks.map((m) => [m.id, m]));
-        setMaskShapes((prev) => prev.map((m) => {
-          const s = snapMap.get(m.id);
-          return s ? { ...m, x: Math.round(s.x + dx), y: Math.round(s.y + dy) } : m;
-        }));
+        setMaskShapes((prev) => {
+          const next = prev.map((m) => {
+            const s = snapMap.get(m.id);
+            return s ? { ...m, x: Math.round(s.x + dx), y: Math.round(s.y + dy) } : m;
+          });
+          appStateRef.current.maskShapes = next;
+          return next;
+        });
       }
       if (snapshot.triangles && snapshot.triangles.length > 0) {
         const snapMap = new Map(snapshot.triangles.map((t) => [t.id, t]));
-        setTriangles((prev) => prev.map((t) => {
-          const s = snapMap.get(t.id);
-          return s ? { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy) } : t;
-        }));
+        setTriangles((prev) => {
+          const next = prev.map((t) => {
+            const s = snapMap.get(t.id);
+            return s ? { ...t, x: Math.round(s.x + dx), y: Math.round(s.y + dy) } : t;
+          });
+          appStateRef.current.triangles = next;
+          return next;
+        });
       }
       return;
     }
@@ -1041,16 +1162,32 @@ export default function App() {
     const tIds = selectedTriangleIds.length > 0 ? selectedTriangleIds : (selectedTriangleId ? [selectedTriangleId] : []);
 
     if (fIds.length > 0) {
-      setFocuses((prev) => prev.map((f) => fIds.includes(f.id) ? { ...f, x: Math.round(f.x + dx), y: Math.round(f.y + dy) } : f));
+      setFocuses((prev) => {
+        const next = prev.map((f) => fIds.includes(f.id) ? { ...f, x: Math.round(f.x + dx), y: Math.round(f.y + dy) } : f);
+        appStateRef.current.focuses = next;
+        return next;
+      });
     }
     if (bIds.length > 0) {
-      setBlurZones((prev) => prev.map((b) => bIds.includes(b.id) ? { ...b, x: Math.round(b.x + dx), y: Math.round(b.y + dy) } : b));
+      setBlurZones((prev) => {
+        const next = prev.map((b) => bIds.includes(b.id) ? { ...b, x: Math.round(b.x + dx), y: Math.round(b.y + dy) } : b);
+        appStateRef.current.blurZones = next;
+        return next;
+      });
     }
     if (mIds.length > 0) {
-      setMaskShapes((prev) => prev.map((m) => mIds.includes(m.id) ? { ...m, x: Math.round(m.x + dx), y: Math.round(m.y + dy) } : m));
+      setMaskShapes((prev) => {
+        const next = prev.map((m) => mIds.includes(m.id) ? { ...m, x: Math.round(m.x + dx), y: Math.round(m.y + dy) } : m);
+        appStateRef.current.maskShapes = next;
+        return next;
+      });
     }
     if (tIds.length > 0) {
-      setTriangles((prev) => prev.map((t) => tIds.includes(t.id) ? { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy) } : t));
+      setTriangles((prev) => {
+        const next = prev.map((t) => tIds.includes(t.id) ? { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy) } : t);
+        appStateRef.current.triangles = next;
+        return next;
+      });
     }
   }, [selectedFocusIds, selectedFocusId, selectedBlurIds, selectedBlurId, selectedMaskIds, selectedMaskId, selectedTriangleIds, selectedTriangleId]);
 
@@ -1213,7 +1350,10 @@ export default function App() {
         if (focuses.length > 0) {
           handleSelectFocus(focuses[0].id);
         }
-        return { ...prev!, enabled: false };
+        const disabledCallout = { ...prev!, enabled: false };
+        appStateRef.current.calloutVignette = disabledCallout;
+        recordHistory({ calloutVignette: disabledCallout });
+        return disabledCallout;
       }
 
       // Entering Callout mode:
@@ -1239,8 +1379,9 @@ export default function App() {
       // Alignement au bas du screenshot en référence à l'ombre portée (vigY + vigH + shadowDist = bgY + bgHeight)
       const alignedBottomY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
 
+      let nextCallout: CalloutVignette;
       if (prev) {
-        return {
+        nextCallout = {
           ...prev,
           enabled: true,
           alignBottom: true,
@@ -1253,33 +1394,35 @@ export default function App() {
           shadowOffsetY: 5,
           shadowOpacity: 0.50,
         };
+      } else {
+        // Initialize default Callout Vignette (default 100px)
+        nextCallout = {
+          enabled: true,
+          sourceX: Math.round(bounds.bgX + bounds.bgWidth * 0.25),
+          sourceY: Math.round(bounds.bgY + bounds.bgHeight * 0.35),
+          sourceWidth: 40,
+          sourceHeight: 40,
+          width: 100,
+          height: 100,
+          shape: 'rounded',
+          borderRadius: 16,
+          gap: 5, // Strict requirement: exactly 5px gap from screen border
+          offsetY: alignedBottomY, // Aligned to bottom of screenshot
+          alignBottom: true,
+          borderWidth: 0,
+          borderColor: 'transparent',
+          showShadow: true,
+          shadowDistance: 5,
+          shadowSize: 2,
+          shadowBlur: 2,
+          shadowOffsetX: 0,
+          shadowOffsetY: 5,
+          shadowOpacity: 0.50,
+        };
       }
-
-      // Initialize default Callout Vignette (default 100px)
-      return {
-        id: `callout-${Date.now()}`,
-        enabled: true,
-        sourceX: Math.round(bounds.bgX + bounds.bgWidth * 0.25),
-        sourceY: Math.round(bounds.bgY + bounds.bgHeight * 0.35),
-        sourceWidth: 40,
-        sourceHeight: 40,
-        width: 100,
-        height: 100,
-        shape: 'rounded',
-        borderRadius: 16,
-        gap: 5, // Strict requirement: exactly 5px gap from screen border
-        offsetY: alignedBottomY, // Aligned to bottom of screenshot
-        alignBottom: true,
-        borderWidth: 0,
-        borderColor: 'transparent',
-        showShadow: true,
-        shadowDistance: 5,
-        shadowSize: 2,
-        shadowBlur: 2,
-        shadowOffsetX: 0,
-        shadowOffsetY: 5,
-        shadowOpacity: 0.50,
-      };
+      appStateRef.current.calloutVignette = nextCallout;
+      recordHistory({ calloutVignette: nextCallout });
+      return nextCallout;
     });
   };
 
@@ -1314,6 +1457,7 @@ export default function App() {
         next.sourceCenterY = (next.sourceY ?? prev.sourceY ?? 0) + curH / 2;
       }
 
+      appStateRef.current.calloutVignette = next;
       return next;
     });
     scheduleDebouncedRecordHistory();
@@ -1970,6 +2114,8 @@ export default function App() {
           calloutVignette={calloutVignette}
           onUpdateCallout={handleUpdateCallout}
           onToggleCallout={handleToggleCallout}
+          activeTool={activeTool}
+          onSelectTool={setActiveTool}
           onUndo={handleUndo}
           onRedo={handleRedo}
           canUndo={historyIndex > 0}

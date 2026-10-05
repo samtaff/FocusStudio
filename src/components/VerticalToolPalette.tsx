@@ -17,7 +17,8 @@ import {
   Download,
   Loader2,
   X,
-  Hash
+  Hash,
+  MousePointer2
 } from 'lucide-react';
 import { 
   FocusZone, 
@@ -396,7 +397,6 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
     }
     menuLeaveTimerRef.current = window.setTimeout(() => {
       setActiveMenu(null);
-      onSelectTool('select');
     }, 280);
   };
 
@@ -406,7 +406,6 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       menuLeaveTimerRef.current = null;
     }
     setActiveMenu(null);
-    onSelectTool('select');
   };
 
   // Position flottante (fixe, déplaçable librement dans toute la fenêtre)
@@ -500,9 +499,13 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       window.clearTimeout(menuLeaveTimerRef.current);
       menuLeaveTimerRef.current = null;
     }
-    // Assure toujours que l'outil actif repasse en 'select' pour éviter que la souris ne reste collée sur dupliquer
-    onSelectTool('select');
-    setActiveMenu((prev) => (prev === menu ? null : menu));
+    const nextMenu = activeMenu === menu ? null : menu;
+    setActiveMenu(nextMenu);
+    if (nextMenu) {
+      onSelectTool(menu as ToolType);
+    } else {
+      onSelectTool('select');
+    }
   };
 
   const targetFocus = selectedFocus || (focuses.length > 0 ? focuses[0] : null);
@@ -550,6 +553,28 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       >
         <GripVertical className="w-3.5 h-3.5" />
       </div>
+
+      {/* 0. OUTIL POINTEUR / SÉLECTION */}
+      <button
+        id="tool-select-pointer"
+        type="button"
+        onClick={() => {
+          onSelectTool('select');
+          closeMenu();
+        }}
+        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative cursor-pointer ${
+          activeTool === 'select'
+            ? isDarkMode
+              ? 'bg-[#0088cc] text-white shadow-xs scale-105 ring-2 ring-[#0088cc]/30'
+              : 'bg-[#000000] text-white shadow-xs scale-105 ring-2 ring-black/20'
+            : isDarkMode
+              ? 'text-[#aaaaaa] hover:text-white hover:bg-white/10'
+              : 'text-[#666666] hover:text-[#000000] hover:bg-white/40'
+        }`}
+        title="Outil Pointeur / Sélection (Raccourci V ou Échap)"
+      >
+        <MousePointer2 className="w-4 h-4 stroke-[2.2]" />
+      </button>
 
       {/* ========================================================= */}
       {/* 1. OUTIL Z1 / ZONES DE FOCUS (Menu radial & Pill Pastille) */}
@@ -734,6 +759,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
           } : undefined}
           onAdd={() => {
             onAddFocus(targetFocus?.orientation || 'horizontal');
+            onSelectTool('select');
             closeMenu();
           }}
           onDuplicate={() => {
@@ -800,7 +826,8 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
             canDelete={hasCallout}
             onAdd={() => {
               if (!hasCallout) onToggleCallout();
-              onSelectTool('select');
+              onSelectTool('callout');
+              closeMenu();
             }}
             onDuplicate={() => {
               if (onUpdateCallout) {
@@ -872,6 +899,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
           onAdd={() => {
             onAddBlur();
             onSelectTool('select');
+            closeMenu();
           }}
           onDuplicate={() => {
             if (currentBlur && onDuplicateBlur) {
@@ -882,6 +910,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
               onAddBlur();
             }
             onSelectTool('select');
+            closeMenu();
           }}
           onDelete={() => {
             if (currentBlur && onDeleteBlur) {
@@ -889,7 +918,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
             } else if (blurZones[0] && onDeleteBlur) {
               onDeleteBlur(blurZones[0].id);
             }
-            onSelectTool('select');
+            closeMenu();
           }}
           onMouseEnter={handleMenuMouseEnter}
           onMouseLeave={handleMenuMouseLeave}
@@ -942,6 +971,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
           onAdd={() => {
             onAddMask();
             onSelectTool('select');
+            closeMenu();
           }}
           onDuplicate={() => {
             if (currentMask && onDuplicateMask) {
@@ -952,6 +982,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
               onAddMask();
             }
             onSelectTool('select');
+            closeMenu();
           }}
           onDelete={() => {
             if (currentMask && onDeleteMask) {
@@ -959,7 +990,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
             } else if (maskShapes[0] && onDeleteMask) {
               onDeleteMask(maskShapes[0].id);
             }
-            onSelectTool('select');
+            closeMenu();
           }}
           onMouseEnter={handleMenuMouseEnter}
           onMouseLeave={handleMenuMouseLeave}
@@ -1009,6 +1040,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
             onAdd={() => {
               onAddTriangle();
               onSelectTool('select');
+              closeMenu();
             }}
             onDuplicate={() => {
               if (currentTriangle && onDuplicateTriangle) {
@@ -1019,6 +1051,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
                 onAddTriangle();
               }
               onSelectTool('select');
+              closeMenu();
             }}
             onDelete={() => {
               if (currentTriangle && onDeleteTriangle) {
@@ -1026,7 +1059,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
               } else if (triangles[0] && onDeleteTriangle) {
                 onDeleteTriangle(triangles[0].id);
               }
-              onSelectTool('select');
+              closeMenu();
             }}
             onMouseEnter={handleMenuMouseEnter}
             onMouseLeave={handleMenuMouseLeave}

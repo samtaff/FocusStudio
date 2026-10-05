@@ -336,9 +336,27 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       }
 
       if (e.key === 'Alt') setIsAltPressed(true);
-      if (e.key === 'Escape' && isPreviewMode && onTogglePreview) {
-        onTogglePreview();
+
+      // Escape shortcut: cancel preview or reset tool to select and clear marquee
+      if (e.key === 'Escape') {
+        if (isPreviewMode && onTogglePreview) {
+          onTogglePreview();
+          return;
+        }
+        if (activeTool !== 'select') {
+          onSelectTool('select');
+        }
+        setMarqueeState(null);
+        setDragRotateState(null);
         return;
+      }
+
+      // 'V' shortcut: Switch back to pointer/select tool
+      if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (activeTool !== 'select') {
+          onSelectTool('select');
+        }
+        setMarqueeState(null);
       }
 
       // Check Z3 shortcut: 'z' or 'Z' followed by '3' (or direct combination)
@@ -365,7 +383,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       if (e.key === 'Alt') setIsAltPressed(false);
     };
 
-    // Global mouseup and window blur so dragging / panning never gets stuck
+    // Global mouseup and window blur so dragging / panning / marquee never gets stuck
     const handleGlobalMouseUp = () => {
       setIsPanning(false);
       setDragState(null);
@@ -374,13 +392,22 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       setDragMaskState(null);
       setDragTriangleState(null);
       setDragCalloutState(null);
+      setMarqueeState(null);
+      setMultiDragState(null);
+      setDragRotateState(null);
       setActiveGuides([]);
+      if (hasMovedRef.current) {
+        hasMovedRef.current = false;
+        onBatchMoveEnd?.();
+      }
     };
 
     const handleWindowBlur = () => {
       setIsAltPressed(false);
       setIsSpacePressed(false);
       setIsPanning(false);
+      setMarqueeState(null);
+      setMultiDragState(null);
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -394,7 +421,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       window.removeEventListener('mouseup', handleGlobalMouseUp);
       window.removeEventListener('blur', handleWindowBlur);
     };
-  }, [isPreviewMode, onTogglePreview, focuses, onSelectFocus]);
+  }, [isPreviewMode, onTogglePreview, focuses, onSelectFocus, activeTool, onSelectTool]);
 
   // Center workspace function (Reset zoom to 100% and pan to 0,0)
   const handleCenterWorkspace = useCallback(() => {
@@ -639,13 +666,37 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     return null;
   };
 
-  // Hit-test focus bodies (disabled when Callout vignette is active, as vignette mode visually replaces base focus zones)
+  // Hit-test focus bodies and their badges (disabled when Callout vignette is active)
   const getFocusAtCoord = (cx: number, cy: number): FocusZone | null => {
     if (calloutVignette && calloutVignette.enabled) return null;
     for (let i = focuses.length - 1; i >= 0; i--) {
       const f = focuses[i];
       if (cx >= f.x && cx <= f.x + f.width && cy >= f.y && cy <= f.y + f.height) {
         return f;
+      }
+      // Also check 20x20 step pastille badge: centered on screenshot border, 15px exceeding above focus zone
+      if (f.showStepBadge !== false && f.stepNumber !== undefined) {
+        const num = f.stepNumber || 1;
+        const isVertical = f.orientation === 'vertical' || f.height > f.width;
+        let alignLeft = true;
+        if (f.badgePosition === 'left') {
+          alignLeft = true;
+        } else if (f.badgePosition === 'right') {
+          alignLeft = false;
+        } else {
+          if (isVertical) {
+            const focusCenterX = f.x + f.width / 2;
+            const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
+            alignLeft = focusCenterX < phoneCenterX;
+          } else {
+            alignLeft = num % 2 !== 0;
+          }
+        }
+        const badgeX = alignLeft ? bounds.bgX - 10 : bounds.bgX + bounds.bgWidth - 10;
+        const badgeY = f.y - 15;
+        if (cx >= badgeX - 3 && cx <= badgeX + 23 && cy >= badgeY - 3 && cy <= badgeY + 23) {
+          return f;
+        }
       }
     }
     return null;
@@ -740,6 +791,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     centerY: number;
     initialRotation: number;
   } | null => {
+    // If multi-selection is active, disable corner rotation so user can drag all selected elements freely
+    const selCount = (selectedFocusIds.length || (selectedFocusId ? 1 : 0)) +
+                     (selectedBlurIds.length || (selectedBlurId ? 1 : 0)) +
+                     (selectedMaskIds.length || (selectedMaskId ? 1 : 0)) +
+                     (selectedTriangleIds.length || (selectedTriangleId ? 1 : 0));
+    if (selCount > 1) return null;
+
     // 1. Check selected masks
     const activeMaskIds = selectedMaskIds.length > 0 ? selectedMaskIds : (selectedMaskId ? [selectedMaskId] : []);
     for (const mId of activeMaskIds) {
@@ -1748,6 +1806,46 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
+    // 7.5. Clicked inside Multi-Selection Bounding Box or on its Top Badge
+    if (totalSelectedCount > 1) {
+      let bMinX = Infinity;
+      let bMinY = Infinity;
+      let bMaxX = -Infinity;
+      let bMaxY = -Infinity;
+
+      focuses.filter((f) => activeFIds.includes(f.id)).forEach((f) => {
+        bMinX = Math.min(bMinX, f.x);
+        bMinY = Math.min(bMinY, f.y);
+        bMaxX = Math.max(bMaxX, f.x + f.width);
+        bMaxY = Math.max(bMaxY, f.y + f.height);
+      });
+      blurZones.filter((b) => activeBIds.includes(b.id)).forEach((b) => {
+        bMinX = Math.min(bMinX, b.x);
+        bMinY = Math.min(bMinY, b.y);
+        bMaxX = Math.max(bMaxX, b.x + b.width);
+        bMaxY = Math.max(bMaxY, b.y + b.height);
+      });
+      maskShapes.filter((m) => activeMIds.includes(m.id)).forEach((m) => {
+        const mw = m.multiplier?.enabled ? (m.multiplier.cols || 2) * m.width + ((m.multiplier.cols || 2) - 1) * (m.multiplier.gapX ?? 10) : m.width;
+        const mh = m.multiplier?.enabled ? (m.multiplier.rows || 2) * m.height + ((m.multiplier.rows || 2) - 1) * (m.multiplier.gapY ?? 10) : m.height;
+        bMinX = Math.min(bMinX, m.x);
+        bMinY = Math.min(bMinY, m.y);
+        bMaxX = Math.max(bMaxX, m.x + mw);
+        bMaxY = Math.max(bMaxY, m.y + mh);
+      });
+      triangles.filter((t) => activeTIds.includes(t.id)).forEach((t) => {
+        bMinX = Math.min(bMinX, t.x);
+        bMinY = Math.min(bMinY, t.y);
+        bMaxX = Math.max(bMaxX, t.x + (t.width || 15));
+        bMaxY = Math.max(bMaxY, t.y + (t.height || 13));
+      });
+
+      if (bMinX !== Infinity && cx >= bMinX - 8 && cx <= bMaxX + 8 && cy >= bMinY - 24 && cy <= bMaxY + 8) {
+        startMultiDrag();
+        return;
+      }
+    }
+
     // 8. Pan mode explicitly active
     if (isPanMode) {
       setIsPanning(true);
@@ -1829,7 +1927,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               maskIds: hitMaskIds,
               triangleIds: hitTriangleIds,
             },
-            e.shiftKey
+            e?.shiftKey
           );
         }
       }
@@ -1983,6 +2081,43 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const activeB = selectedBlurIds.length > 0 ? selectedBlurIds : (selectedBlurId ? [selectedBlurId] : []);
     const activeM = selectedMaskIds.length > 0 ? selectedMaskIds : (selectedMaskId ? [selectedMaskId] : []);
     const activeT = selectedTriangleIds.length > 0 ? selectedTriangleIds : (selectedTriangleId ? [selectedTriangleId] : []);
+
+    const totalCount = activeF.length + activeB.length + activeM.length + activeT.length;
+    if (totalCount > 1 && canvasMousePos) {
+      let bMinX = Infinity;
+      let bMinY = Infinity;
+      let bMaxX = -Infinity;
+      let bMaxY = -Infinity;
+      focuses.filter((f) => activeF.includes(f.id)).forEach((f) => {
+        bMinX = Math.min(bMinX, f.x);
+        bMinY = Math.min(bMinY, f.y);
+        bMaxX = Math.max(bMaxX, f.x + f.width);
+        bMaxY = Math.max(bMaxY, f.y + f.height);
+      });
+      blurZones.filter((b) => activeB.includes(b.id)).forEach((b) => {
+        bMinX = Math.min(bMinX, b.x);
+        bMinY = Math.min(bMinY, b.y);
+        bMaxX = Math.max(bMaxX, b.x + b.width);
+        bMaxY = Math.max(bMaxY, b.y + b.height);
+      });
+      maskShapes.filter((m) => activeM.includes(m.id)).forEach((m) => {
+        const mw = m.multiplier?.enabled ? (m.multiplier.cols || 2) * m.width + ((m.multiplier.cols || 2) - 1) * (m.multiplier.gapX ?? 10) : m.width;
+        const mh = m.multiplier?.enabled ? (m.multiplier.rows || 2) * m.height + ((m.multiplier.rows || 2) - 1) * (m.multiplier.gapY ?? 10) : m.height;
+        bMinX = Math.min(bMinX, m.x);
+        bMinY = Math.min(bMinY, m.y);
+        bMaxX = Math.max(bMaxX, m.x + mw);
+        bMaxY = Math.max(bMaxY, m.y + mh);
+      });
+      triangles.filter((t) => activeT.includes(t.id)).forEach((t) => {
+        bMinX = Math.min(bMinX, t.x);
+        bMinY = Math.min(bMinY, t.y);
+        bMaxX = Math.max(bMaxX, t.x + (t.width || 15));
+        bMaxY = Math.max(bMaxY, t.y + (t.height || 13));
+      });
+      if (bMinX !== Infinity && canvasMousePos.x >= bMinX - 8 && canvasMousePos.x <= bMaxX + 8 && canvasMousePos.y >= bMinY - 24 && canvasMousePos.y <= bMaxY + 8) {
+        return 'move';
+      }
+    }
 
     if (
       (hoveredTriangleId && activeT.includes(hoveredTriangleId)) ||
@@ -2248,6 +2383,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                     onMouseMove={handleMouseMove}
                     onMouseDown={handleMouseDown}
                     onMouseUp={handleMouseUp}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      if (activeTool !== 'select') {
+                        onSelectTool('select');
+                      }
+                      setMarqueeState(null);
+                    }}
                     onMouseLeave={() => {
                       setCanvasMousePos(null);
                       handleMouseUp();
@@ -2282,6 +2424,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                 onMouseMove={handleMouseMove}
                 onMouseDown={handleMouseDown}
                 onMouseUp={handleMouseUp}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  if (activeTool !== 'select') {
+                    onSelectTool('select');
+                  }
+                  setMarqueeState(null);
+                }}
                 onMouseLeave={() => {
                   setCanvasMousePos(null);
                   handleMouseUp();

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   RotateCcw, 
   ChevronDown, 
@@ -35,7 +35,9 @@ import {
   Ruler,
   Magnet,
   Compass,
-  RotateCw
+  RotateCw,
+  Undo2,
+  Redo2
 } from 'lucide-react';
 import { 
   FocusZone, 
@@ -50,6 +52,7 @@ import {
 import { BASE_COLOR, calculateCompositionBounds } from '../utils/canvasRenderer';
 import { SAMPLE_PRESETS } from '../utils/sampleImages';
 import { NumericInput } from './NumericInput';
+import { ToolType } from './VerticalToolPalette';
 
 interface StudioSettingsPanelProps {
   image: LoadedImage | null;
@@ -99,6 +102,9 @@ interface StudioSettingsPanelProps {
   calloutVignette?: CalloutVignette | null;
   onUpdateCallout?: (updated: Partial<CalloutVignette>) => void;
   onToggleCallout?: () => void;
+  // Active Tool
+  activeTool?: ToolType;
+  onSelectTool?: (tool: ToolType) => void;
   // Actions
   onUndo?: () => void;
   onRedo?: () => void;
@@ -182,6 +188,8 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   calloutVignette,
   onUpdateCallout,
   onToggleCallout,
+  activeTool = 'select',
+  onSelectTool,
   onUndo,
   onRedo,
   canUndo = false,
@@ -215,7 +223,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 }) => {
   const [customGuideH, setCustomGuideH] = useState<number>(100);
   const [customGuideV, setCustomGuideV] = useState<number>(100);
-  // Requirement: Toutes les sections doivent être fermées par défaut et se déplier SEULEMENT au clic !
+  // Requirement: Menu de paramètres qui se déploie selon l'outil actif ou le clic utilisateur
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     capture: false,
     workspace: false,
@@ -226,6 +234,85 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
     callout: false,
     export: false,
   });
+
+  // Déploiement automatique du menu paramètres selon l'outil utilisé (ex: triangle s'ouvre, se ferme si on change d'outil)
+  useEffect(() => {
+    if (!activeTool || activeTool === 'select' || activeTool === 'zoom' || activeTool === 'pan') {
+      return;
+    }
+    const toolToSection: Record<string, string> = {
+      triangle: 'triangle',
+      mask: 'mask',
+      blur: 'blur',
+      focus: 'focus',
+      callout: 'callout',
+    };
+    const targetSection = toolToSection[activeTool];
+    if (targetSection) {
+      setOpenSections((prev) => ({
+        ...prev,
+        triangle: targetSection === 'triangle',
+        mask: targetSection === 'mask',
+        blur: targetSection === 'blur',
+        focus: targetSection === 'focus',
+        callout: targetSection === 'callout',
+      }));
+    }
+  }, [activeTool]);
+
+  // Si un élément spécifique est sélectionné, déployer automatiquement sa section de paramètres
+  useEffect(() => {
+    if (selectedTriangleId) {
+      setOpenSections((prev) => ({
+        ...prev,
+        triangle: true,
+        mask: false,
+        blur: false,
+        focus: false,
+        callout: false,
+      }));
+    }
+  }, [selectedTriangleId]);
+
+  useEffect(() => {
+    if (selectedMaskId) {
+      setOpenSections((prev) => ({
+        ...prev,
+        mask: true,
+        triangle: false,
+        blur: false,
+        focus: false,
+        callout: false,
+      }));
+    }
+  }, [selectedMaskId]);
+
+  useEffect(() => {
+    if (selectedBlurId) {
+      setOpenSections((prev) => ({
+        ...prev,
+        blur: true,
+        triangle: false,
+        mask: false,
+        focus: false,
+        callout: false,
+      }));
+    }
+  }, [selectedBlurId]);
+
+  useEffect(() => {
+    const focusId = selectedFocus?.id || (selectedFocusIds && selectedFocusIds.length > 0 ? selectedFocusIds[0] : null);
+    if (focusId && !selectedTriangleId && !selectedMaskId && !selectedBlurId && !calloutVignette?.enabled) {
+      setOpenSections((prev) => ({
+        ...prev,
+        focus: true,
+        triangle: false,
+        mask: false,
+        blur: false,
+        callout: false,
+      }));
+    }
+  }, [selectedFocus?.id, selectedFocusIds, selectedTriangleId, selectedMaskId, selectedBlurId, calloutVignette?.enabled]);
 
   // Requirement: La div "ombre portée" doit être repliée par défaut et dépliable au clic
   const [isShadowExpanded, setIsShadowExpanded] = useState<boolean>(false);
@@ -301,19 +388,63 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
           </h2>
         </div>
 
-        <button
-          id="btn-studio-reset"
-          onClick={onResetToDefaults}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
-            isDarkMode
-              ? 'bg-[#333333] hover:bg-[#3e3e3e] text-white border border-[#444444]'
-              : 'bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000]'
-          }`}
-          title="Réinitialiser tous les réglages par défaut"
-        >
-          <RotateCcw className={`w-3 h-3 ${isDarkMode ? 'text-[#bbbbbb]' : 'text-[#666666]'}`} />
-          <span>Réinitialiser</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          {/* Undo / Redo in settings panel header */}
+          {(onUndo || onRedo) && (
+            <div className={`flex items-center gap-0.5 p-0.5 rounded-full border ${
+              isDarkMode 
+                ? 'bg-[#2a2a2a] border-[#444444]' 
+                : 'bg-[#eeeeee]/90 border-[#e0e0e0]'
+            }`}>
+              <button
+                id="btn-panel-undo"
+                type="button"
+                onClick={onUndo}
+                disabled={!canUndo}
+                className={`p-1 rounded-full transition-all ${
+                  canUndo 
+                    ? isDarkMode 
+                      ? 'text-white hover:bg-white/15 cursor-pointer' 
+                      : 'text-[#000000] hover:bg-white shadow-2xs cursor-pointer' 
+                    : 'text-[#979797] cursor-not-allowed opacity-30'
+                }`}
+                title="Annuler (Ctrl+Z)"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                id="btn-panel-redo"
+                type="button"
+                onClick={onRedo}
+                disabled={!canRedo}
+                className={`p-1 rounded-full transition-all ${
+                  canRedo 
+                    ? isDarkMode 
+                      ? 'text-white hover:bg-white/15 cursor-pointer' 
+                      : 'text-[#000000] hover:bg-white shadow-2xs cursor-pointer' 
+                    : 'text-[#979797] cursor-not-allowed opacity-30'
+                }`}
+                title="Rétablir (Ctrl+Y ou Ctrl+Shift+Z)"
+              >
+                <Redo2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          <button
+            id="btn-studio-reset"
+            onClick={onResetToDefaults}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
+              isDarkMode
+                ? 'bg-[#333333] hover:bg-[#3e3e3e] text-white border border-[#444444]'
+                : 'bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000]'
+            }`}
+            title="Réinitialiser tous les réglages par défaut"
+          >
+            <RotateCcw className={`w-3 h-3 ${isDarkMode ? 'text-[#bbbbbb]' : 'text-[#666666]'}`} />
+            <span>Réinitialiser</span>
+          </button>
+        </div>
       </div>
 
       {/* Multi-Selection Banner Card */}
