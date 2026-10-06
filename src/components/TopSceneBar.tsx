@@ -12,7 +12,8 @@ import {
   Droplet,
   Square,
   Undo2,
-  Redo2
+  Redo2,
+  Move
 } from 'lucide-react';
 import { GlobalStyleSettings } from '../types';
 import { NumericInput } from './NumericInput';
@@ -211,6 +212,40 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           <Grid className="w-3.5 h-3.5" />
           <span>Grille {globalStyles.showGrid ? 'ON' : 'OFF'}</span>
         </button>
+
+        {/* Pas de déplacement des flèches : 0.1, 0.5, 1, 5, 10 px */}
+        <div 
+          className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all ${
+            isDarkMode
+              ? 'bg-[#353535] border-[#525252] text-[#dddddd]'
+              : 'bg-[#eeeeee]/80 border-[#e5e5e5] text-[#666666]'
+          }`}
+          title="Pas de déplacement avec les flèches du clavier. Raccourcis : Alt + Flèches = 0.1 px (micro-précision) • Shift + Flèches = 10 px"
+        >
+          <Move className="w-3 h-3 text-[#0088cc] mr-0.5 shrink-0" />
+          <span className="text-[10px] text-[#888888] font-medium mr-1">Pas :</span>
+          {[0.1, 0.5, 1, 5, 10].map((step) => {
+            const isSelected = (globalStyles.nudgeStep ?? 1) === step;
+            return (
+              <button
+                key={step}
+                type="button"
+                onClick={() => onUpdateGlobalStyles({ nudgeStep: step })}
+                className={`px-1.5 py-0.5 rounded-full font-mono text-[10px] font-semibold transition-all ${
+                  isSelected
+                    ? 'bg-[#0088cc] text-white shadow-2xs'
+                    : isDarkMode
+                      ? 'text-[#cccccc] hover:text-white hover:bg-white/10'
+                      : 'text-[#666666] hover:text-[#000000] hover:bg-black/5'
+                }`}
+                title={`Régler le pas à ${step} px (Flèches = ${step} px • Alt + Flèches = 0.1 px • Shift + Flèches = ${step * 10} px)`}
+              >
+                {step}
+              </button>
+            );
+          })}
+          <span className="text-[9px] text-[#888888] font-mono ml-0.5">px</span>
+        </div>
       </div>
 
       {/* Right: Zoom controls */}

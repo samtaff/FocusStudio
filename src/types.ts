@@ -206,6 +206,7 @@ export interface GlobalStyleSettings {
   gridSize?: number; // Taille de la grille en pixels (ex: 10 ou 20px, défaut 20)
   snapPrecision?: 'normal' | 'high'; // Sensibilité d'aimantation
   previewHD: boolean;
+  nudgeStep?: number; // Pas de déplacement des flèches en px (0.1, 0.5, 1, 5, 10, défaut: 1)
 }
 
 export interface DetectedElement {

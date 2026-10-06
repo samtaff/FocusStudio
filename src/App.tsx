@@ -227,6 +227,7 @@ export default function App() {
     showHandles: true,
     showGuides: true,
     previewHD: false,
+    nudgeStep: 1,
   });
 
   // Panel width management (responsive)
@@ -1165,28 +1166,28 @@ export default function App() {
 
     if (fIds.length > 0) {
       setFocuses((prev) => {
-        const next = prev.map((f) => fIds.includes(f.id) ? { ...f, x: Math.round(f.x + dx), y: Math.round(f.y + dy) } : f);
+        const next = prev.map((f) => fIds.includes(f.id) ? { ...f, x: Math.round((f.x + dx) * 10) / 10, y: Math.round((f.y + dy) * 10) / 10 } : f);
         appStateRef.current.focuses = next;
         return next;
       });
     }
     if (bIds.length > 0) {
       setBlurZones((prev) => {
-        const next = prev.map((b) => bIds.includes(b.id) ? { ...b, x: Math.round(b.x + dx), y: Math.round(b.y + dy) } : b);
+        const next = prev.map((b) => bIds.includes(b.id) ? { ...b, x: Math.round((b.x + dx) * 10) / 10, y: Math.round((b.y + dy) * 10) / 10 } : b);
         appStateRef.current.blurZones = next;
         return next;
       });
     }
     if (mIds.length > 0) {
       setMaskShapes((prev) => {
-        const next = prev.map((m) => mIds.includes(m.id) ? { ...m, x: Math.round(m.x + dx), y: Math.round(m.y + dy) } : m);
+        const next = prev.map((m) => mIds.includes(m.id) ? { ...m, x: Math.round((m.x + dx) * 10) / 10, y: Math.round((m.y + dy) * 10) / 10 } : m);
         appStateRef.current.maskShapes = next;
         return next;
       });
     }
     if (tIds.length > 0) {
       setTriangles((prev) => {
-        const next = prev.map((t) => tIds.includes(t.id) ? { ...t, x: Math.round(t.x + dx), y: Math.round(t.y + dy) } : t);
+        const next = prev.map((t) => tIds.includes(t.id) ? { ...t, x: Math.round((t.x + dx) * 10) / 10, y: Math.round((t.y + dy) * 10) / 10 } : t);
         appStateRef.current.triangles = next;
         return next;
       });
@@ -1845,7 +1846,18 @@ export default function App() {
 
       // Arrow keys to nudge selected object(s) (Photoshop style: 1px by default, 10px with Shift)
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        const step = e.shiftKey ? 10 : 1;
+        // Unité / pas de déplacement avec les flèches :
+        // - Si Alt (Option) est maintenu : micro-déplacement chirurgical de 0.1 px (ou 0.05 px)
+        // - Si Shift est maintenu : grand déplacement (10× le pas configuré, minimum 10 px)
+        // - Par défaut : pas configuré (ex: 1 px par défaut, ou 0.1, 0.5, 5, 10 px)
+        const baseStep = globalStyles.nudgeStep ?? 1;
+        let step = baseStep;
+        if (e.altKey) {
+          step = baseStep < 0.2 ? 0.05 : 0.1;
+        } else if (e.shiftKey) {
+          step = Math.max(10, Math.round(baseStep * 10 * 10) / 10);
+        }
+
         let dx = 0;
         let dy = 0;
         if (e.key === 'ArrowUp') dy = -step;
@@ -1890,17 +1902,17 @@ export default function App() {
             const alignedBottomY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
             const currentY = calloutVignette.alignBottom !== false ? alignedBottomY : (calloutVignette.offsetY ?? alignedBottomY);
             handleUpdateCallout({
-              offsetY: Math.round(currentY + dy),
+              offsetY: Math.round((currentY + dy) * 10) / 10,
               alignBottom: false,
             });
             handled = true;
           } else {
-            // Déplacement précis de la cible loupe (source) avec les flèches du clavier (1 px par défaut, 10 px avec Shift)
+            // Déplacement précis de la cible loupe (source) avec les flèches du clavier
             const curX = calloutVignette.sourceX ?? 0;
             const curY = calloutVignette.sourceY ?? 0;
             handleUpdateCallout({
-              sourceX: Math.round(curX + dx),
-              sourceY: Math.round(curY + dy),
+              sourceX: Math.round((curX + dx) * 10) / 10,
+              sourceY: Math.round((curY + dy) * 10) / 10,
             });
             if (selectedCalloutPart !== 'source') {
               setSelectedCalloutPart('source');
@@ -1911,8 +1923,8 @@ export default function App() {
           const current = focuses.find((f) => f.id === selectedFocusId);
           if (current) {
             handleUpdateFocus({
-              sourceOffsetX: Math.round((current.sourceOffsetX || 0) + dx),
-              sourceOffsetY: Math.round((current.sourceOffsetY || 0) + dy),
+              sourceOffsetX: Math.round(((current.sourceOffsetX || 0) + dx) * 10) / 10,
+              sourceOffsetY: Math.round(((current.sourceOffsetY || 0) + dy) * 10) / 10,
             });
             handled = true;
           }
@@ -1966,6 +1978,7 @@ export default function App() {
     history,
     calloutVignette,
     selectedCalloutPart,
+    globalStyles.nudgeStep,
     handleBatchMove,
     handleBatchDelete,
     handleBatchDuplicate,

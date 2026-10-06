@@ -902,6 +902,49 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   </button>
                 </div>
 
+                {/* Pas de déplacement des flèches (Unité de déplacement) */}
+                <div className={`flex flex-col gap-2 p-2.5 rounded-xl border ${
+                  isDarkMode ? 'bg-[#2a2a2a] border-[#444444]' : 'bg-[#eeeeee]/60 border-white'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10.5px] font-semibold text-[#000000] dark:text-white flex items-center gap-1.5">
+                      <Move className="w-3 h-3 text-[#0088cc]" />
+                      Pas de déplacement des flèches
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-[#0088cc]">
+                      {globalStyles.nudgeStep ?? 1} px
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    {[0.1, 0.5, 1, 5, 10].map((step) => {
+                      const isSelected = (globalStyles.nudgeStep ?? 1) === step;
+                      return (
+                        <button
+                          key={step}
+                          type="button"
+                          onClick={() => onUpdateGlobalStyles({ nudgeStep: step })}
+                          className={`flex-1 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all ${
+                            isSelected
+                              ? 'bg-[#0088cc] text-white shadow-2xs'
+                              : isDarkMode
+                                ? 'bg-[#353535] text-[#cccccc] hover:bg-[#404040]'
+                                : 'bg-white text-[#666666] hover:bg-[#f3f4f6] border border-[#e5e7eb]'
+                          }`}
+                        >
+                          {step} px
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <p className="text-[9px] text-[#666666] dark:text-[#aaaaaa] leading-tight">
+                    • <strong className="text-[#000000] dark:text-white">Flèches seules :</strong> {globalStyles.nudgeStep ?? 1} px<br />
+                    • <strong className="text-[#000000] dark:text-white">Alt + Flèches :</strong> 0.1 px (micro-précision chirurgicale)<br />
+                    • <strong className="text-[#000000] dark:text-white">Shift + Flèches :</strong> {Math.max(10, (globalStyles.nudgeStep ?? 1) * 10)} px (rapide)
+                  </p>
+                </div>
+
                 {/* Ajout rapide de repères manuels */}
                 <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-[#eeeeee]/60 border border-white">
                   <div className="text-[10.5px] font-semibold text-[#000000]">
@@ -3812,6 +3855,67 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               <span>3.5×</span>
                               <span>5.0× (serré)</span>
                             </div>
+                          </div>
+
+                          {/* Coordonnées et micro-déplacement de la cible */}
+                          <div className="pt-2 border-t border-[#eeeeee] dark:border-[#333333] flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between text-[9px] text-[#666666] dark:text-[#aaaaaa]">
+                              <span>Position de la cible (X, Y)</span>
+                              <span className="font-mono font-semibold text-[#0088cc]">
+                                X: {Math.round((calloutVignette.sourceX ?? 0) * 10) / 10} px • Y: {Math.round((calloutVignette.sourceY ?? 0) * 10) / 10} px
+                              </span>
+                            </div>
+
+                            {/* Micro-ajustements rapides */}
+                            <div className="flex items-center gap-1.5 justify-between">
+                              <span className="text-[9px] text-[#888888]">Ajustement rapide :</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateCallout({
+                                    sourceX: Math.round(((calloutVignette.sourceX ?? 0) - (globalStyles.nudgeStep ?? 1)) * 10) / 10,
+                                  })}
+                                  className="px-1.5 py-0.5 rounded bg-white dark:bg-[#333333] border border-[#dddddd] dark:border-[#444444] text-[9px] font-mono hover:text-[#0088cc]"
+                                  title={`Déplacer à gauche (-${globalStyles.nudgeStep ?? 1}px)`}
+                                >
+                                  ← {globalStyles.nudgeStep ?? 1}px
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateCallout({
+                                    sourceX: Math.round(((calloutVignette.sourceX ?? 0) + (globalStyles.nudgeStep ?? 1)) * 10) / 10,
+                                  })}
+                                  className="px-1.5 py-0.5 rounded bg-white dark:bg-[#333333] border border-[#dddddd] dark:border-[#444444] text-[9px] font-mono hover:text-[#0088cc]"
+                                  title={`Déplacer à droite (+${globalStyles.nudgeStep ?? 1}px)`}
+                                >
+                                  → {globalStyles.nudgeStep ?? 1}px
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateCallout({
+                                    sourceY: Math.round(((calloutVignette.sourceY ?? 0) - (globalStyles.nudgeStep ?? 1)) * 10) / 10,
+                                  })}
+                                  className="px-1.5 py-0.5 rounded bg-white dark:bg-[#333333] border border-[#dddddd] dark:border-[#444444] text-[9px] font-mono hover:text-[#0088cc]"
+                                  title={`Déplacer vers le haut (-${globalStyles.nudgeStep ?? 1}px)`}
+                                >
+                                  ↑ {globalStyles.nudgeStep ?? 1}px
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateCallout({
+                                    sourceY: Math.round(((calloutVignette.sourceY ?? 0) + (globalStyles.nudgeStep ?? 1)) * 10) / 10,
+                                  })}
+                                  className="px-1.5 py-0.5 rounded bg-white dark:bg-[#333333] border border-[#dddddd] dark:border-[#444444] text-[9px] font-mono hover:text-[#0088cc]"
+                                  title={`Déplacer vers le bas (+${globalStyles.nudgeStep ?? 1}px)`}
+                                >
+                                  ↓ {globalStyles.nudgeStep ?? 1}px
+                                </button>
+                              </div>
+                            </div>
+
+                            <p className="text-[8.5px] text-[#888888] leading-tight">
+                              💡 <strong>Raccourcis :</strong> Flèches ({globalStyles.nudgeStep ?? 1}px) • Alt+Flèches (0.1px) • Shift+Flèches (10px)
+                            </p>
                           </div>
                         </>
                       );
