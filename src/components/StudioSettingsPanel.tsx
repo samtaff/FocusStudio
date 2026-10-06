@@ -3771,6 +3771,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                                       onUpdateCallout({ sourceWidth: newSrcW, sourceHeight: newSrcW });
                                     }
                                   }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === 'Escape') {
+                                      (e.target as HTMLElement).blur();
+                                    }
+                                  }}
                                   className="w-10 text-right text-[11px] font-mono font-bold text-[#0088cc] outline-none"
                                   title="Entrez la valeur exacte du grossissement (ex: 2.5)"
                                 />

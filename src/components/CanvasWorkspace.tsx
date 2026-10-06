@@ -1011,7 +1011,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   // Hit-test Callout parts: source target on screen or vignette bubble on left
   const getCalloutPartAtCoord = (cx: number, cy: number): 'source' | 'vignette' | null => {
     if (!calloutVignette || !calloutVignette.enabled) return null;
-    const pad = 5;
+    const pad = 8;
 
     // 1. Source target on screen
     const srcX = calloutVignette.sourceX;
@@ -1796,7 +1796,6 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       onSelectBlur(null);
       onSelectMask(null);
       onSelectTriangle?.(null);
-      onClearSelection?.();
       setDragCalloutState({
         part: clickedCallout,
         startX: cx,
@@ -1857,7 +1856,12 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
     // 9. Clicked empty background: clear selection unless Shift is held, and start Marquee Selection
     if (!isShiftHolding) {
-      updateSelectedCallout(null);
+      if (!calloutVignette?.enabled) {
+        updateSelectedCallout(null);
+      } else {
+        // En mode Callout, maintenir la cible active par défaut pour les flèches du clavier
+        updateSelectedCallout('source');
+      }
       onSelectFocus(null);
       onSelectBlur(null);
       onSelectMask(null);
