@@ -439,13 +439,13 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
           <button
             id="btn-studio-reset"
-            onClick={onResetToDefaults}
+            onClick={onResetAllShapes || onResetToDefaults}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
               isDarkMode
                 ? 'bg-[#333333] hover:bg-[#3e3e3e] text-white border border-[#444444]'
                 : 'bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000]'
             }`}
-            title="Réinitialiser tous les réglages par défaut"
+            title="Réinitialiser toutes les formes et annotations du canevas"
           >
             <RotateCcw className={`w-3 h-3 ${isDarkMode ? 'text-[#bbbbbb]' : 'text-[#666666]'}`} />
             <span>Réinitialiser</span>
@@ -706,27 +706,6 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                 <p className={`text-[10px] leading-relaxed ${isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]'}`}>
                   Garde en place vos cadres de focus, zones de flou, triangles, masques et repères lorsque vous changez de capture d'écran.
                 </p>
-
-                {onResetAllShapes && (
-                  <div className={`pt-2 border-t flex items-center justify-between text-[11px] ${
-                    isDarkMode ? 'border-[#383838]' : 'border-white/80'
-                  }`}>
-                    <span className={isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]'}>Remise à zéro :</span>
-                    <button
-                      type="button"
-                      onClick={onResetAllShapes}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer ${
-                        isDarkMode
-                          ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30'
-                          : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
-                      }`}
-                      title="Effacer toutes les formes actuelles et réinitialiser"
-                    >
-                      <Trash2 className="w-2.5 h-2.5" />
-                      <span>Réinitialiser les formes</span>
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Redimensionnement automatique explicite */}
@@ -3460,8 +3439,8 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     <label className="text-[10px] text-[#666666] font-medium">Orientation de la pointe</label>
                     <div className="grid grid-cols-4 gap-1.5">
                       {[
-                        { id: 'down', label: 'Bas ↓' },
                         { id: 'up', label: 'Haut ↑' },
+                        { id: 'down', label: 'Bas ↓' },
                         { id: 'left', label: 'Gauche ←' },
                         { id: 'right', label: 'Droite →' },
                       ].map((dir) => (
@@ -3469,7 +3448,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           key={dir.id}
                           onClick={() => onUpdateTriangle(activeTriangle.id, { direction: dir.id as any })}
                           className={`py-1 text-[10px] rounded-full text-center transition-all ${
-                            (activeTriangle.direction || 'down') === dir.id
+                            (activeTriangle.direction || 'up') === dir.id
                               ? 'bg-[#000000] text-white font-semibold shadow-2xs'
                               : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
                           }`}

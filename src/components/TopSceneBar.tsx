@@ -13,6 +13,7 @@ import {
   Square,
   Undo2,
   Redo2,
+  RotateCcw,
   Move
 } from 'lucide-react';
 import { GlobalStyleSettings } from '../types';
@@ -38,6 +39,7 @@ interface TopSceneBarProps {
   onTogglePreview: () => void;
   isCalloutMode?: boolean;
   onCenterWorkspace?: () => void;
+  onResetShapes?: () => void;
   // Undo / Redo
   onUndo?: () => void;
   onRedo?: () => void;
@@ -64,6 +66,7 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
   onTogglePreview,
   isCalloutMode = false,
   onCenterWorkspace,
+  onResetShapes,
   onUndo,
   onRedo,
   canUndo = false,
@@ -78,7 +81,7 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
         ? 'bg-[#282828]/95 border border-[#383838] text-[#cccccc] shadow-2xs'
         : 'bg-white/70 border border-[#eeeeee] text-[#666666] shadow-xs'
     }`}>
-      {/* Left: Title + Undo/Redo Pills */}
+      {/* Left: Title + Undo/Redo Pills + Réinitialiser + Prévisualisation */}
       <div className="flex items-center gap-2">
         <span className={`font-semibold tracking-tight text-xs ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
           Scène Studio
@@ -123,6 +126,23 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
               <Redo2 className="w-3.5 h-3.5" />
             </button>
           </div>
+        )}
+
+        {/* Bouton Réinitialiser */}
+        {onResetShapes && (
+          <button
+            id="btn-scene-reset-shapes"
+            onClick={onResetShapes}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
+              isDarkMode
+                ? 'bg-[#353535] text-[#dddddd] hover:bg-[#404040] hover:text-white border border-[#444444]'
+                : 'bg-[#eeeeee]/80 text-[#000000] hover:bg-[#eeeeee]'
+            }`}
+            title="Réinitialiser toutes les formes et annotations du canevas"
+          >
+            <RotateCcw className="w-3 h-3 text-rose-500" />
+            <span>Réinitialiser</span>
+          </button>
         )}
 
         {/* Bouton Prévisualisation mis en valeur */}

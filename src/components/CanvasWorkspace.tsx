@@ -118,6 +118,7 @@ interface CanvasWorkspaceProps {
   // Workspace centering & reset
   resetWorkspaceTrigger?: number;
   onCenterWorkspace?: () => void;
+  onResetShapes?: () => void;
   // Internal screenshot framing inside focus zone
   internalFramingFocusId?: string | null;
   onToggleInternalFraming?: (id: string | null) => void;
@@ -204,6 +205,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   onImportClick,
   resetWorkspaceTrigger,
   onCenterWorkspace: externalCenterWorkspace,
+  onResetShapes,
   internalFramingFocusId = null,
   onToggleInternalFraming,
   onUndo,
@@ -2196,6 +2198,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         onTogglePreview={onTogglePreview}
         isCalloutMode={!!calloutVignette?.enabled}
         onCenterWorkspace={handleCenterWorkspace}
+        onResetShapes={onResetShapes}
         onUndo={onUndo}
         onRedo={onRedo}
         canUndo={canUndo}
@@ -2296,6 +2299,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             onExportClick={onExportClick}
             isExporting={isExporting}
             onCenterWorkspace={handleCenterWorkspace}
+            onResetShapes={onResetShapes}
             onSelectFocus={(id) => onSelectFocus(id)}
             onUpdateFocus={(id, updated) => {
               if (selectedFocusId === id) {

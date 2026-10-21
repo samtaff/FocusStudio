@@ -623,6 +623,7 @@ export default function App() {
     };
 
     recordHistory(resetSnapshot);
+    appStateRef.current = cloneSnapshot(resetSnapshot);
     setFocuses([initialFocus]);
     setBlurZones([]);
     setMaskShapes([]);
@@ -1047,7 +1048,7 @@ export default function App() {
       blurType: 'gaussian',
       opacity: 1,
       borderRadius: 4,
-      layer: 'above',
+      layer: 'below',
     };
     const updated = [...blurZones, newBlur];
     setBlurZones(updated);
@@ -1183,7 +1184,7 @@ export default function App() {
       width: 15,
       height: 13,
       color: '#25465F',
-      direction: 'down',
+      direction: 'up',
       opacity: 1,
     };
     const updated = [...triangles, newTriangle];
@@ -2240,6 +2241,7 @@ export default function App() {
           canRedo={historyIndex < history.length - 1}
           resetWorkspaceTrigger={resetWorkspaceTrigger}
           onCenterWorkspace={handleCenterWorkspace}
+          onResetShapes={handleResetAllShapes}
           onExportClick={handleExportPng}
           isExporting={isExporting}
           onImportClick={() => {

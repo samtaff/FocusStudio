@@ -347,21 +347,32 @@ export function drawComposition(
   }
   ctx.restore();
 
-  // 3. Screenshot border: MUST ALWAYS HAVE A 1px BORDER IN #25465F (straight square corners)
+  // 3. Draw Blur zones on background screenshot (screenBlurs)
+  // All blurs on the screenshot are drawn underneath the screenshot 1px border and underneath focus zones
+  const isBlurOverAnyFocus = (blur: BlurZone) => {
+    return focuses.some((f) => 
+      blur.x < f.x + f.width && blur.x + blur.width > f.x &&
+      blur.y < f.y + f.height && blur.y + blur.height > f.y
+    );
+  };
+
+  const screenClip = { x: bgX, y: bgY, width: bgWidth, height: bgHeight, borderRadius: 0 };
+  const screenBlurs = blurZones.filter((b) => b.layer === 'below' || !isBlurOverAnyFocus(b));
+  const focusBlurs = blurZones.filter((b) => b.layer !== 'below' && isBlurOverAnyFocus(b));
+
+  if (screenBlurs.length > 0) {
+    screenBlurs.forEach((blur) => {
+      drawSingleBlurZone(ctx, blur, interactive && !options.previewMode && blur.id === selectedBlurId, screenClip);
+    });
+  }
+
+  // 4. Screenshot border: MUST ALWAYS HAVE A 1px BORDER IN #25465F (straight square corners)
+  // Drawn strictly ON TOP of screenshot blurs (so blur never covers it), but BEHIND focus zones!
   ctx.save();
   ctx.strokeStyle = BASE_COLOR; // Strictly #25465F
   ctx.lineWidth = 1;
   ctx.strokeRect(bgX + 0.5, bgY + 0.5, bgWidth - 1, bgHeight - 1);
   ctx.restore();
-
-  // 4. Draw Blur zones positioned BEHIND focus zones (layer === 'below')
-  if (blurZones.length > 0) {
-    blurZones.forEach((blur) => {
-      if (blur.layer === 'below') {
-        drawSingleBlurZone(ctx, blur, interactive && !options.previewMode && blur.id === selectedBlurId);
-      }
-    });
-  }
 
   // 4.5. Draw Mask shapes positioned BEHIND focus zones (layer === 'below')
   if (maskShapes.length > 0) {
@@ -372,7 +383,7 @@ export function drawComposition(
     });
   }
 
-  // 5. Draw Focus zones content & borders (renders on top of behind-blur zones and behind-masks)
+  // 5. Draw Focus zones content & borders (renders on top of the screenshot, its 1px border, and background blurs/masks)
   // When Callout option is chosen, the focus zone disappears!
   if (!isCalloutMode) {
     focuses.forEach((focus) => {
@@ -380,12 +391,25 @@ export function drawComposition(
     });
   }
 
-  // 5.5. Draw Blur zones positioned ABOVE focus zones (layer !== 'below', default)
-  if (blurZones.length > 0) {
-    blurZones.forEach((blur) => {
-      if (blur.layer !== 'below') {
-        drawSingleBlurZone(ctx, blur, interactive && !options.previewMode && blur.id === selectedBlurId);
-      }
+  // 5.5. Draw Blur zones positioned on focus zones (focusBlurs)
+  if (focusBlurs.length > 0) {
+    focusBlurs.forEach((blur) => {
+      const blurCenterX = blur.x + blur.width / 2;
+      const blurCenterY = blur.y + blur.height / 2;
+      const containingFocus = focuses.find((f) => 
+        blurCenterX >= f.x && blurCenterX <= f.x + f.width &&
+        blurCenterY >= f.y && blurCenterY <= f.y + f.height
+      );
+
+      const focusClip = containingFocus ? {
+        x: Math.round(containingFocus.x),
+        y: Math.round(containingFocus.y),
+        width: Math.round(containingFocus.width),
+        height: Math.round(containingFocus.height),
+        borderRadius: containingFocus.borderRadius ?? 10,
+      } : screenClip;
+
+      drawSingleBlurZone(ctx, blur, interactive && !options.previewMode && blur.id === selectedBlurId, focusClip);
     });
   }
 
@@ -395,6 +419,27 @@ export function drawComposition(
       if (mask.layer !== 'below') {
         drawSingleMaskShape(ctx, mask);
       }
+    });
+  }
+
+  // 6.5. RÈGLE ABSOLUE : Re-tracer les bordures de toutes les zones de focus au-dessus des flous internes
+  // Le flou ne doit jamais recouvrir le contour de la zone focus
+  if (!isCalloutMode && focuses.length > 0) {
+    focuses.forEach((focus) => {
+      const destX = Math.round(focus.x);
+      const destY = Math.round(focus.y);
+      const destW = Math.round(focus.width);
+      const destH = Math.round(focus.height);
+      const radius = focus.borderRadius ?? 10;
+      const bWidth = focus.borderWidth || 2;
+
+      ctx.save();
+      ctx.strokeStyle = focus.borderColor || BASE_COLOR;
+      ctx.lineWidth = bWidth;
+      ctx.beginPath();
+      ctx.roundRect(destX, destY, destW, destH, radius);
+      ctx.stroke();
+      ctx.restore();
     });
   }
 
@@ -872,7 +917,8 @@ function drawStepBadge(
 function drawSingleBlurZone(
   ctx: CanvasRenderingContext2D,
   blur: BlurZone,
-  showIndicator = false
+  showIndicator = false,
+  clipBounds?: { x: number; y: number; width: number; height: number; borderRadius?: number }
 ) {
   const { x, y, width: w, height: h } = blur;
   if (w <= 0 || h <= 0) return;
@@ -925,6 +971,15 @@ function drawSingleBlurZone(
         pixelCtx.drawImage(offscreen, 0, 0, clampedW, clampedH, 0, 0, tinyW, tinyH);
 
         ctx.save();
+        if (clipBounds) {
+          ctx.beginPath();
+          if (clipBounds.borderRadius) {
+            ctx.roundRect(clipBounds.x, clipBounds.y, clipBounds.width, clipBounds.height, clipBounds.borderRadius);
+          } else {
+            ctx.rect(clipBounds.x, clipBounds.y, clipBounds.width, clipBounds.height);
+          }
+          ctx.clip();
+        }
         ctx.globalAlpha = opacity;
         ctx.beginPath();
         ctx.roundRect(x, y, w, h, radius);
@@ -1020,6 +1075,15 @@ function drawSingleBlurZone(
 
           // Draw central blurred region (pad, pad, destW, destH) strictly into (x, y, w, h)
           ctx.save();
+          if (clipBounds) {
+            ctx.beginPath();
+            if (clipBounds.borderRadius) {
+              ctx.roundRect(clipBounds.x, clipBounds.y, clipBounds.width, clipBounds.height, clipBounds.borderRadius);
+            } else {
+              ctx.rect(clipBounds.x, clipBounds.y, clipBounds.width, clipBounds.height);
+            }
+            ctx.clip();
+          }
           ctx.globalAlpha = opacity;
           ctx.beginPath();
           ctx.roundRect(x, y, w, h, radius);
@@ -1066,6 +1130,15 @@ function drawSingleBlurZone(
   // Subtle border only for interactive positioning when selected
   if (showIndicator) {
     ctx.save();
+    if (clipBounds) {
+      ctx.beginPath();
+      if (clipBounds.borderRadius) {
+        ctx.roundRect(clipBounds.x, clipBounds.y, clipBounds.width, clipBounds.height, clipBounds.borderRadius);
+      } else {
+        ctx.rect(clipBounds.x, clipBounds.y, clipBounds.width, clipBounds.height);
+      }
+      ctx.clip();
+    }
     ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
     ctx.lineWidth = 1;
     ctx.setLineDash([2.5, 2.5]);
@@ -1183,7 +1256,7 @@ function drawSingleTriangle(
   ctx: CanvasRenderingContext2D,
   triangle: TriangleShape
 ) {
-  const { x, y, width: w, height: h, color, direction = 'down', opacity = 1, rotation = 0 } = triangle;
+  const { x, y, width: w, height: h, color, direction = 'up', opacity = 1, rotation = 0 } = triangle;
   const centerX = x + w / 2;
   const centerY = y + h / 2;
 

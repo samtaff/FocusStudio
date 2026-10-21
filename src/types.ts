@@ -133,7 +133,7 @@ export interface TriangleShape {
   height: number; // default 13px
   rotation?: number; // custom angle in degrees (default 0)
   color: string; // default #25465F or #ffffff
-  direction: 'down' | 'up' | 'left' | 'right'; // default 'down'
+  direction: 'up' | 'down' | 'left' | 'right'; // default 'up'
   borderWidth?: number;
   borderColor?: string;
   opacity?: number; // 0 to 1

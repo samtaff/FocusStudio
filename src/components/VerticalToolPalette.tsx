@@ -90,6 +90,7 @@ interface VerticalToolPaletteProps {
   showHandles: boolean;
   onToggleHandles: () => void;
   onCenterWorkspace?: () => void;
+  onResetShapes?: () => void;
   onToggleMiniWidget?: () => void;
 
   // Undo / Redo
@@ -368,6 +369,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
   showHandles,
   onToggleHandles,
   onCenterWorkspace,
+  onResetShapes,
   onUndo,
   onRedo,
   canUndo = false,
@@ -1071,23 +1073,8 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       <div className={`w-5 h-px my-0.5 ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`} />
 
       {/* ========================================================= */}
-      {/* 6. OUTILS DE CONTRÔLE (Recentrer, Poignées, Undo, Redo)    */}
+      {/* 6. OUTILS DE CONTRÔLE (Poignées, Undo, Redo, Réinitialiser) */}
       {/* ========================================================= */}
-      {onCenterWorkspace && (
-        <button
-          id="tool-center-workspace"
-          onClick={onCenterWorkspace}
-          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-            isDarkMode
-              ? 'text-[#e5e5e5] hover:text-white hover:bg-white/15'
-              : 'text-[#666666] hover:text-[#000000] hover:bg-white/40'
-          }`}
-          title="Recentrer le plan de travail (vue 100%, centrée)"
-        >
-          <Maximize2 className="w-4 h-4" />
-        </button>
-      )}
-
       {/* Sélection / Poignées de transformation */}
       <button
         id="tool-toggle-handles"
@@ -1136,10 +1123,45 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
         </>
       )}
 
+      {/* Bouton Réinitialiser les formes */}
+      {onResetShapes && (
+        <button
+          id="tool-reset-shapes"
+          onClick={onResetShapes}
+          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+            isDarkMode
+              ? 'text-[#e5e5e5] hover:text-rose-400 hover:bg-white/15'
+              : 'text-[#666666] hover:text-rose-600 hover:bg-white/40'
+          }`}
+          title="Réinitialiser (effacer toutes les formes et annotations)"
+        >
+          <RotateCcw className="w-4 h-4 text-rose-500" />
+        </button>
+      )}
+
+      {/* Bouton Recentrer - Placé au-dessus de l'outil Prévisualisation */}
+      {onCenterWorkspace && (
+        <>
+          <div className={`w-5 h-px my-0.5 ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`} />
+          <button
+            id="tool-center-workspace"
+            onClick={onCenterWorkspace}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+              isDarkMode
+                ? 'text-[#e5e5e5] hover:text-white hover:bg-white/15'
+                : 'text-[#666666] hover:text-[#000000] hover:bg-white/40'
+            }`}
+            title="Recentrer le plan de travail (vue 100%, centrée)"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+        </>
+      )}
+
       {/* Prévisualisation */}
       {onTogglePreview && (
         <>
-          <div className={`w-5 h-px my-0.5 ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`} />
+          {!onCenterWorkspace && <div className={`w-5 h-px my-0.5 ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`} />}
           <button
             id="tool-preview-mode"
             onClick={onTogglePreview}
