@@ -878,40 +878,43 @@ function drawSingleBlurZone(
   if (w <= 0 || h <= 0) return;
 
   const radius = blur.borderRadius ?? 4;
-  const userRadius = Math.max(2, Math.min(50, blur.blurRadius || 12));
+  const userRadius = Math.max(2, Math.min(60, blur.blurRadius || 18));
   const opacity = Math.max(0.05, Math.min(1.0, blur.opacity ?? 1.0));
   const blurType = blur.blurType || 'gaussian';
 
-  // For pixelate, we sample exactly the bounding area; for blurs, we add a padding
-  const pad = blurType === 'pixelate' ? 0 : Math.ceil(userRadius * 0.75);
-  const srcX = Math.max(0, Math.floor(x - pad));
-  const srcY = Math.max(0, Math.floor(y - pad));
-  const srcW = Math.min(ctx.canvas.width - srcX, Math.ceil(w + pad * 2));
-  const srcH = Math.min(ctx.canvas.height - srcY, Math.ceil(h + pad * 2));
+  // Extract current 2D canvas transform matrix (handles export scale, preview modal scale, and offsets)
+  const matrix = ctx.getTransform();
+  const scaleX = Math.hypot(matrix.a, matrix.b) || 1;
+  const scaleY = Math.hypot(matrix.c, matrix.d) || 1;
 
-  if (srcW <= 0 || srcH <= 0) return;
+  // Physical canvas pixel coordinates for the blur zone
+  const destX = Math.round(x * matrix.a + y * matrix.c + matrix.e);
+  const destY = Math.round(x * matrix.b + y * matrix.d + matrix.f);
+  const destW = Math.max(1, Math.round(w * scaleX));
+  const destH = Math.max(1, Math.round(h * scaleY));
+
+  // Determine valid overlap with physical ctx.canvas
+  const clampedX = Math.max(0, Math.min(ctx.canvas.width, destX));
+  const clampedY = Math.max(0, Math.min(ctx.canvas.height, destY));
+  const clampedW = Math.max(0, Math.min(ctx.canvas.width - clampedX, destX + destW - clampedX));
+  const clampedH = Math.max(0, Math.min(ctx.canvas.height - clampedY, destY + destH - clampedY));
+
+  if (clampedW <= 0 || clampedH <= 0) return;
 
   try {
-    // 1. Snapshot the existing pixels on the canvas (underneath all other objects)
-    const offscreen = document.createElement('canvas');
-    offscreen.width = srcW;
-    offscreen.height = srcH;
-    const offCtx = offscreen.getContext('2d');
-    if (!offCtx) return;
-    offCtx.drawImage(ctx.canvas, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
-
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, radius);
-    ctx.clip();
-
     if (blurType === 'pixelate') {
-      // 2. PIXELATE / MOSAIC REDACTION
-      // Block size scaled from intensity (between 4px and 32px)
+      // 1. PIXELATE / MOSAIC REDACTION
       const blockSize = blur.pixelSize || Math.max(4, Math.min(32, Math.round(userRadius * 0.85)));
-      const tinyW = Math.max(1, Math.floor(w / blockSize));
-      const tinyH = Math.max(1, Math.floor(h / blockSize));
+      const tinyW = Math.max(1, Math.round(destW / (blockSize * scaleX)));
+      const tinyH = Math.max(1, Math.round(destH / (blockSize * scaleY)));
+
+      // Snapshot directly from canvas
+      const offscreen = document.createElement('canvas');
+      offscreen.width = clampedW;
+      offscreen.height = clampedH;
+      const offCtx = offscreen.getContext('2d');
+      if (!offCtx) return;
+      offCtx.drawImage(ctx.canvas, clampedX, clampedY, clampedW, clampedH, 0, 0, clampedW, clampedH);
 
       const pixelCanvas = document.createElement('canvas');
       pixelCanvas.width = tinyW;
@@ -919,19 +922,79 @@ function drawSingleBlurZone(
       const pixelCtx = pixelCanvas.getContext('2d');
       if (pixelCtx) {
         pixelCtx.imageSmoothingEnabled = false;
-        // Sample exact area from offscreen
-        pixelCtx.drawImage(offscreen, x - srcX, y - srcY, w, h, 0, 0, tinyW, tinyH);
+        pixelCtx.drawImage(offscreen, 0, 0, clampedW, clampedH, 0, 0, tinyW, tinyH);
 
-        // Render back with nearest-neighbor mosaic magnification
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, radius);
+        ctx.clip();
+
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(pixelCanvas, 0, 0, tinyW, tinyH, x, y, w, h);
+        ctx.restore();
       }
     } else {
-      // 3. OPTICAL BLURS: GAUSSIAN, FROSTED, SMOKED
-      // Downsample stage to eliminate high-frequency details
-      const scaleDivisor = Math.max(2, Math.min(10, Math.round(userRadius / 2.5)));
-      const downW = Math.max(4, Math.floor(srcW / scaleDivisor));
-      const downH = Math.max(4, Math.floor(srcH / scaleDivisor));
+      // 2. OPTICAL BLURS: GAUSSIAN, FROSTED, SMOKED
+      // Generous clamp-to-edge padding: ensures the Gaussian kernel NEVER fades to transparent or black at borders
+      const pad = Math.ceil(userRadius * 2.2 * scaleX) + 24;
+      const totalW = destW + pad * 2;
+      const totalH = destH + pad * 2;
+
+      const sourceCanvas = document.createElement('canvas');
+      sourceCanvas.width = totalW;
+      sourceCanvas.height = totalH;
+      const sourceCtx = sourceCanvas.getContext('2d');
+      if (!sourceCtx) return;
+
+      // Compute average color of sampled region for solid 100% opaque backdrop
+      const avgCanvas = document.createElement('canvas');
+      avgCanvas.width = 1;
+      avgCanvas.height = 1;
+      const avgCtx = avgCanvas.getContext('2d');
+      let avgFill = '#e2e8f0';
+      if (avgCtx) {
+        avgCtx.drawImage(ctx.canvas, clampedX, clampedY, clampedW, clampedH, 0, 0, 1, 1);
+        const p = avgCtx.getImageData(0, 0, 1, 1).data;
+        if (p[3] > 10) {
+          avgFill = `rgb(${p[0]}, ${p[1]}, ${p[2]})`;
+        }
+      }
+
+      // Pre-fill entire padded canvas with solid average color (prevents transparent black bleed-through)
+      sourceCtx.fillStyle = avgFill;
+      sourceCtx.fillRect(0, 0, totalW, totalH);
+
+      // Draw sampled canvas pixels into the central zone (pad, pad, destW, destH)
+      const targetInSourceX = pad + (clampedX - destX);
+      const targetInSourceY = pad + (clampedY - destY);
+      sourceCtx.drawImage(
+        ctx.canvas,
+        clampedX,
+        clampedY,
+        clampedW,
+        clampedH,
+        targetInSourceX,
+        targetInSourceY,
+        clampedW,
+        clampedH
+      );
+
+      // CLAMP-TO-EDGE BORDER REPLICATION:
+      // Replicate the perimeter pixels of the central zone across the outer pad margins
+      // Left margin
+      sourceCtx.drawImage(sourceCanvas, pad, pad, 1, destH, 0, pad, pad, destH);
+      // Right margin
+      sourceCtx.drawImage(sourceCanvas, pad + destW - 1, pad, 1, destH, pad + destW, pad, pad, destH);
+      // Top margin (spans full totalW including top corners)
+      sourceCtx.drawImage(sourceCanvas, 0, pad, totalW, 1, 0, 0, totalW, pad);
+      // Bottom margin (spans full totalW including bottom corners)
+      sourceCtx.drawImage(sourceCanvas, 0, pad + destH - 1, totalW, 1, 0, pad + destH, totalW, pad);
+
+      // Dual-stage downsample: dissolves high-frequency contours (sharp letters, icons)
+      const scaleDivisor = Math.max(2, Math.min(5, Math.round(userRadius / 4)));
+      const downW = Math.max(4, Math.floor(totalW / scaleDivisor));
+      const downH = Math.max(4, Math.floor(totalH / scaleDivisor));
 
       const downCanvas = document.createElement('canvas');
       downCanvas.width = downW;
@@ -939,35 +1002,63 @@ function drawSingleBlurZone(
       const downCtx = downCanvas.getContext('2d');
       if (downCtx) {
         downCtx.imageSmoothingEnabled = true;
-        downCtx.imageSmoothingQuality = 'medium';
-        downCtx.drawImage(offscreen, 0, 0, srcW, srcH, 0, 0, downW, downH);
+        downCtx.imageSmoothingQuality = 'high';
+        downCtx.drawImage(sourceCanvas, 0, 0, totalW, totalH, 0, 0, downW, downH);
 
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.filter = `blur(${Math.max(3, Math.round(userRadius / 2))}px)`;
-        ctx.drawImage(downCanvas, 0, 0, downW, downH, srcX, srcY, srcW, srcH);
-        ctx.filter = 'none';
+        // Pre-rasterize Gaussian blur on an offscreen canvas
+        const blurredCanvas = document.createElement('canvas');
+        blurredCanvas.width = totalW;
+        blurredCanvas.height = totalH;
+        const blurCtx = blurredCanvas.getContext('2d');
+        if (blurCtx) {
+          blurCtx.imageSmoothingEnabled = true;
+          blurCtx.imageSmoothingQuality = 'high';
+          const blurPx = Math.max(4, Math.round(userRadius * 0.75 * scaleX));
+          blurCtx.filter = `blur(${blurPx}px)`;
+          blurCtx.drawImage(downCanvas, 0, 0, downW, downH, 0, 0, totalW, totalH);
+          blurCtx.filter = 'none';
 
-        if (blurType === 'frosted') {
-          // Dépoli : Voile translucide blanc laiteux + reflet givré en haut
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
-          ctx.fillRect(x, y, w, h);
+          // Draw central blurred region (pad, pad, destW, destH) strictly into (x, y, w, h)
+          ctx.save();
+          ctx.globalAlpha = opacity;
+          ctx.beginPath();
+          ctx.roundRect(x, y, w, h, radius);
+          ctx.clip();
 
-          const grad = ctx.createLinearGradient(x, y, x, y + Math.min(h, 24));
-          grad.addColorStop(0, 'rgba(255, 255, 255, 0.30)');
-          grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
-          ctx.fillStyle = grad;
-          ctx.fillRect(x, y, w, Math.min(h, 24));
-        } else if (blurType === 'smoked') {
-          // Fumé : Voile sombre élégant pour assombrir et masquer avec discrétion
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.38)';
-          ctx.fillRect(x, y, w, h);
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(
+            blurredCanvas,
+            pad,
+            pad,
+            destW,
+            destH,
+            x,
+            y,
+            w,
+            h
+          );
+
+          if (blurType === 'frosted') {
+            // Dépoli : Voile translucide blanc laiteux + reflet givré en haut
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+            ctx.fillRect(x, y, w, h);
+
+            const grad = ctx.createLinearGradient(x, y, x, y + Math.min(h, 26));
+            grad.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
+            grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(x, y, w, Math.min(h, 26));
+          } else if (blurType === 'smoked') {
+            // Fumé : Voile sombre élégant pour assombrir et masquer avec discrétion
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.40)';
+            ctx.fillRect(x, y, w, h);
+          }
+
+          ctx.restore();
         }
-        // 'gaussian' keeps pure blurred pixels without additional color wash
       }
     }
-
-    ctx.restore();
   } catch (e) {
     console.error('Error applying blur:', e);
   }

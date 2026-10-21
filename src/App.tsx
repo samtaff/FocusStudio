@@ -916,7 +916,7 @@ export default function App() {
       y: posY,
       width: 100,
       height: 40,
-      blurRadius: 12,
+      blurRadius: 18,
       blurType: 'gaussian',
       opacity: 1,
       borderRadius: 4,
