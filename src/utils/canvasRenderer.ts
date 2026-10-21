@@ -1829,7 +1829,12 @@ function drawFocusSelectionHandles(ctx: CanvasRenderingContext2D, focus: FocusZo
     ctx.restore();
 
     // Badge indicateur au-dessus
-    const badgeText = `Recadrage actif : X: ${focus.sourceOffsetX ? `${focus.sourceOffsetX > 0 ? '+' : ''}${Math.round(focus.sourceOffsetX)}` : '0'}px, Y: ${focus.sourceOffsetY ? `${focus.sourceOffsetY > 0 ? '+' : ''}${Math.round(focus.sourceOffsetY)}` : '0'}px`;
+    const fmtOff = (val?: number) => {
+      if (!val) return '0';
+      const r = Math.round(val * 10) / 10;
+      return `${r > 0 ? '+' : ''}${r}`;
+    };
+    const badgeText = `Recadrage actif : X: ${fmtOff(focus.sourceOffsetX)}px, Y: ${fmtOff(focus.sourceOffsetY)}px`;
     ctx.font = '600 8.5px system-ui, -apple-system, sans-serif';
     const textMetrics = ctx.measureText(badgeText);
     const badgeW = textMetrics.width + 12;

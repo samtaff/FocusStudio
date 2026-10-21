@@ -840,11 +840,13 @@ export default function App() {
   };
 
   // Update selected focus
-  const handleUpdateFocus = (updatedFields: Partial<FocusZone>) => {
-    if (!selectedFocusId) return;
+  // Update single focus (supports explicit focusId or current selection/framing)
+  const handleUpdateFocus = (updatedFields: Partial<FocusZone>, focusId?: string) => {
+    const targetId = focusId || selectedFocusId || internalFramingFocusId;
+    if (!targetId) return;
     setFocuses((prev) => {
       const next = prev.map((f) => {
-        if (f.id === selectedFocusId) {
+        if (f.id === targetId) {
           return { ...f, ...updatedFields };
         }
         return f;
@@ -1790,9 +1792,24 @@ export default function App() {
         return;
       }
 
-      // Enter: Valider et quitter le mode recadrage interne
-      if (e.key === 'Enter' && internalFramingFocusId) {
-        setInternalFramingFocusId(null);
+      // Enter: Valider et quitter le mode recadrage interne (ou entrer en recadrage si un focus est sélectionné)
+      if (e.key === 'Enter') {
+        if (internalFramingFocusId) {
+          e.preventDefault();
+          setInternalFramingFocusId(null);
+          return;
+        }
+        if (selectedFocusId && !calloutVignette?.enabled) {
+          e.preventDefault();
+          setInternalFramingFocusId(selectedFocusId);
+          return;
+        }
+      }
+
+      // 'c' / 'C': Basculer le mode cadrage interne pour le focus sélectionné
+      if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey && !e.altKey && selectedFocusId && !calloutVignette?.enabled) {
+        e.preventDefault();
+        setInternalFramingFocusId((prev) => (prev === selectedFocusId ? null : selectedFocusId));
         return;
       }
 
@@ -1844,7 +1861,7 @@ export default function App() {
         return;
       }
 
-      // Arrow keys to nudge selected object(s) (Photoshop style: 1px by default, 10px with Shift)
+      // Arrow keys to nudge selected object(s) or internal framing
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         // Unité / pas de déplacement avec les flèches :
         // - Si Alt (Option) est maintenu : micro-déplacement chirurgical de 0.1 px (ou 0.05 px)
@@ -1869,64 +1886,75 @@ export default function App() {
 
         const isCalloutActive = Boolean(calloutVignette && calloutVignette.enabled);
 
-        const hasSelectedOtherShape = Boolean(
-          selectedBlurIds.length > 0 ||
-          selectedMaskIds.length > 0 ||
-          selectedTriangleIds.length > 0 ||
-          selectedBlurId ||
-          selectedMaskId ||
-          selectedTriangleId
-        );
-        // Les zones focus ne sont actives et sélectionnables QUE hors mode Callout
-        const hasSelectedFocus = !isCalloutActive && Boolean(
-          selectedFocusIds.length > 0 ||
-          selectedFocusId
-        );
-        const hasSelectedShape = hasSelectedOtherShape || hasSelectedFocus;
-
-        // Si une ou plusieurs formes sont sélectionnées (masque, triangle, flou, focus hors callout), les flèches déplacent ces formes !
-        if (hasSelectedShape) {
-          handleBatchMove(dx, dy);
-          handled = true;
-          scheduleDebouncedRecordHistory();
-        } else if (isCalloutActive && calloutVignette) {
-          // En mode Callout :
-          // Si la vignette est explicitement sélectionnée, déplacer la vignette (offsetY).
-          // Sinon (cible loupe sélectionnée ou mode callout actif sans autre sélection), déplacer la cible (sourceX, sourceY) !
-          if (selectedCalloutPart === 'vignette') {
-            const vigH = calloutVignette.height || calloutVignette.width || 100;
-            const shadowDist = (calloutVignette.showShadow !== false)
-              ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
-              : 0;
-            const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, calloutVignette);
-            const alignedBottomY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
-            const currentY = calloutVignette.alignBottom !== false ? alignedBottomY : (calloutVignette.offsetY ?? alignedBottomY);
-            handleUpdateCallout({
-              offsetY: Math.round((currentY + dy) * 10) / 10,
-              alignBottom: false,
-            });
-            handled = true;
-          } else {
-            // Déplacement précis de la cible loupe (source) avec les flèches du clavier
-            const curX = calloutVignette.sourceX ?? 0;
-            const curY = calloutVignette.sourceY ?? 0;
-            handleUpdateCallout({
-              sourceX: Math.round((curX + dx) * 10) / 10,
-              sourceY: Math.round((curY + dy) * 10) / 10,
-            });
-            if (selectedCalloutPart !== 'source') {
-              setSelectedCalloutPart('source');
-            }
+        // 1. PRIORITÉ ABSOLUE : Mode Cadrage interne actif (ou raccourci Ctrl/Cmd + Flèches quand un focus est sélectionné)
+        const activeFramingId = internalFramingFocusId || (!isCalloutActive && selectedFocusId && (e.ctrlKey || e.metaKey) ? selectedFocusId : null);
+        if (activeFramingId) {
+          const framingFocus = focuses.find((f) => f.id === activeFramingId) || (selectedFocusId ? focuses.find((f) => f.id === selectedFocusId) : null);
+          if (framingFocus) {
+            const curX = framingFocus.sourceOffsetX || 0;
+            const curY = framingFocus.sourceOffsetY || 0;
+            const newX = Math.round((curX + dx) * 100) / 100;
+            const newY = Math.round((curY + dy) * 100) / 100;
+            handleUpdateFocus({
+              sourceOffsetX: newX,
+              sourceOffsetY: newY,
+            }, framingFocus.id);
             handled = true;
           }
-        } else if (internalFramingFocusId && selectedFocusId) {
-          const current = focuses.find((f) => f.id === selectedFocusId);
-          if (current) {
-            handleUpdateFocus({
-              sourceOffsetX: Math.round(((current.sourceOffsetX || 0) + dx) * 10) / 10,
-              sourceOffsetY: Math.round(((current.sourceOffsetY || 0) + dy) * 10) / 10,
-            });
+        }
+
+        // 2. Déplacement standard des formes ou de la loupe callout
+        if (!handled) {
+          const hasSelectedOtherShape = Boolean(
+            selectedBlurIds.length > 0 ||
+            selectedMaskIds.length > 0 ||
+            selectedTriangleIds.length > 0 ||
+            selectedBlurId ||
+            selectedMaskId ||
+            selectedTriangleId
+          );
+          // Les zones focus ne sont actives et sélectionnables QUE hors mode Callout
+          const hasSelectedFocus = !isCalloutActive && Boolean(
+            selectedFocusIds.length > 0 ||
+            selectedFocusId
+          );
+          const hasSelectedShape = hasSelectedOtherShape || hasSelectedFocus;
+
+          // Si une ou plusieurs formes sont sélectionnées (masque, triangle, flou, focus hors callout), les flèches déplacent ces formes !
+          if (hasSelectedShape) {
+            handleBatchMove(dx, dy);
             handled = true;
+            scheduleDebouncedRecordHistory();
+          } else if (isCalloutActive && calloutVignette) {
+            // En mode Callout :
+            // Si la vignette est explicitement sélectionnée, déplacer la vignette (offsetY).
+            // Sinon (cible loupe sélectionnée ou mode callout actif sans autre sélection), déplacer la cible (sourceX, sourceY) !
+            if (selectedCalloutPart === 'vignette') {
+              const vigH = calloutVignette.height || calloutVignette.width || 100;
+              const shadowDist = (calloutVignette.showShadow !== false)
+                ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
+                : 0;
+              const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, calloutVignette);
+              const alignedBottomY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
+              const currentY = calloutVignette.alignBottom !== false ? alignedBottomY : (calloutVignette.offsetY ?? alignedBottomY);
+              handleUpdateCallout({
+                offsetY: Math.round((currentY + dy) * 10) / 10,
+                alignBottom: false,
+              });
+              handled = true;
+            } else {
+              // Déplacement précis de la cible loupe (source) avec les flèches du clavier
+              const curX = calloutVignette.sourceX ?? 0;
+              const curY = calloutVignette.sourceY ?? 0;
+              handleUpdateCallout({
+                sourceX: Math.round((curX + dx) * 10) / 10,
+                sourceY: Math.round((curY + dy) * 10) / 10,
+              });
+              if (selectedCalloutPart !== 'source') {
+                setSelectedCalloutPart('source');
+              }
+              handled = true;
+            }
           }
         }
 

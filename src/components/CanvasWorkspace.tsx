@@ -2216,12 +2216,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
               <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
               <span className="font-semibold text-white">Mode Cadrage interne :</span>
               <span className="font-mono text-sky-200">
-                X: {(selectedFocus.sourceOffsetX ?? 0) > 0 ? `+${Math.round(selectedFocus.sourceOffsetX ?? 0)}` : Math.round(selectedFocus.sourceOffsetX ?? 0)}px, 
-                Y: {(selectedFocus.sourceOffsetY ?? 0) > 0 ? `+${Math.round(selectedFocus.sourceOffsetY ?? 0)}` : Math.round(selectedFocus.sourceOffsetY ?? 0)}px
+                X: {(() => {
+                  const x = Math.round((selectedFocus.sourceOffsetX ?? 0) * 10) / 10;
+                  return `${x > 0 ? '+' : ''}${x}px`;
+                })()}, 
+                Y: {(() => {
+                  const y = Math.round((selectedFocus.sourceOffsetY ?? 0) * 10) / 10;
+                  return `${y > 0 ? '+' : ''}${y}px`;
+                })()}
               </span>
             </div>
             <span className="text-[11px] text-sky-100/70 hidden md:inline">
-              Glissez la souris ou utilisez les flèches (Alt pour 1px, Shift pour 10px)
+              Glissez la souris ou Flèches (Shift = 10px, Alt = 0.1px, Entrée / Échap pour valider)
             </span>
             {((selectedFocus.sourceOffsetX ?? 0) !== 0 || (selectedFocus.sourceOffsetY ?? 0) !== 0) && (
               <button
