@@ -139,8 +139,11 @@ interface StudioSettingsPanelProps {
   onAddGuideV?: () => void;
   onAddCustomGuide?: (type: 'horizontal' | 'vertical', position: number) => void;
   onUpdateGuide?: (id: string, position: number) => void;
-  onDeleteGuide?: (id: string) => void;
   onClearAllGuides?: () => void;
+  // Option : Conserver les formes (focus, flous, triangles, etc.) lors de l'import
+  keepShapesOnImport?: boolean;
+  onToggleKeepShapesOnImport?: () => void;
+  onResetAllShapes?: () => void;
 }
 
 export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
@@ -220,6 +223,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
   onUpdateGuide,
   onDeleteGuide,
   onClearAllGuides,
+  keepShapesOnImport = true,
+  onToggleKeepShapesOnImport,
+  onResetAllShapes,
 }) => {
   const [customGuideH, setCustomGuideH] = useState<number>(100);
   const [customGuideV, setCustomGuideV] = useState<number>(100);
@@ -661,6 +667,64 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         <span>Recommencer à 1</span>
                       </button>
                     )}
+                  </div>
+                )}
+              </div>
+
+              {/* Conserver les formes et annotations à l'import */}
+              <div className={`p-3 rounded-2xl border transition-colors flex flex-col gap-2 ${
+                isDarkMode ? 'bg-[#2a2a2a] border-[#383838]' : 'bg-[#eeeeee]/60 border-white'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-xs font-semibold ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
+                      Conserver les formes à l'import
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                      keepShapesOnImport
+                        ? 'bg-emerald-500/15 text-emerald-500 border border-emerald-500/30'
+                        : isDarkMode ? 'bg-[#383838] text-[#888888]' : 'bg-[#e0e0e0] text-[#777777]'
+                    }`}>
+                      {keepShapesOnImport ? 'Activée' : 'Désactivée'}
+                    </span>
+                  </div>
+
+                  {/* Toggle Switch */}
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={keepShapesOnImport}
+                      onChange={onToggleKeepShapesOnImport}
+                      className="sr-only peer"
+                    />
+                    <div className={`w-8 h-4 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#979797]/30 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#0088cc] ${
+                      isDarkMode ? 'bg-[#444444]' : 'bg-[#d0d0d0]'
+                    }`} />
+                  </label>
+                </div>
+
+                <p className={`text-[10px] leading-relaxed ${isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]'}`}>
+                  Garde en place vos cadres de focus, zones de flou, triangles, masques et repères lorsque vous changez de capture d'écran.
+                </p>
+
+                {onResetAllShapes && (
+                  <div className={`pt-2 border-t flex items-center justify-between text-[11px] ${
+                    isDarkMode ? 'border-[#383838]' : 'border-white/80'
+                  }`}>
+                    <span className={isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]'}>Remise à zéro :</span>
+                    <button
+                      type="button"
+                      onClick={onResetAllShapes}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium transition-all cursor-pointer ${
+                        isDarkMode
+                          ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30'
+                          : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
+                      }`}
+                      title="Effacer toutes les formes actuelles et réinitialiser"
+                    >
+                      <Trash2 className="w-2.5 h-2.5" />
+                      <span>Réinitialiser les formes</span>
+                    </button>
                   </div>
                 )}
               </div>

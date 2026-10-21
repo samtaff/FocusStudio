@@ -390,6 +390,26 @@ export default function App() {
   const nextSequentialStepRef = useRef(nextSequentialStep);
   nextSequentialStepRef.current = nextSequentialStep;
 
+  // Option : Conserver les formes (focus, flous, triangles, etc.) lors de l'import/changement de capture
+  const [keepShapesOnImport, setKeepShapesOnImport] = useState<boolean>(() => {
+    const saved = localStorage.getItem('keep_shapes_on_import');
+    return saved !== null ? saved === 'true' : true; // Activé par défaut selon la demande utilisateur
+  });
+
+  const keepShapesOnImportRef = useRef(keepShapesOnImport);
+  keepShapesOnImportRef.current = keepShapesOnImport;
+
+  const selectedFocusIdsRef = useRef(selectedFocusIds);
+  selectedFocusIdsRef.current = selectedFocusIds;
+
+  const handleToggleKeepShapesOnImport = () => {
+    setKeepShapesOnImport((prev) => {
+      const next = !prev;
+      localStorage.setItem('keep_shapes_on_import', String(next));
+      return next;
+    });
+  };
+
   const handleToggleSequentialImportNumbering = () => {
     setSequentialImportNumbering((prev) => {
       const next = !prev;
@@ -480,7 +500,120 @@ export default function App() {
       shadowOffsetY: 2,
     };
 
-    const initSnapshot = {
+    // Vérification de la préservation des formes existantes (flous, masques, triangles, cadres focus)
+    const currentAppState = appStateRef.current;
+    const hasExistingShapes = Boolean(
+      (currentAppState.focuses && currentAppState.focuses.length > 0) ||
+      (currentAppState.blurZones && currentAppState.blurZones.length > 0) ||
+      (currentAppState.maskShapes && currentAppState.maskShapes.length > 0) ||
+      (currentAppState.triangles && currentAppState.triangles.length > 0) ||
+      currentAppState.calloutVignette !== null
+    );
+
+    const shouldKeepShapes = Boolean(keepShapesOnImportRef.current && hasExistingShapes);
+
+    let nextFocuses: FocusZone[];
+    let nextBlurZones: BlurZone[];
+    let nextMaskShapes: MaskShape[];
+    let nextTriangles: TriangleShape[];
+    let nextCalloutVignette: CalloutVignette | null;
+    let nextUserGuides: UserGuide[];
+
+    if (shouldKeepShapes) {
+      // Conserver toutes les formes, flous, triangles, repères et zones de focus existants
+      nextFocuses = currentAppState.focuses && currentAppState.focuses.length > 0
+        ? cloneSnapshot(currentAppState.focuses)
+        : [initialFocus];
+      nextBlurZones = cloneSnapshot(currentAppState.blurZones || []);
+      nextMaskShapes = cloneSnapshot(currentAppState.maskShapes || []);
+      nextTriangles = cloneSnapshot(currentAppState.triangles || []);
+      nextCalloutVignette = currentAppState.calloutVignette ? cloneSnapshot(currentAppState.calloutVignette) : null;
+      nextUserGuides = cloneSnapshot(currentAppState.userGuides || []);
+    } else {
+      nextFocuses = [initialFocus];
+      nextBlurZones = [];
+      nextMaskShapes = [];
+      nextTriangles = [];
+      nextCalloutVignette = null;
+      nextUserGuides = [];
+    }
+
+    const nextSnapshot = {
+      focuses: nextFocuses,
+      blurZones: nextBlurZones,
+      maskShapes: nextMaskShapes,
+      triangles: nextTriangles,
+      calloutVignette: nextCalloutVignette,
+      userGuides: nextUserGuides,
+    };
+
+    appStateRef.current = cloneSnapshot(nextSnapshot);
+
+    setFocuses(nextFocuses);
+    setBlurZones(nextBlurZones);
+    setMaskShapes(nextMaskShapes);
+    setTriangles(nextTriangles);
+    setCalloutVignette(nextCalloutVignette);
+    setUserGuides(nextUserGuides);
+
+    if (nextFocuses.length > 0) {
+      const activeSelId = selectedFocusIdsRef.current[0];
+      const found = nextFocuses.find((f) => f.id === activeSelId);
+      if (!found) {
+        handleSelectFocus(nextFocuses[0].id);
+      }
+    }
+
+    historyRef.current = [cloneSnapshot(nextSnapshot)];
+    historyIndexRef.current = 0;
+    setHistory([cloneSnapshot(nextSnapshot)]);
+    setHistoryIndex(0);
+
+    // Trigger smart detection asynchronously
+    detectInterfaceElements(img, scaleFactor)
+      .then((elements) => setDetectedElements(elements))
+      .catch((err) => console.error(err));
+  }, [globalStyles.workspaceWidth, handleSelectFocus]);
+
+  // Réinitialiser manuellement toutes les formes si l'utilisateur souhaite repartir à zéro
+  const handleResetAllShapes = useCallback(() => {
+    if (!image) return;
+    const bounds = calculateCompositionBounds(image, [], globalStyles.workspaceWidth);
+    const defaultFocusW = 240;
+    const defaultFocusH = 50;
+    const phoneCenterX = bounds.bgX + bounds.bgWidth / 2;
+    const defaultX = Math.round(phoneCenterX - defaultFocusW / 2);
+    const defaultY = Math.round(bounds.bgY + bounds.bgHeight * 0.42);
+    const defaultZoom = bounds.bgWidth > 0 ? Number((defaultFocusW / bounds.bgWidth).toFixed(3)) : 1.0;
+
+    const initialFocus: FocusZone = {
+      id: `focus-${Date.now()}`,
+      name: `Zone 1`,
+      x: defaultX,
+      y: defaultY,
+      width: defaultFocusW,
+      height: defaultFocusH,
+      zoom: defaultZoom,
+      sourceOffsetX: 0,
+      sourceOffsetY: 0,
+      borderWidth: 2,
+      borderColor: BASE_COLOR,
+      borderRadius: 10,
+      stepNumber: 1,
+      showStepBadge: true,
+      badgePosition: 'auto',
+      badgeColor: BASE_COLOR,
+      hasShadow: true,
+      shadowColor: BASE_COLOR,
+      shadowOpacity: 0.30,
+      shadowAngle: 90,
+      shadowDistance: 2,
+      shadowSize: 2,
+      shadowBlur: 2,
+      shadowOffsetY: 2,
+    };
+
+    const resetSnapshot = {
       focuses: [initialFocus],
       blurZones: [] as BlurZone[],
       maskShapes: [] as MaskShape[],
@@ -489,26 +622,18 @@ export default function App() {
       userGuides: [] as UserGuide[],
     };
 
-    appStateRef.current = cloneSnapshot(initSnapshot);
-
+    recordHistory(resetSnapshot);
     setFocuses([initialFocus]);
     setBlurZones([]);
     setMaskShapes([]);
     setTriangles([]);
     setCalloutVignette(null);
     setUserGuides([]);
-    handleSelectFocus(initialFocus.id);
-
-    historyRef.current = [cloneSnapshot(initSnapshot)];
-    historyIndexRef.current = 0;
-    setHistory([cloneSnapshot(initSnapshot)]);
-    setHistoryIndex(0);
-
-    // Trigger smart detection asynchronously
-    detectInterfaceElements(img, scaleFactor)
-      .then((elements) => setDetectedElements(elements))
-      .catch((err) => console.error(err));
-  }, [globalStyles.workspaceWidth, handleSelectFocus]);
+    setSelectedFocusIds([initialFocus.id]);
+    setSelectedBlurIds([]);
+    setSelectedMaskIds([]);
+    setSelectedTriangleIds([]);
+  }, [image, globalStyles.workspaceWidth, recordHistory]);
 
   // Keep appStateRef synchronized with current state
   useEffect(() => {
@@ -2202,6 +2327,9 @@ export default function App() {
           nextSequentialStep={nextSequentialStep}
           onChangeNextSequentialStep={setNextSequentialStep}
           onResetSequentialCounter={handleResetSequentialCounter}
+          keepShapesOnImport={keepShapesOnImport}
+          onToggleKeepShapesOnImport={handleToggleKeepShapesOnImport}
+          onResetAllShapes={handleResetAllShapes}
         />
       </div>
 
