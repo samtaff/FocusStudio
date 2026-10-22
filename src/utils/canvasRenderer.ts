@@ -319,14 +319,17 @@ export function drawComposition(
   } = options;
 
   if (!skipClear) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.restore();
   }
 
   if (!image) return;
 
   const workspaceWidth = globalStyles.workspaceWidth || DEFAULT_WORKSPACE_WIDTH;
   const isCalloutMode = Boolean(calloutVignette && calloutVignette.enabled);
-  const { bgX, bgY, bgWidth, bgHeight, scale } = calculateCompositionBounds(image, focuses, workspaceWidth, calloutVignette);
+  const { canvasWidth, canvasHeight, bgX, bgY, bgWidth, bgHeight, scale } = calculateCompositionBounds(image, focuses, workspaceWidth, calloutVignette);
 
   // 1. Draw base screenshot non-destructively with STRAIGHT SQUARE CORNERS (no rounded corners, no shadow)
   ctx.save();
@@ -491,11 +494,11 @@ export function drawComposition(
     }
 
     if (smartGuides.length > 0) {
-      drawSmartGuides(ctx, smartGuides);
+      drawSmartGuides(ctx, smartGuides, canvasWidth, canvasHeight);
     }
 
     if (userGuides.length > 0) {
-      drawUserGuides(ctx, userGuides);
+      drawUserGuides(ctx, userGuides, canvasWidth, canvasHeight);
     }
   }
 
@@ -1682,7 +1685,9 @@ function drawSymmetryAxis(ctx: CanvasRenderingContext2D, centerX: number, bgY: n
 /**
  * Draws smart alignment guides
  */
-function drawSmartGuides(ctx: CanvasRenderingContext2D, guides: SmartGuide[]) {
+function drawSmartGuides(ctx: CanvasRenderingContext2D, guides: SmartGuide[], canvasWidth?: number, canvasHeight?: number) {
+  const cw = canvasWidth ?? ctx.canvas.width;
+  const ch = canvasHeight ?? ctx.canvas.height;
   ctx.save();
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 3]);
@@ -1692,10 +1697,10 @@ function drawSmartGuides(ctx: CanvasRenderingContext2D, guides: SmartGuide[]) {
     ctx.beginPath();
     if (g.type === 'vertical') {
       ctx.moveTo(g.position, 0);
-      ctx.lineTo(g.position, ctx.canvas.height);
+      ctx.lineTo(g.position, ch);
     } else {
       ctx.moveTo(0, g.position);
-      ctx.lineTo(ctx.canvas.width, g.position);
+      ctx.lineTo(cw, g.position);
     }
     ctx.stroke();
 
@@ -1708,7 +1713,7 @@ function drawSmartGuides(ctx: CanvasRenderingContext2D, guides: SmartGuide[]) {
       const textH = 14;
 
       if (g.type === 'vertical') {
-        const lx = Math.min(ctx.canvas.width - textW - 8, Math.max(4, g.position + 4));
+        const lx = Math.min(cw - textW - 8, Math.max(4, g.position + 4));
         const ly = 16;
         // Pill background
         ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
@@ -1781,7 +1786,9 @@ function drawPhotoshopGrid(
 /**
  * Draws manual user-placed guides
  */
-function drawUserGuides(ctx: CanvasRenderingContext2D, guides: UserGuide[]) {
+function drawUserGuides(ctx: CanvasRenderingContext2D, guides: UserGuide[], canvasWidth?: number, canvasHeight?: number) {
+  const cw = canvasWidth ?? ctx.canvas.width;
+  const ch = canvasHeight ?? ctx.canvas.height;
   ctx.save();
   ctx.lineWidth = 1;
   ctx.setLineDash([4, 4]);
@@ -1792,10 +1799,10 @@ function drawUserGuides(ctx: CanvasRenderingContext2D, guides: UserGuide[]) {
     ctx.beginPath();
     if (g.type === 'vertical') {
       ctx.moveTo(g.position + 0.5, 0);
-      ctx.lineTo(g.position + 0.5, ctx.canvas.height);
+      ctx.lineTo(g.position + 0.5, ch);
     } else {
       ctx.moveTo(0, g.position + 0.5);
-      ctx.lineTo(ctx.canvas.width, g.position + 0.5);
+      ctx.lineTo(cw, g.position + 0.5);
     }
     ctx.stroke();
 
@@ -1807,7 +1814,7 @@ function drawUserGuides(ctx: CanvasRenderingContext2D, guides: UserGuide[]) {
     const tw = ctx.measureText(label).width;
 
     if (g.type === 'vertical') {
-      const lx = Math.min(ctx.canvas.width - tw - 8, Math.max(4, g.position + 3));
+      const lx = Math.min(cw - tw - 8, Math.max(4, g.position + 3));
       ctx.fillStyle = 'rgba(0, 229, 255, 0.9)';
       ctx.beginPath();
       ctx.roundRect(lx, 4, tw + 6, 12, 3);
@@ -1815,7 +1822,7 @@ function drawUserGuides(ctx: CanvasRenderingContext2D, guides: UserGuide[]) {
       ctx.fillStyle = '#000000';
       ctx.fillText(label, lx + 3, 13);
     } else {
-      const ly = Math.min(ctx.canvas.height - 4, Math.max(14, g.position - 3));
+      const ly = Math.min(ch - 4, Math.max(14, g.position - 3));
       ctx.fillStyle = 'rgba(0, 229, 255, 0.9)';
       ctx.beginPath();
       ctx.roundRect(4, ly - 10, tw + 6, 12, 3);

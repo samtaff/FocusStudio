@@ -443,15 +443,21 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   // Calculate composition bounds with adjustable workspace width up to 500px, or dynamic Callout mode bounds
   const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, calloutVignette);
 
+  // High-DPI and zoom-aware supersampling scale factor
+  // Guarantees razor-sharp curves, borders, handles and text without aliasing / crénelage
+  const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+  const renderScale = Math.min(4, Math.max(2, Math.ceil(dpr * Math.max(1, zoomLevel))));
+
   // Convert client viewport coordinates to Canvas composition coordinates
   const clientToCanvasCoord = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    const x = (clientX - rect.left) * (canvas.width / rect.width);
-    const y = (clientY - rect.top) * (canvas.height / rect.height);
+    if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
+    const x = (clientX - rect.left) * (bounds.canvasWidth / rect.width);
+    const y = (clientY - rect.top) * (bounds.canvasHeight / rect.height);
     return { x, y };
-  }, []);
+  }, [bounds.canvasWidth, bounds.canvasHeight]);
 
   // Global drag listener for Guide pulling (from rulers) and Shape Rotation
   useEffect(() => {
@@ -544,13 +550,24 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    if (canvas.width !== bounds.canvasWidth || canvas.height !== bounds.canvasHeight) {
-      canvas.width = bounds.canvasWidth;
-      canvas.height = bounds.canvasHeight;
+    const targetWidth = Math.round(bounds.canvasWidth * renderScale);
+    const targetHeight = Math.round(bounds.canvasHeight * renderScale);
+
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
     }
+
+    canvas.style.width = `${bounds.canvasWidth}px`;
+    canvas.style.height = `${bounds.canvasHeight}px`;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // Apply high-DPI supersampling transform and high quality smoothing
+    ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     const activeFocusIds = selectedFocusIds.length > 0 ? selectedFocusIds : (selectedFocusId ? [selectedFocusId] : []);
     const activeBlurIds = selectedBlurIds.length > 0 ? selectedBlurIds : (selectedBlurId ? [selectedBlurId] : []);
@@ -604,7 +621,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     selectedFocusIds,
     hoveredFocusId, 
     hoveredHandle, 
+    internalFramingFocusId,
+    activeSnapGuides,
+    draggingGuide,
     bounds, 
+    renderScale,
     activeGuides, 
     userGuides, 
     globalStyles,
@@ -2245,7 +2266,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             <button
               type="button"
               onClick={() => onToggleInternalFraming?.(null)}
-              className="px-2.5 py-1 rounded-full bg-white text-[#25465F] hover:bg-sky-50 font-bold text-[11px] transition-all shadow-sm"
+              className={`px-2.5 py-1 rounded-full font-bold text-[11px] transition-all shadow-sm ${
+                isDarkMode 
+                  ? 'bg-sky-500 hover:bg-sky-400 text-white' 
+                  : 'bg-white text-[#25465F] hover:bg-sky-50'
+              }`}
               title="Terminer le recadrage (Échap ou Entrée)"
             >
               Terminer
@@ -2394,8 +2419,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                   )}
                   <canvas
                     ref={canvasRef}
-                    width={bounds.canvasWidth}
-                    height={bounds.canvasHeight}
+                    width={Math.round(bounds.canvasWidth * renderScale)}
+                    height={Math.round(bounds.canvasHeight * renderScale)}
                     onMouseMove={handleMouseMove}
                     onMouseDown={handleMouseDown}
                     onMouseUp={handleMouseUp}
@@ -2435,8 +2460,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             >
               <canvas
                 ref={canvasRef}
-                width={bounds.canvasWidth}
-                height={bounds.canvasHeight}
+                width={Math.round(bounds.canvasWidth * renderScale)}
+                height={Math.round(bounds.canvasHeight * renderScale)}
                 onMouseMove={handleMouseMove}
                 onMouseDown={handleMouseDown}
                 onMouseUp={handleMouseUp}
@@ -2465,18 +2490,22 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
         {/* Bottom Status Bar: discreet, outside the plan de travail (fixed at bottom of workspace viewport) */}
         <div className="absolute bottom-3 z-30 pointer-events-none select-none flex items-center justify-center">
-          <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono bg-white/80 backdrop-blur-md px-3 py-1 rounded-full border border-slate-200/80 shadow-xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#0088cc]/80 inline-block" />
+          <div className={`flex items-center gap-2 text-[10px] font-mono backdrop-blur-md px-3 py-1 rounded-full transition-colors ${
+            isDarkMode 
+              ? 'bg-[#222222]/90 text-[#a0a0a0] border border-[#383838] shadow-md' 
+              : 'bg-white/80 text-slate-500 border border-slate-200/80 shadow-xs'
+          }`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#0088cc] inline-block" />
             <span>
-              Plan : <strong className="text-slate-700 font-medium">{bounds.canvasWidth} × {bounds.canvasHeight} px</strong>
+              Plan : <strong className={`font-medium ${isDarkMode ? 'text-white' : 'text-slate-700'}`}>{bounds.canvasWidth} × {bounds.canvasHeight} px</strong>
             </span>
-            <span className="text-slate-300">·</span>
+            <span className={isDarkMode ? 'text-slate-600' : 'text-slate-300'}>·</span>
             <span>
-              Screenshot : <strong className="text-slate-700 font-medium">{bounds.bgWidth} × {bounds.bgHeight} px</strong>
+              Screenshot : <strong className={`font-medium ${isDarkMode ? 'text-white' : 'text-slate-700'}`}>{bounds.bgWidth} × {bounds.bgHeight} px</strong>
             </span>
             {selectedFocus && (
               <>
-                <span className="text-slate-300">·</span>
+                <span className={isDarkMode ? 'text-slate-600' : 'text-slate-300'}>·</span>
                 <span>
                   Focus :{' '}
                   <strong className="text-[#0088cc] font-medium">
@@ -2485,7 +2514,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                 </span>
               </>
             )}
-            <span className="text-slate-300">·</span>
+            <span className={isDarkMode ? 'text-slate-600' : 'text-slate-300'}>·</span>
             <span>Zoom : {Math.round(zoomLevel * 100)}%</span>
           </div>
         </div>
@@ -2493,7 +2522,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         {/* Drag over indicator */}
         {isDragOver && (
           <div className="absolute inset-0 bg-[#0088cc]/10 backdrop-blur-xs border-2 border-dashed border-[#0088cc] rounded-2xl flex items-center justify-center z-50 pointer-events-none">
-            <div className="bg-white px-6 py-4 rounded-2xl shadow-xl border border-white text-[#000000] font-semibold text-sm">
+            <div className={`px-6 py-4 rounded-2xl shadow-xl border font-semibold text-sm ${
+              isDarkMode 
+                ? 'bg-[#222222] border-[#383838] text-white' 
+                : 'bg-white border-white text-[#000000]'
+            }`}>
               Déposez votre capture d'écran ici
             </div>
           </div>

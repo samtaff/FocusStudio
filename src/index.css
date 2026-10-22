@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   * {
@@ -103,86 +104,106 @@ body.dark-mode aside .text-\[\#979797\] {
   color: #888888 !important;
 }
 
-/* Any active black button in dark mode inside aside becomes crisp white with black text */
-.dark aside .bg-\[\#000000\],
-body.dark-mode aside .bg-\[\#000000\],
-.dark aside button.bg-\[\#000000\],
-body.dark-mode aside button.bg-\[\#000000\] {
-  background-color: #ffffff !important;
-  color: #000000 !important;
-  border-color: #ffffff !important;
-}
-
-.dark aside .bg-\[\#eeeeee\],
-.dark aside .bg-\[\#eeeeee\]\/80,
-.dark aside .bg-\[\#eeeeee\]\/60,
-.dark aside .bg-\[\#eeeeee\]\/50,
-.dark aside .bg-\[\#eeeeee\]\/40,
-body.dark-mode aside .bg-\[\#eeeeee\],
-body.dark-mode aside .bg-\[\#eeeeee\]\/80,
-body.dark-mode aside .bg-\[\#eeeeee\]\/60,
-body.dark-mode aside .bg-\[\#eeeeee\]\/50,
-body.dark-mode aside .bg-\[\#eeeeee\]\/40 {
-  background-color: #2d2d2d !important;
-  border-color: #404040 !important;
-  color: #e0e0e0 !important;
-}
-
-.dark aside .bg-slate-50,
-body.dark-mode aside .bg-slate-50 {
-  background-color: #262626 !important;
-  border-color: #383838 !important;
-}
-
-.dark aside .bg-slate-100,
-body.dark-mode aside .bg-slate-100 {
-  background-color: #2e2e2e !important;
-  border-color: #404040 !important;
-  color: #ffffff !important;
-}
-
-.dark aside .bg-white,
-body.dark-mode aside .bg-white {
-  background-color: #282828 !important;
-  border-color: #404040 !important;
-  color: #ffffff !important;
-}
-
-/* All pill buttons (rounded-full) in dark mode: ensure high contrast and clear borders */
-.dark aside button.rounded-full,
-body.dark-mode aside button.rounded-full {
-  border-width: 1px;
-}
-
-/* Active / Selected black or default pill buttons in dark mode: crisp cyan/sky blue with white text */
-.dark aside button.rounded-full.bg-\[\#000000\],
-body.dark-mode aside button.rounded-full.bg-\[\#000000\],
-.dark aside button.rounded-full[class*="bg-[#000000]"],
-body.dark-mode aside button.rounded-full[class*="bg-[#000000]"] {
+/* Active buttons in dark mode: corporate cyan #0088cc with white text and icons */
+.dark .bg-\[\#000000\],
+body.dark-mode .bg-\[\#000000\],
+.dark button.bg-\[\#000000\],
+body.dark-mode button.bg-\[\#000000\],
+.dark button[class*="bg-[#000000]"],
+body.dark-mode button[class*="bg-[#000000]"],
+.dark button.rounded-full.bg-\[\#000000\],
+body.dark-mode button.rounded-full.bg-\[\#000000\] {
   background-color: #0088cc !important;
   border-color: #0088cc !important;
   color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(0, 136, 204, 0.4) !important;
 }
 
-/* Unselected pill buttons in dark mode: clear visible background and border */
-.dark aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):not([class*="bg-[#000000]"]),
-body.dark-mode aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):not([class*="bg-[#000000]"]) {
-  background-color: #333333 !important;
-  border: 1px solid #4f4f4f !important;
-  color: #e5e5e5 !important;
+.dark button[class*="bg-[#000000]"] svg,
+body.dark-mode button[class*="bg-[#000000]"] svg,
+.dark .bg-\[\#000000\] svg,
+body.dark-mode .bg-\[\#000000\] svg {
+  color: #ffffff !important;
 }
 
-.dark aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):hover,
-body.dark-mode aside button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):hover {
+.dark .bg-\[\#eeeeee\],
+.dark .bg-\[\#eeeeee\]\/80,
+.dark .bg-\[\#eeeeee\]\/60,
+.dark .bg-\[\#eeeeee\]\/50,
+.dark .bg-\[\#eeeeee\]\/40,
+body.dark-mode .bg-\[\#eeeeee\],
+body.dark-mode .bg-\[\#eeeeee\]\/80,
+body.dark-mode .bg-\[\#eeeeee\]\/60,
+body.dark-mode .bg-\[\#eeeeee\]\/50,
+body.dark-mode .bg-\[\#eeeeee\]\/40 {
+  background-color: #2d2d2d !important;
+  border-color: #404040 !important;
+  color: #e0e0e0 !important;
+}
+
+.dark .bg-slate-50,
+body.dark-mode .bg-slate-50 {
+  background-color: #262626 !important;
+  border-color: #383838 !important;
+}
+
+.dark .bg-slate-100,
+body.dark-mode .bg-slate-100 {
+  background-color: #2e2e2e !important;
+  border-color: #404040 !important;
+  color: #ffffff !important;
+}
+
+/* Any button with bg-white in dark mode: dark surface with high contrast */
+.dark button.bg-white,
+body.dark-mode button.bg-white,
+.dark button[class*="bg-white"]:not([class*="bg-[#0088cc]"]):not([class*="bg-white/10"]):not([class*="bg-white/15"]):not([class*="bg-white/20"]),
+body.dark-mode button[class*="bg-white"]:not([class*="bg-[#0088cc]"]):not([class*="bg-white/10"]):not([class*="bg-white/15"]):not([class*="bg-white/20"]) {
+  background-color: #333333 !important;
+  border-color: #4d4d4d !important;
+  color: #f0f0f0 !important;
+}
+
+.dark button.bg-white:hover,
+body.dark-mode button.bg-white:hover,
+.dark button[class*="bg-white"]:hover:not([class*="bg-[#0088cc]"]) {
   background-color: #404040 !important;
   border-color: #666666 !important;
   color: #ffffff !important;
 }
 
-/* Counter / Tag pills in accordion headers and info chips in dark mode */
-.dark aside span.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-rose"]):not([class*="bg-[#25465F]"]):not([class*="bg-emerald"]):not([class*="bg-amber"]),
-body.dark-mode aside span.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-rose"]):not([class*="bg-[#25465F]"]):not([class*="bg-emerald"]):not([class*="bg-amber"]) {
+/* Ensure icons inside dark mode buttons are always visible */
+.dark button.bg-white svg,
+body.dark-mode button.bg-white svg,
+.dark button svg.text-white,
+body.dark-mode button svg.text-white {
+  color: #ffffff;
+}
+
+/* All pill buttons (rounded-full) in dark mode: ensure high contrast and clear borders */
+.dark button.rounded-full,
+body.dark-mode button.rounded-full {
+  border-width: 1px;
+}
+
+/* Unselected pill buttons in dark mode: clear visible background and border */
+.dark button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):not([class*="bg-[#000000]"]):not([class*="bg-amber"]),
+body.dark-mode button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):not([class*="bg-[#000000]"]):not([class*="bg-amber"]) {
+  background-color: #333333 !important;
+  border: 1px solid #4f4f4f !important;
+  color: #e5e5e5 !important;
+}
+
+.dark button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):hover,
+body.dark-mode button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):hover {
+  background-color: #404040 !important;
+  border-color: #666666 !important;
+  color: #ffffff !important;
+}
+
+/* Counter / Tag pills in headers and info chips in dark mode */
+.dark span.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-rose"]):not([class*="bg-[#25465F]"]):not([class*="bg-emerald"]):not([class*="bg-amber"]),
+body.dark-mode span.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-rose"]):not([class*="bg-[#25465F]"]):not([class*="bg-emerald"]):not([class*="bg-amber"]) {
   background-color: #383838 !important;
   border: 1px solid #555555 !important;
   color: #ffffff !important;

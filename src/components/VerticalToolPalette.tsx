@@ -1081,7 +1081,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
         onClick={onToggleHandles}
         className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
           showHandles 
-            ? isDarkMode ? 'text-white bg-white/25 shadow-xs border border-white/20' : 'text-[#000000] bg-white/60 shadow-xs' 
+            ? isDarkMode ? 'bg-[#0088cc] text-white shadow-xs ring-2 ring-[#0088cc]/30 scale-105' : 'text-[#000000] bg-white/60 shadow-xs' 
             : isDarkMode ? 'text-[#888888] hover:text-[#e5e5e5] hover:bg-white/15' : 'text-[#979797] hover:bg-white/40'
         }`}
         title="Afficher/Masquer les poignées de sélection"

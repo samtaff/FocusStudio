@@ -1238,7 +1238,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             <button
                               type="button"
                               onClick={onRenumberFocuses}
-                              className="text-[10px] px-2 py-0.5 rounded-full bg-white hover:bg-[#eeeeee] border border-[#eeeeee] text-[#0088cc] font-medium transition-colors"
+                              className={`text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors ${
+                                isDarkMode 
+                                  ? 'bg-[#333333] hover:bg-[#404040] border border-[#4d4d4d] text-sky-400' 
+                                  : 'bg-white hover:bg-[#eeeeee] border border-[#eeeeee] text-[#0088cc]'
+                              }`}
                               title="Renuméroter toutes les étapes de haut en bas (1, 2, 3...)"
                             >
                               Renuméroter 1..{focuses.length}
@@ -1268,8 +1272,8 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               onClick={() => onUpdateFocus({ badgePosition: 'auto' })}
                               className={`py-1 px-1 rounded-lg text-[10px] font-medium text-center transition-all ${
                                 (selectedFocus.badgePosition || 'auto') === 'auto'
-                                  ? 'bg-[#000000] text-white shadow-2xs font-semibold'
-                                  : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
+                                  ? isDarkMode ? 'bg-[#0088cc] text-white shadow-2xs font-semibold' : 'bg-[#000000] text-white shadow-2xs font-semibold'
+                                  : isDarkMode ? 'bg-[#333333] text-[#cccccc] hover:bg-[#404040] hover:text-white border border-[#484848]' : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
                               }`}
                               title="Règle automatique : impair = bordure gauche du screen, pair = bordure droite du screen"
                             >
@@ -1280,8 +1284,8 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               onClick={() => onUpdateFocus({ badgePosition: 'left' })}
                               className={`py-1 px-1 rounded-lg text-[10px] font-medium text-center transition-all ${
                                 selectedFocus.badgePosition === 'left'
-                                  ? 'bg-[#000000] text-white shadow-2xs font-semibold'
-                                  : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
+                                  ? isDarkMode ? 'bg-[#0088cc] text-white shadow-2xs font-semibold' : 'bg-[#000000] text-white shadow-2xs font-semibold'
+                                  : isDarkMode ? 'bg-[#333333] text-[#cccccc] hover:bg-[#404040] hover:text-white border border-[#484848]' : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
                               }`}
                               title="Forcer sur la bordure gauche du screen"
                             >
@@ -1292,8 +1296,8 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               onClick={() => onUpdateFocus({ badgePosition: 'right' })}
                               className={`py-1 px-1 rounded-lg text-[10px] font-medium text-center transition-all ${
                                 selectedFocus.badgePosition === 'right'
-                                  ? 'bg-[#000000] text-white shadow-2xs font-semibold'
-                                  : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
+                                  ? isDarkMode ? 'bg-[#0088cc] text-white shadow-2xs font-semibold' : 'bg-[#000000] text-white shadow-2xs font-semibold'
+                                  : isDarkMode ? 'bg-[#333333] text-[#cccccc] hover:bg-[#404040] hover:text-white border border-[#484848]' : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
                               }`}
                               title="Forcer sur la bordure droite du screen"
                             >
@@ -1317,14 +1321,22 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => onDuplicateFocus(selectedFocus.id)}
-                        className="p-1.5 rounded-full text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee] transition-colors"
+                        className={`p-1.5 rounded-full transition-colors ${
+                          isDarkMode
+                            ? 'text-[#aaaaaa] hover:text-white hover:bg-[#333333]'
+                            : 'text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
+                        }`}
                         title="Dupliquer le focus"
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => onDeleteFocus(selectedFocus.id)}
-                        className="p-1.5 rounded-full text-[#666666] hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        className={`p-1.5 rounded-full transition-colors ${
+                          isDarkMode
+                            ? 'text-[#aaaaaa] hover:text-rose-400 hover:bg-rose-950/40'
+                            : 'text-[#666666] hover:text-rose-600 hover:bg-rose-50'
+                        }`}
                         title="Supprimer ce focus"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1925,7 +1937,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               shadowColor: '#25465F',
                               hasShadow: true,
                             })}
-                            className="px-2 py-0.5 rounded-full bg-white hover:bg-[#e0e0e0] text-[#0088cc] font-medium text-[9px] transition-colors"
+                            className={`px-2 py-0.5 rounded-full font-medium text-[9px] transition-colors ${
+                              isDarkMode 
+                                ? 'bg-[#333333] hover:bg-[#404040] border border-[#4d4d4d] text-sky-400' 
+                                : 'bg-white hover:bg-[#e0e0e0] border border-[#eeeeee] text-[#0088cc]'
+                            }`}
                             title="Réinitialiser l'ombre aux réglages Photoshop demandés (30%, 90°, 2px, 2px, #25465F)"
                           >
                             Réinitialiser (30%, 90°, 2px)
@@ -1936,19 +1952,27 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   </div>
                 </>
               ) : (
-                <div className="text-center py-5 text-[#666666] flex flex-col items-center gap-2">
+                <div className={`text-center py-5 flex flex-col items-center gap-2 ${isDarkMode ? 'text-[#888888]' : 'text-[#666666]'}`}>
                   <p className="text-[11px]">Aucun focus sélectionné</p>
                   <div className="flex items-center gap-2 mt-1">
                     <button
                       onClick={() => onAddFocus('horizontal')}
-                      className="px-3 py-1.5 rounded-xl bg-white border border-[#eeeeee] hover:border-[#0088cc] text-[#0088cc] hover:bg-sky-50 font-semibold text-[11px] transition-all shadow-2xs flex items-center gap-1.5"
+                      className={`px-3 py-1.5 rounded-xl font-semibold text-[11px] transition-all shadow-2xs flex items-center gap-1.5 ${
+                        isDarkMode 
+                          ? 'bg-[#2a2a2a] border border-[#3f3f3f] hover:border-[#0088cc] text-sky-400 hover:bg-[#333333]' 
+                          : 'bg-white border border-[#eeeeee] hover:border-[#0088cc] text-[#0088cc] hover:bg-sky-50'
+                      }`}
                     >
                       <span className="inline-block w-3.5 h-2 border border-current rounded-xs" />
                       <span>+ Focus horizontal (240×50)</span>
                     </button>
                     <button
                       onClick={() => onAddFocus('vertical')}
-                      className="px-3 py-1.5 rounded-xl bg-white border border-[#eeeeee] hover:border-[#0088cc] text-[#0088cc] hover:bg-sky-50 font-semibold text-[11px] transition-all shadow-2xs flex items-center gap-1.5"
+                      className={`px-3 py-1.5 rounded-xl font-semibold text-[11px] transition-all shadow-2xs flex items-center gap-1.5 ${
+                        isDarkMode 
+                          ? 'bg-[#2a2a2a] border border-[#3f3f3f] hover:border-[#0088cc] text-sky-400 hover:bg-[#333333]' 
+                          : 'bg-white border border-[#eeeeee] hover:border-[#0088cc] text-[#0088cc] hover:bg-sky-50'
+                      }`}
                     >
                       <span className="inline-block w-2 h-3.5 border border-current rounded-xs" />
                       <span>+ Focus vertical (50×240)</span>
@@ -2145,14 +2169,16 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             className={`flex flex-col items-start p-2 rounded-xl border text-left transition-all ${
                               isCurrent
                                 ? 'bg-[#0088cc] border-[#0088cc] text-white shadow-2xs'
-                                : 'bg-white border-[#e5e5e5] text-[#333333] hover:border-[#cccccc]'
+                                : isDarkMode
+                                  ? 'bg-[#333333] border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
+                                  : 'bg-white border-[#e5e5e5] text-[#333333] hover:border-[#cccccc]'
                             }`}
                           >
                             <div className="flex items-center gap-1.5 font-semibold text-xs">
                               {style.icon}
                               <span>{style.label}</span>
                             </div>
-                            <span className={`text-[10px] mt-0.5 ${isCurrent ? 'text-white/80' : 'text-[#888888]'}`}>
+                            <span className={`text-[10px] mt-0.5 ${isCurrent ? 'text-white/80' : isDarkMode ? 'text-[#aaaaaa]' : 'text-[#888888]'}`}>
                               {style.desc}
                             </span>
                           </button>
@@ -2307,7 +2333,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   </div>
 
                   {/* Note d'information de superposition */}
-                  <div className="p-2 rounded-xl bg-sky-50/80 border border-sky-100 flex items-center gap-1.5 text-[10px] text-sky-800">
+                  <div className={`p-2 rounded-xl flex items-center gap-1.5 text-[10px] ${
+                    isDarkMode ? 'bg-sky-950/40 border border-sky-900/50 text-sky-300' : 'bg-sky-50/80 border border-sky-100 text-sky-800'
+                  }`}>
                     <span className="w-1.5 h-1.5 rounded-full bg-[#0088cc] shrink-0" />
                     <span>Les flous restent toujours situés <b>en dessous</b> des zones de focus, formes et vignettes.</span>
                   </div>
@@ -2323,7 +2351,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
         {/* 5. FORME BLEUE DE MASQUAGE (#25465F) */}
         <div className="flex flex-col">
-          <div className="w-full px-4 py-3.5 flex items-center justify-between font-semibold text-[#000000] hover:bg-[#eeeeee]/40 transition-colors">
+          <div className={`w-full px-4 py-3.5 flex items-center justify-between font-semibold transition-colors ${
+            isDarkMode ? 'text-white hover:bg-white/5' : 'text-[#000000] hover:bg-[#eeeeee]/40'
+          }`}>
             <button
               onClick={() => toggleSection('mask')}
               className="flex items-center gap-2 text-left"
@@ -2356,7 +2386,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
               <div className="flex gap-2">
                 <button
                   onClick={onAddMask}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-full bg-[#000000] hover:bg-[#333333] text-white font-medium text-xs shadow-2xs transition-all hover:scale-[1.01] active:scale-[0.98]"
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-full text-white font-medium text-xs shadow-2xs transition-all hover:scale-[1.01] active:scale-[0.98] ${
+                    isDarkMode ? 'bg-[#0088cc] hover:bg-[#0099e6]' : 'bg-[#000000] hover:bg-[#333333]'
+                  }`}
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Ajouter une forme bleue</span>
@@ -2364,7 +2396,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                 {activeMask && (
                   <button
                     onClick={() => onDeleteMask(activeMask.id)}
-                    className="p-2 rounded-full bg-[#eeeeee]/80 hover:bg-rose-50 text-[#666666] hover:text-rose-600 transition-colors"
+                    className={`p-2 rounded-full transition-colors ${
+                      isDarkMode ? 'bg-[#333333] hover:bg-[#404040] text-[#aaaaaa] hover:text-rose-400' : 'bg-[#eeeeee]/80 hover:bg-rose-50 text-[#666666] hover:text-rose-600'
+                    }`}
                     title="Supprimer la forme bleue"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -2406,7 +2440,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
               )}
 
               {activeMask ? (
-                <div className="flex flex-col gap-3 p-3 rounded-2xl bg-[#eeeeee]/50 border border-white">
+                <div className={`flex flex-col gap-3 p-3 rounded-2xl border ${
+                  isDarkMode ? 'bg-[#252525] border-[#383838]' : 'bg-[#eeeeee]/50 border-white'
+                }`}>
                   <div className="flex justify-between items-center">
                     <input
                       type="text"
@@ -2556,7 +2592,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           />
                           <button
                             onClick={() => onUpdateMask(activeMask.id, { borderColor: '#ffffff' })}
-                            className="text-[9px] px-2 py-0.5 border border-[#eeeeee] rounded-full bg-white hover:bg-[#eeeeee] text-[#000000]"
+                            className={`text-[9px] px-2 py-0.5 rounded-full transition-colors ${
+                              isDarkMode 
+                                ? 'border border-[#4d4d4d] bg-[#333333] hover:bg-[#404040] text-white' 
+                                : 'border border-[#eeeeee] bg-white hover:bg-[#eeeeee] text-[#000000]'
+                            }`}
                           >
                             Blanc
                           </button>
@@ -2565,15 +2605,15 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2 pt-1">
-                      <label className="text-[9px] text-[#666666]">Style :</label>
+                      <label className={`text-[9px] ${isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]'}`}>Style :</label>
                       {(['solid', 'dashed', 'dotted'] as const).map((st) => (
                         <button
                           key={st}
                           onClick={() => onUpdateMask(activeMask.id, { borderStyle: st })}
                           className={`text-[9px] px-2.5 py-0.5 rounded-full capitalize transition-all ${
                             (activeMask.borderStyle || 'solid') === st
-                              ? 'bg-[#000000] text-white font-medium shadow-2xs'
-                              : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
+                              ? isDarkMode ? 'bg-[#0088cc] text-white font-medium shadow-2xs' : 'bg-[#000000] text-white font-medium shadow-2xs'
+                              : isDarkMode ? 'bg-[#2a2a2a] border border-[#3f3f3f] text-[#aaaaaa] hover:bg-[#353535] hover:text-white' : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                           }`}
                         >
                           {st === 'solid' ? 'Plein' : st === 'dashed' ? 'Tirets' : 'Points'}
@@ -2656,7 +2696,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   </div>
 
                   {/* Rotation & Orientation de la forme */}
-                  <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
+                  <div className={`flex flex-col gap-2 pt-2 border-t ${
+                    isDarkMode ? 'border-[#383838]' : 'border-[#eeeeee]'
+                  }`}>
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-[#666666] font-medium flex items-center gap-1.5">
                         <RotateCcw className="w-3.5 h-3.5 text-[#0088cc]" />
@@ -2666,7 +2708,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         {Boolean((activeMask.rotation || 0) !== 0) && (
                           <button
                             onClick={() => onUpdateMask(activeMask.id, { rotation: 0 })}
-                            className="text-[9px] px-2 py-0.5 rounded-full bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-medium transition-all"
+                            className={`text-[9px] px-2 py-0.5 rounded-full font-medium transition-all ${
+                              isDarkMode ? 'bg-[#333333] hover:bg-[#404040] text-white' : 'bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333]'
+                            }`}
                             title="Réinitialiser l'angle à 0° (droit)"
                           >
                             0° (Droit)
@@ -2887,9 +2931,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </div>
 
                     {!activeMask.multiplier?.enabled ? (
-                      <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white border border-[#e5e5e5]">
+                      <div className={`flex items-center justify-between gap-2 p-2 rounded-xl border ${
+                        isDarkMode ? 'bg-[#282828] border-[#383838]' : 'bg-white border-[#e5e5e5]'
+                      }`}>
                         <div className="flex flex-col min-w-0">
-                          <span className="text-[10px] font-semibold text-[#111111]">Multiplier la forme en 4</span>
+                          <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-white' : 'text-[#111111]'}`}>Multiplier la forme en 4</span>
                           <span className="text-[9px] text-[#777777]">Grille 2×2 avec espacement ajustable</span>
                         </div>
                         <button
@@ -2904,13 +2950,17 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               },
                             });
                           }}
-                          className="px-3 py-1.5 rounded-full bg-[#000000] hover:bg-[#25465F] text-white text-[10px] font-semibold transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] shrink-0"
+                          className={`px-3 py-1.5 rounded-full text-white text-[10px] font-semibold transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] shrink-0 ${
+                            isDarkMode ? 'bg-[#0088cc] hover:bg-[#0099e6]' : 'bg-[#000000] hover:bg-[#25465F]'
+                          }`}
                         >
                           Multiplier en 4
                         </button>
                       </div>
                     ) : (
-                      <div className="flex flex-col gap-2.5 p-2.5 rounded-xl bg-white border border-[#e5e5e5]">
+                      <div className={`flex flex-col gap-2.5 p-2.5 rounded-xl border ${
+                        isDarkMode ? 'bg-[#282828] border-[#383838]' : 'bg-white border-[#e5e5e5]'
+                      }`}>
                         {/* Presets rapides de disposition (Grille 2x2, Ligne 4x1, Colonne 1x4) */}
                         <div className="flex flex-col gap-1">
                           <span className="text-[9px] uppercase font-bold text-[#777777] tracking-wider">
@@ -2954,7 +3004,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         </div>
 
                         {/* Colonnes & Lignes personnalisées */}
-                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#f0f0f0]">
+                        <div className={`grid grid-cols-2 gap-2 pt-1 border-t ${
+                          isDarkMode ? 'border-[#383838]' : 'border-[#f0f0f0]'
+                        }`}>
                           <div className="flex flex-col gap-0.5">
                             <label className="text-[9px] text-[#666666] font-medium">Colonnes (H)</label>
                             <div className="flex items-center gap-1">
@@ -2967,7 +3019,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                                     });
                                   }
                                 }}
-                                className="w-6 h-6 rounded-md bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-bold text-xs flex items-center justify-center transition-colors"
+                                className={`w-6 h-6 rounded-md font-bold text-xs flex items-center justify-center transition-colors ${
+                                  isDarkMode ? 'bg-[#333333] hover:bg-[#404040] text-white' : 'bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333]'
+                                }`}
                               >
                                 -
                               </button>
@@ -2993,7 +3047,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                                     });
                                   }
                                 }}
-                                className="w-6 h-6 rounded-md bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-bold text-xs flex items-center justify-center transition-colors"
+                                className={`w-6 h-6 rounded-md font-bold text-xs flex items-center justify-center transition-colors ${
+                                  isDarkMode ? 'bg-[#333333] hover:bg-[#404040] text-white' : 'bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333]'
+                                }`}
                               >
                                 +
                               </button>
@@ -3012,7 +3068,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                                     });
                                   }
                                 }}
-                                className="w-6 h-6 rounded-md bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-bold text-xs flex items-center justify-center transition-colors"
+                                className={`w-6 h-6 rounded-md font-bold text-xs flex items-center justify-center transition-colors ${
+                                  isDarkMode ? 'bg-[#333333] hover:bg-[#404040] text-white' : 'bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333]'
+                                }`}
                               >
                                 -
                               </button>
@@ -3038,7 +3096,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                                     });
                                   }
                                 }}
-                                className="w-6 h-6 rounded-md bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-bold text-xs flex items-center justify-center transition-colors"
+                                className={`w-6 h-6 rounded-md font-bold text-xs flex items-center justify-center transition-colors ${
+                                  isDarkMode ? 'bg-[#333333] hover:bg-[#404040] text-white' : 'bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333]'
+                                }`}
                               >
                                 +
                               </button>
@@ -3047,7 +3107,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         </div>
 
                         {/* Gestion des espacements (Gaps) */}
-                        <div className="flex flex-col gap-2 pt-1 border-t border-[#f0f0f0]">
+                        <div className={`flex flex-col gap-2 pt-1 border-t ${
+                          isDarkMode ? 'border-[#383838]' : 'border-[#f0f0f0]'
+                        }`}>
                           <div className="flex items-center justify-between">
                             <span className="text-[9px] uppercase font-bold text-[#777777] tracking-wider">
                               Espacements entre formes
@@ -3055,7 +3117,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             <button
                               onClick={() => setIsMaskGapsLinked(!isMaskGapsLinked)}
                               className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] transition-colors ${
-                                isMaskGapsLinked ? 'bg-sky-100 text-[#0088cc] font-semibold' : 'text-[#888888] hover:text-[#333333]'
+                                isMaskGapsLinked
+                                  ? 'bg-[#0088cc]/20 text-[#0088cc] font-semibold'
+                                  : isDarkMode ? 'text-[#aaaaaa] hover:text-white' : 'text-[#888888] hover:text-[#333333]'
                               }`}
                               title={isMaskGapsLinked ? 'Espacements H & V liés' : 'Espacements H & V indépendants'}
                             >
@@ -3250,15 +3314,21 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     />
 
                     {activeMask.clipImage ? (
-                      <div className="flex flex-col gap-2 bg-white/70 p-2.5 rounded-2xl border border-white">
+                      <div className={`flex flex-col gap-2 p-2.5 rounded-2xl border ${
+                        isDarkMode ? 'bg-[#282828] border-[#383838]' : 'bg-white/70 border-white'
+                      }`}>
                         <div className="flex items-center gap-2">
                           <img
                             src={activeMask.clipImage.dataUrl}
                             alt="Screenshot écrêté"
-                            className="w-10 h-10 object-cover rounded-xl border border-[#eeeeee]"
+                            className={`w-10 h-10 object-cover rounded-xl border ${
+                              isDarkMode ? 'border-[#444444]' : 'border-[#eeeeee]'
+                            }`}
                           />
                           <div className="flex-1 truncate">
-                            <span className="text-[10px] font-medium text-[#000000] block truncate">
+                            <span className={`text-[10px] font-medium block truncate ${
+                              isDarkMode ? 'text-white' : 'text-[#000000]'
+                            }`}>
                               {activeMask.clipImage.name}
                             </span>
                             <span className="text-[9px] text-[#0088cc]">Écrêté dans le rectangle</span>
@@ -3391,13 +3461,19 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
               )}
 
               {activeTriangle && onUpdateTriangle ? (
-                <div className="flex flex-col gap-2.5 p-3 rounded-2xl bg-[#eeeeee]/50 border border-white">
+                <div className={`flex flex-col gap-2.5 p-3 rounded-2xl border ${
+                  isDarkMode ? 'bg-[#252525] border-[#383838]' : 'bg-[#eeeeee]/50 border-white'
+                }`}>
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold text-[#000000] text-xs">{activeTriangle.name}</span>
+                    <span className={`font-semibold text-xs ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
+                      {activeTriangle.name}
+                    </span>
                     {onDeleteTriangle && (
                       <button
                         onClick={() => onDeleteTriangle(activeTriangle.id)}
-                        className="text-[#666666] hover:text-rose-600 text-[10px] font-medium transition-colors"
+                        className={`text-[10px] font-medium transition-colors ${
+                          isDarkMode ? 'text-[#aaaaaa] hover:text-rose-400' : 'text-[#666666] hover:text-rose-600'
+                        }`}
                       >
                         Supprimer
                       </button>
@@ -3413,7 +3489,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         className={`flex-1 py-1.5 px-3 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                           (activeTriangle.color || '#25465F').toLowerCase() === '#25465f'
                             ? 'bg-[#25465F] text-white shadow-2xs ring-2 ring-[#0088cc]'
-                            : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
+                            : isDarkMode
+                              ? 'bg-[#333333] text-[#cccccc] border border-[#4d4d4d] hover:bg-[#404040]'
+                              : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
                         }`}
                       >
                         <span className="w-2.5 h-2.5 rounded-full bg-[#25465F] inline-block border border-white" />
@@ -3424,8 +3502,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         onClick={() => onUpdateTriangle(activeTriangle.id, { color: '#ffffff' })}
                         className={`flex-1 py-1.5 px-3 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
                           activeTriangle.color?.toLowerCase() === '#ffffff'
-                            ? 'bg-[#000000] text-white shadow-2xs ring-2 ring-[#0088cc]'
-                            : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
+                            ? isDarkMode ? 'bg-[#0088cc] text-white shadow-2xs ring-2 ring-[#0088cc]' : 'bg-[#000000] text-white shadow-2xs ring-2 ring-[#0088cc]'
+                            : isDarkMode
+                              ? 'bg-[#333333] text-[#cccccc] border border-[#4d4d4d] hover:bg-[#404040]'
+                              : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
                         }`}
                       >
                         <span className="w-2.5 h-2.5 rounded-full bg-white inline-block border border-[#979797]/40" />
@@ -3449,8 +3529,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           onClick={() => onUpdateTriangle(activeTriangle.id, { direction: dir.id as any })}
                           className={`py-1 text-[10px] rounded-full text-center transition-all ${
                             (activeTriangle.direction || 'up') === dir.id
-                              ? 'bg-[#000000] text-white font-semibold shadow-2xs'
-                              : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
+                              ? 'bg-[#0088cc] text-white font-semibold shadow-2xs'
+                              : isDarkMode
+                                ? 'bg-[#333333] text-[#cccccc] border border-[#4d4d4d] hover:bg-[#404040]'
+                                : 'bg-white text-[#666666] border border-[#eeeeee] hover:bg-[#eeeeee]'
                           }`}
                         >
                           {dir.label}
@@ -3460,7 +3542,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   </div>
 
                   {/* Rotation & Angle personnalisé du triangle */}
-                  <div className="flex flex-col gap-2 pt-2 border-t border-[#eeeeee]">
+                  <div className={`flex flex-col gap-2 pt-2 border-t ${
+                    isDarkMode ? 'border-[#383838]' : 'border-[#eeeeee]'
+                  }`}>
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-[#666666] font-medium flex items-center gap-1.5">
                         <RotateCcw className="w-3.5 h-3.5 text-[#0088cc]" />
@@ -3470,7 +3554,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         {Boolean((activeTriangle.rotation || 0) !== 0) && (
                           <button
                             onClick={() => onUpdateTriangle(activeTriangle.id, { rotation: 0 })}
-                            className="text-[9px] px-2 py-0.5 rounded-full bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333] font-medium transition-all"
+                            className={`text-[9px] px-2 py-0.5 rounded-full font-medium transition-all ${
+                              isDarkMode ? 'bg-[#333333] hover:bg-[#404040] text-white' : 'bg-[#eeeeee] hover:bg-[#dddddd] text-[#333333]'
+                            }`}
                             title="Réinitialiser l'angle à 0°"
                           >
                             0°
@@ -3689,20 +3775,24 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => onUpdateCallout({ shape: 'rounded', borderRadius: calloutVignette.borderRadius || 16 })}
-                        className={`py-1.5 px-3 rounded-full text-xs font-medium border transition-all ${
+                        className={`py-1.5 px-3 rounded-full text-xs font-semibold border transition-all ${
                           calloutVignette.shape !== 'circle'
-                            ? 'bg-[#000000] text-white border-[#000000]'
-                            : 'bg-white text-[#666666] border-[#eeeeee] hover:bg-[#eeeeee]/50'
+                            ? isDarkMode ? 'bg-[#0088cc] text-white border-[#0088cc] shadow-2xs' : 'bg-[#000000] text-white border-[#000000]'
+                            : isDarkMode
+                              ? 'bg-[#333333] text-[#cccccc] border-[#4d4d4d] hover:bg-[#404040]'
+                              : 'bg-white text-[#666666] border-[#eeeeee] hover:bg-[#eeeeee]/50'
                         }`}
                       >
                         Rectangle arrondi
                       </button>
                       <button
                         onClick={() => onUpdateCallout({ shape: 'circle' })}
-                        className={`py-1.5 px-3 rounded-full text-xs font-medium border transition-all ${
+                        className={`py-1.5 px-3 rounded-full text-xs font-semibold border transition-all ${
                           calloutVignette.shape === 'circle'
-                            ? 'bg-[#000000] text-white border-[#000000]'
-                            : 'bg-white text-[#666666] border-[#eeeeee] hover:bg-[#eeeeee]/50'
+                            ? isDarkMode ? 'bg-[#0088cc] text-white border-[#0088cc] shadow-2xs' : 'bg-[#000000] text-white border-[#000000]'
+                            : isDarkMode
+                              ? 'bg-[#333333] text-[#cccccc] border-[#4d4d4d] hover:bg-[#404040]'
+                              : 'bg-white text-[#666666] border-[#eeeeee] hover:bg-[#eeeeee]/50'
                         }`}
                       >
                         Cercle parfait
@@ -3724,7 +3814,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               className={`px-1.5 py-0.5 rounded text-[9px] font-medium transition-all ${
                                 (calloutVignette.borderRadius ?? 16) === r
                                   ? 'bg-[#0088cc] text-white'
-                                  : 'bg-[#eeeeee] text-[#666666] hover:text-[#000000]'
+                                  : isDarkMode
+                                    ? 'bg-[#333333] text-[#cccccc] hover:text-white'
+                                    : 'bg-[#eeeeee] text-[#666666] hover:text-[#000000]'
                               }`}
                             >
                               {r}px
@@ -3756,9 +3848,13 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   )}
 
                   {/* Alignement au bas du screenshot (simplifié et placé après la forme) */}
-                  <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#eeeeee]/40 border border-[#eeeeee]">
+                  <div className={`flex items-center justify-between p-2.5 rounded-2xl border ${
+                    isDarkMode ? 'bg-[#252525] border-[#383838]' : 'bg-[#eeeeee]/40 border-[#eeeeee]'
+                  }`}>
                     <div>
-                      <span className="text-[10px] font-semibold text-[#000000] block">Alignement au bas du screenshot</span>
+                      <span className={`text-[10px] font-semibold block ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
+                        Alignement au bas du screenshot
+                      </span>
                       <span className="text-[9px] text-[#666666]">Calé sur l'ombre au bas du screenshot</span>
                     </div>
                     <button
@@ -3777,7 +3873,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       className={`px-3 py-1 rounded-full text-[10px] font-semibold transition-all ${
                         calloutVignette.alignBottom !== false
                           ? 'bg-[#0088cc] text-white shadow-2xs'
-                          : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
+                          : isDarkMode
+                            ? 'bg-[#333333] text-[#cccccc] hover:text-white border border-[#4d4d4d]'
+                            : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
                       }`}
                     >
                       {calloutVignette.alignBottom !== false ? '✓ Aligné au bas' : 'Manuel'}
@@ -3826,7 +3924,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   </div>
 
                   {/* Zoom de la cible loupe (Saisie numérique directe + curseur de grossissement 1.0x à 5.0x) */}
-                  <div className="p-2.5 rounded-2xl bg-[#eeeeee]/40 border border-[#eeeeee] flex flex-col gap-2">
+                  <div className={`p-2.5 rounded-2xl border flex flex-col gap-2 ${
+                    isDarkMode ? 'bg-[#252525] border-[#383838]' : 'bg-[#eeeeee]/40 border-[#eeeeee]'
+                  }`}>
                     {(() => {
                       const vigW = calloutVignette.width || 100;
                       const currentSrcW = calloutVignette.sourceWidth || 40;
@@ -3838,11 +3938,13 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-[#ff007f] shadow-[0_0_6px_#ff007f] inline-block shrink-0" title="Cible loupe rose fluo sur la capture" />
-                              <span className="text-[10px] font-semibold text-[#000000] dark:text-white">Cible loupe & zoom</span>
+                              <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>Cible loupe & zoom</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                               {/* Saisie directe du niveau de zoom */}
-                              <div className="flex items-center bg-white border border-[#eeeeee] rounded-lg px-2 py-0.5 shadow-2xs">
+                              <div className={`flex items-center border rounded-lg px-2 py-0.5 shadow-2xs ${
+                                isDarkMode ? 'bg-[#333333] border-[#444444]' : 'bg-white border-[#eeeeee]'
+                              }`}>
                                 <input
                                   type="number"
                                   min="1"
@@ -3862,10 +3964,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                                       (e.target as HTMLElement).blur();
                                     }
                                   }}
-                                  className="w-10 text-right text-[11px] font-mono font-bold text-[#0088cc] outline-none"
+                                  className="w-10 text-right text-[11px] font-mono font-bold text-[#0088cc] bg-transparent outline-none"
                                   title="Entrez la valeur exacte du grossissement (ex: 2.5)"
                                 />
-                                <span className="text-[10px] text-[#666666] font-bold ml-0.5">×</span>
+                                <span className={`text-[10px] font-bold ml-0.5 ${isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]'}`}>×</span>
                               </div>
                             </div>
                           </div>
@@ -3966,11 +4068,15 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   </div>
 
                   {/* Ombre portée derrière la vignette (Repliée par défaut, dépliable au clic) */}
-                  <div className="rounded-2xl bg-[#eeeeee]/40 border border-[#eeeeee] overflow-hidden transition-all">
+                  <div className={`rounded-2xl border overflow-hidden transition-all ${
+                    isDarkMode ? 'bg-[#252525] border-[#383838]' : 'bg-[#eeeeee]/40 border-[#eeeeee]'
+                  }`}>
                     <button
                       type="button"
                       onClick={() => setIsShadowExpanded(!isShadowExpanded)}
-                      className="w-full p-2.5 flex items-center justify-between text-left hover:bg-[#eeeeee]/70 transition-colors cursor-pointer"
+                      className={`w-full p-2.5 flex items-center justify-between text-left transition-colors cursor-pointer ${
+                        isDarkMode ? 'hover:bg-white/5' : 'hover:bg-[#eeeeee]/70'
+                      }`}
                     >
                       <div className="flex items-center gap-2">
                         {isShadowExpanded ? (
@@ -3979,7 +4085,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           <ChevronRight className="w-3.5 h-3.5 text-[#666666]" />
                         )}
                         <div>
-                          <span className="text-[10px] font-semibold text-[#000000] block">Ombre portée</span>
+                          <span className={`text-[10px] font-semibold block ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
+                            Ombre portée
+                          </span>
                           <span className="text-[9px] text-[#666666]">
                             {calloutVignette.showShadow !== false ? 'Active (50%, 5px, 2px)' : 'Désactivée'}
                           </span>
@@ -4008,7 +4116,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </button>
 
                     {isShadowExpanded && (calloutVignette.showShadow ?? true) && (
-                      <div className="p-2.5 pt-1 border-t border-[#eeeeee] flex flex-col gap-2 bg-white/40">
+                      <div className={`p-2.5 pt-1 border-t flex flex-col gap-2 ${
+                        isDarkMode ? 'border-[#383838] bg-[#222222]/60' : 'border-[#eeeeee] bg-white/40'
+                      }`}>
                         <div className="flex justify-end">
                           <button
                             type="button"
@@ -4020,7 +4130,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               shadowBlur: 2,
                               showShadow: true,
                             })}
-                            className="text-[9px] px-2 py-0.5 rounded-full bg-white border border-[#eeeeee] text-[#666666] hover:text-[#000000]"
+                            className={`text-[9px] px-2 py-0.5 rounded-full border transition-all ${
+                              isDarkMode
+                                ? 'bg-[#333333] border-[#4d4d4d] text-[#cccccc] hover:text-white'
+                                : 'bg-white border-[#eeeeee] text-[#666666] hover:text-[#000000]'
+                            }`}
                             title="Réinitialiser (50% / 5px / 2px)"
                           >
                             Défaut
@@ -4115,7 +4229,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       onClick={() => onUpdateGlobalStyles({ exportScale: scale as 1 | 2 | 3 })}
                       className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all cursor-pointer ${
                         globalStyles.exportScale === scale
-                          ? isDarkMode ? 'bg-white text-black font-bold shadow-2xs' : 'bg-[#000000] text-white shadow-2xs'
+                          ? 'bg-[#0088cc] text-white font-bold shadow-2xs'
                           : isDarkMode ? 'bg-[#333333] text-[#aaaaaa] hover:bg-[#404040] hover:text-white' : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                       }`}
                     >
@@ -4126,11 +4240,17 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
               </div>
 
               {/* Badge PNG avec transparence garantie */}
-              <div className="flex items-center gap-2 p-2.5 rounded-2xl bg-white/70 border border-white text-[#000000] text-[11px]">
+              <div className={`flex items-center gap-2 p-2.5 rounded-2xl border text-[11px] ${
+                isDarkMode ? 'bg-[#282828] border-[#383838] text-white' : 'bg-white/70 border-white text-[#000000]'
+              }`}>
                 <Check className="w-4 h-4 text-[#0088cc] shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-semibold text-[#000000]">Format PNG avec transparence</span>
-                  <span className="text-[10px] text-[#666666]">Fond transparent exporté proprement (canal alpha pur)</span>
+                  <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
+                    Format PNG avec transparence
+                  </span>
+                  <span className={`text-[10px] ${isDarkMode ? 'text-[#aaaaaa]' : 'text-[#666666]'}`}>
+                    Fond transparent exporté proprement (canal alpha pur)
+                  </span>
                 </div>
               </div>
 
@@ -4141,7 +4261,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                   className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-full text-xs font-semibold transition-all ${
                     isPreviewMode
                       ? 'bg-[#0088cc] text-white shadow-2xs'
-                      : 'bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000] dark:bg-[#333333] dark:hover:bg-[#3e3e3e] dark:text-white'
+                      : isDarkMode
+                        ? 'bg-[#333333] hover:bg-[#3e3e3e] text-white'
+                        : 'bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000]'
                   }`}
                 >
                   <Eye className="w-4 h-4" />
@@ -4156,8 +4278,10 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                 disabled={isExporting || !image}
                 className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-full font-bold text-xs shadow-sm transition-all ${
                   isExporting || !image
-                    ? 'bg-[#eeeeee] text-[#979797] cursor-not-allowed'
-                    : 'bg-[#000000] hover:bg-[#222222] text-white hover:scale-[1.01] active:scale-[0.98]'
+                    ? isDarkMode ? 'bg-[#333333] text-[#777777] cursor-not-allowed' : 'bg-[#eeeeee] text-[#979797] cursor-not-allowed'
+                    : isDarkMode
+                      ? 'bg-[#0088cc] hover:bg-[#0099e6] text-white hover:scale-[1.01] active:scale-[0.98]'
+                      : 'bg-[#000000] hover:bg-[#222222] text-white hover:scale-[1.01] active:scale-[0.98]'
                 }`}
               >
                 <Download className="w-4 h-4" />
@@ -4171,7 +4295,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                 id="btn-copy-clipboard-panel"
                 onClick={onCopyClipboard}
                 disabled={!image}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-full bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000] font-medium text-xs transition-all hover:scale-[1.01] active:scale-[0.98]"
+                className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-full font-medium text-xs transition-all hover:scale-[1.01] active:scale-[0.98] ${
+                  isDarkMode
+                    ? 'bg-[#333333] hover:bg-[#404040] text-white'
+                    : 'bg-[#eeeeee]/80 hover:bg-[#eeeeee] text-[#000000]'
+                }`}
               >
                 {copied ? (
                   <>

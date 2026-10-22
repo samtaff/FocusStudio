@@ -125,10 +125,11 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Render at 2x resolution for crisp zoom inspection
-    const internalScale = 2;
-    const w = bounds.exportWidth * internalScale;
-    const h = bounds.exportHeight * internalScale;
+    // High-DPI and zoom-aware internal scaling for razor-sharp visual preview
+    const modalDpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+    const internalScale = Math.min(4, Math.max(2, Math.ceil(modalDpr * Math.max(1, zoom))));
+    const w = Math.round(bounds.exportWidth * internalScale);
+    const h = Math.round(bounds.exportHeight * internalScale);
 
     canvas.width = w;
     canvas.height = h;
@@ -155,7 +156,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     });
 
     ctx.restore();
-  }, [isOpen, image, focuses, activeArrows, globalStyles, bounds, blurZones, maskShapes, triangles, calloutVignette]);
+  }, [isOpen, image, focuses, activeArrows, globalStyles, bounds, blurZones, maskShapes, triangles, calloutVignette, zoom]);
 
   // Wheel zoom handler centered around cursor position
   useEffect(() => {
