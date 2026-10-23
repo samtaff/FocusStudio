@@ -57,18 +57,18 @@ export const MiniZonesWidget: React.FC<MiniZonesWidgetProps> = ({
 
   return (
     <div 
-      className="absolute bg-white/80 backdrop-blur-xl border border-white/80 rounded-2xl p-3 shadow-[0_10px_30px_rgba(0,0,0,0.08)] ring-1 ring-[#979797]/15 z-20 w-56 text-xs select-none"
+      className="absolute bg-white/90 dark:bg-[#252525]/95 backdrop-blur-xl border border-white/80 dark:border-[#383838] rounded-2xl p-3 shadow-[0_10px_30px_rgba(0,0,0,0.18)] ring-1 ring-[#979797]/15 dark:ring-white/10 z-20 w-56 text-xs select-none"
       style={{ left: `${pos.x}px`, top: `${pos.y}px` }}
     >
       {/* Header with drag handle */}
       <div 
-        className="flex items-center justify-between pb-2 border-b border-[#eeeeee] mb-2 cursor-move group"
+        className="flex items-center justify-between pb-2 border-b border-[#eeeeee] dark:border-[#383838] mb-2 cursor-move group"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
-        <div className="flex items-center gap-1.5 text-[#000000] font-semibold text-xs">
-          <GripHorizontal className="w-3.5 h-3.5 text-[#979797] group-hover:text-[#000000] transition-colors" />
+        <div className="flex items-center gap-1.5 text-[#000000] dark:text-white font-semibold text-xs">
+          <GripHorizontal className="w-3.5 h-3.5 text-[#979797] group-hover:text-[#000000] dark:group-hover:text-white transition-colors" />
           <span>Zones ({focuses.length})</span>
         </div>
         {onClose && (
@@ -77,7 +77,7 @@ export const MiniZonesWidget: React.FC<MiniZonesWidgetProps> = ({
               e.stopPropagation();
               onClose();
             }}
-            className="text-[#979797] hover:text-[#000000] p-1 rounded-full hover:bg-[#eeeeee] transition-colors"
+            className="text-[#979797] hover:text-[#000000] dark:hover:text-white p-1 rounded-full hover:bg-[#eeeeee] dark:hover:bg-[#383838] transition-colors"
             title="Fermer la liste"
           >
             <X className="w-3.5 h-3.5" />
@@ -88,7 +88,7 @@ export const MiniZonesWidget: React.FC<MiniZonesWidgetProps> = ({
       {/* Zones list */}
       <div className="flex flex-col gap-1 max-h-40 overflow-y-auto mb-2 pr-0.5">
         {focuses.length === 0 ? (
-          <div className="text-[11px] text-[#979797] text-center py-2">
+          <div className="text-[11px] text-[#979797] dark:text-[#888888] text-center py-2">
             Aucune zone active
           </div>
         ) : (
@@ -101,8 +101,8 @@ export const MiniZonesWidget: React.FC<MiniZonesWidgetProps> = ({
                 onMouseLeave={() => onHoverFocus?.(null)}
                 className={`group flex items-center justify-between w-full px-2.5 py-1.5 rounded-xl text-left transition-all ${
                   isSelected
-                    ? 'bg-[#000000] text-white font-medium shadow-xs'
-                    : 'bg-[#eeeeee]/60 hover:bg-[#eeeeee] text-[#000000]'
+                    ? 'bg-[#0088cc] text-white font-medium shadow-xs'
+                    : 'bg-[#eeeeee]/60 hover:bg-[#eeeeee] text-[#000000] dark:bg-[#333333] dark:hover:bg-[#3e3e3e] dark:text-white'
                 }`}
               >
                 <button
@@ -110,14 +110,14 @@ export const MiniZonesWidget: React.FC<MiniZonesWidgetProps> = ({
                   onClick={() => onSelectFocus(f.id)}
                   className="flex items-center gap-1.5 truncate flex-1 text-left"
                 >
-                  <Target className={`w-3 h-3 shrink-0 ${isSelected ? 'text-[#0088cc]' : 'text-[#666666]'}`} />
+                  <Target className={`w-3 h-3 shrink-0 ${isSelected ? 'text-white' : 'text-[#666666] dark:text-[#aaaaaa]'}`} />
                   <span className="truncate text-[11px]">
                     {f.name || `Zone ${f.stepNumber || index + 1}`}
                   </span>
                 </button>
 
                 <div className="flex items-center gap-1 ml-1 shrink-0">
-                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-white/20 text-white' : 'bg-white/80 text-[#666666]'}`}>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-white/80 dark:bg-[#444444] text-[#666666] dark:text-[#dddddd]'}`}>
                     {Math.round(f.width)}×{Math.round(f.height)}
                   </span>
                   {onDeleteFocus && (
@@ -129,8 +129,8 @@ export const MiniZonesWidget: React.FC<MiniZonesWidgetProps> = ({
                       }}
                       className={`p-1 rounded-full transition-opacity ${
                         isSelected 
-                          ? 'opacity-100 hover:bg-white/20 text-rose-300 hover:text-rose-100' 
-                          : 'opacity-0 group-hover:opacity-100 hover:bg-rose-50 text-[#979797] hover:text-rose-600'
+                          ? 'opacity-100 hover:bg-white/20 text-white' 
+                          : 'opacity-0 group-hover:opacity-100 hover:bg-rose-50 dark:hover:bg-rose-900/40 text-[#979797] hover:text-rose-600 dark:hover:text-rose-400'
                       }`}
                       title="Supprimer cette zone"
                     >
@@ -145,7 +145,7 @@ export const MiniZonesWidget: React.FC<MiniZonesWidgetProps> = ({
       </div>
 
       {/* Bottom Action buttons */}
-      <div className="pt-2 border-t border-[#eeeeee]">
+      <div className="pt-2 border-t border-[#eeeeee] dark:border-[#383838]">
         <button
           id="mini-widget-add-focus"
           onClick={onAddFocus}
