@@ -3868,7 +3868,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, calloutVignette);
                         const vigH = calloutVignette.height || calloutVignette.width || 100;
                         const shadowDist = (calloutVignette.showShadow !== false)
-                          ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
+                          ? ((calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5) + (calloutVignette.shadowBlur ?? calloutVignette.shadowSize ?? 2))
                           : 0;
                         const targetY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
                         onUpdateCallout({
@@ -4169,7 +4169,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           <input
                             type="range"
                             min="0"
-                            max="25"
+                            max="30"
                             value={calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5}
                             onChange={(e) => {
                               const val = parseInt(e.target.value, 10);
@@ -4239,7 +4239,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           : isDarkMode ? 'bg-[#333333] text-[#aaaaaa] hover:bg-[#404040] hover:text-white' : 'bg-[#eeeeee]/80 text-[#666666] hover:bg-[#eeeeee] hover:text-[#000000]'
                       }`}
                     >
-                      {scale === 1 ? '1x' : scale === 2 ? '2x (HD)' : '3x (4K)'}
+                      {scale === 1 ? '1x (Défaut)' : scale === 2 ? '2x (HD)' : '3x (4K)'}
                     </button>
                   ))}
                 </div>

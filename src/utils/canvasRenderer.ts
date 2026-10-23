@@ -166,9 +166,9 @@ export function calculateExportBounds(
 
     const vigW = calloutVignette.width || 100;
     const vigH = calloutVignette.height || vigW;
-    const shadowDist = (calloutVignette.showShadow !== false)
-      ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
-      : 0;
+    const shadowDistance = calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5;
+    const shadowBlur = calloutVignette.shadowBlur ?? calloutVignette.shadowSize ?? 2;
+    const shadowDist = (calloutVignette.showShadow !== false) ? (shadowDistance + shadowBlur) : 0;
     const alignedBottomY = bgY + bgHeight - vigH - shadowDist;
     const vigY = calloutVignette.alignBottom !== false ? alignedBottomY : (calloutVignette.offsetY ?? alignedBottomY);
 
@@ -2187,8 +2187,11 @@ export function drawCalloutVignette(
   const showShadow = callout.showShadow !== false;
   const shadowDistance = callout.shadowDistance ?? callout.shadowOffsetY ?? 5; // distance 5px
   const shadowSize = callout.shadowSize ?? callout.shadowBlur ?? 2; // taille 2px
+  const shadowBlur = callout.shadowBlur ?? shadowSize;
   const shadowOpacity = callout.shadowOpacity ?? 0.50; // opacité 50%
-  const shadowDist = showShadow ? shadowDistance : 0;
+  // L'ombre projetée sous la vignette comprend le déport vertical (5px) et son flou (2px)
+  // Ainsi le halo inférieur de l'ombre effleure précisément la ligne inférieure du screenshot (7px au total)
+  const shadowDist = showShadow ? (shadowDistance + shadowBlur) : 0;
 
   // L'alignement bas en référence à l'ombre portée : vigY + vigH + shadowDist = bgY + bgHeight
   const alignedBottomY = bgY + bgHeight - vigH - shadowDist;
@@ -2205,21 +2208,24 @@ export function drawCalloutVignette(
   if (showShadow) {
     ctx.save();
     const shadowOffsetX = callout.shadowOffsetX ?? 0;
-    const shadowOffsetY = shadowDistance;
-    const shadowBlur = shadowSize;
+    const shadowOffsetY = callout.shadowOffsetY ?? shadowDistance;
+    const shadowBlur = callout.shadowBlur ?? shadowSize;
 
     ctx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity})`;
     ctx.shadowBlur = shadowBlur;
     ctx.shadowOffsetX = shadowOffsetX;
     ctx.shadowOffsetY = shadowOffsetY;
-
-    // Déport géométrique hors champ : projette uniquement le flou d'ombre portée
-    // sans déposer de silhouette sombre directement sous le tracé de découpe.
-    // Cela supprime définitivement le liseré sombre de crénelage (anti-aliasing bleed).
-    const SHADOW_OFFSET_HACK = 20000;
-    ctx.shadowOffsetX = shadowOffsetX + SHADOW_OFFSET_HACK;
+    // Découpage inverse (evenodd) : conserve uniquement l'ombre portée projetée à l'extérieur
+    // sans déposer de silhouette opaque sous le tracé de l'image (évite tout liseré sombre).
+    // Les coordonnées restent proches du canvas pour éviter tout culling par le moteur graphique.
+    const pad = Math.max(50, shadowBlur * 4 + Math.abs(shadowOffsetY) + Math.abs(shadowOffsetX));
     ctx.beginPath();
-    ctx.roundRect(vigX - SHADOW_OFFSET_HACK, vigY, vigW, vigH, borderRadius);
+    ctx.rect(vigX - pad, vigY - pad, vigW + pad * 2, vigH + pad * 2);
+    ctx.roundRect(vigX, vigY, vigW, vigH, borderRadius);
+    ctx.clip('evenodd');
+
+    ctx.beginPath();
+    ctx.roundRect(vigX, vigY, vigW, vigH, borderRadius);
     ctx.fillStyle = '#000000';
     ctx.fill();
 

@@ -1150,7 +1150,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const vigH = calloutVignette.height || vigW;
     const vigX = bounds.bgX - gap - vigW;
     const shadowDist = (calloutVignette.showShadow !== false)
-      ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
+      ? ((calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5) + (calloutVignette.shadowBlur ?? calloutVignette.shadowSize ?? 2))
       : 0;
     const alignedBottomY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
     const vigY = calloutVignette.alignBottom !== false ? alignedBottomY : (calloutVignette.offsetY ?? alignedBottomY);
@@ -1560,16 +1560,36 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // Hover detection over focus handles
+    // Hover detection over handles (Focus, Mask, or Blur)
+    let foundHandle: ResizeHandle | null = null;
     const selected = focuses.find((f) => f.id === selectedFocusId);
-    if (selected && globalStyles.showHandles !== false) {
-      const handle = getHandleAtCoord(cx, cy, selected);
-      if (handle) {
-        setHoveredHandle(handle);
-        return;
+    if (selected && globalStyles.showHandles !== false && selectedFocusIds.length <= 1 && selectedBlurIds.length === 0 && selectedMaskIds.length === 0 && selectedTriangleIds.length === 0) {
+      foundHandle = getHandleAtCoord(cx, cy, selected);
+    }
+    if (!foundHandle) {
+      const selectedMask = maskShapes.find((m) => m.id === selectedMaskId);
+      if (selectedMask && selectedMaskIds.length <= 1 && selectedFocusIds.length === 0 && selectedBlurIds.length === 0 && selectedTriangleIds.length === 0) {
+        let handleRect = selectedMask;
+        if (selectedMask.multiplier?.enabled) {
+          const cols = Math.max(1, selectedMask.multiplier.cols || 2);
+          const rows = Math.max(1, selectedMask.multiplier.rows || 2);
+          const gapX = selectedMask.multiplier.gapX ?? 10;
+          const gapY = selectedMask.multiplier.gapY ?? 10;
+          const totalW = cols * selectedMask.width + (cols - 1) * gapX;
+          const totalH = rows * selectedMask.height + (rows - 1) * gapY;
+          handleRect = { x: selectedMask.x, y: selectedMask.y, width: totalW, height: totalH };
+        }
+        foundHandle = getGenericHandleAtCoord(cx, cy, handleRect) || getGenericHandleAtCoord(cx, cy, selectedMask);
       }
     }
-    setHoveredHandle(null);
+    if (!foundHandle) {
+      const selectedBlur = blurZones.find((b) => b.id === selectedBlurId);
+      if (selectedBlur && selectedBlurIds.length <= 1 && selectedFocusIds.length === 0 && selectedMaskIds.length === 0 && selectedTriangleIds.length === 0) {
+        foundHandle = getGenericHandleAtCoord(cx, cy, selectedBlur);
+      }
+    }
+    setHoveredHandle(foundHandle);
+    if (foundHandle) return;
 
     // Photoshop-style corner rotation hover
     const rotCorner = getPhotoshopRotationCornerAtCoord(cx, cy);
@@ -1603,8 +1623,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
   // Mouse Down
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // 0. Maintien Espace OU clic molette : Déplacer le plan librement
-    if (e.button === 1 || isSpacePressed) {
+    // Prevent event from bubbling to outer workspace container
+    e.stopPropagation();
+
+    // 0. Maintien Espace OU clic molette OU outil/mode Pan : Déplacer le plan librement
+    if (e.button === 1 || isSpacePressed || isPanMode || activeTool === 'pan') {
       isPanningRef.current = true;
       panStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
       setIsPanning(true);
@@ -1624,7 +1647,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
 
     // If an element already exists under the mouse click, never create an unwanted new element: revert to 'select' and interact with it
-    const clickedExistingElement = getFocusAtCoord(cx, cy) || getBlurAtCoord(cx, cy) || getMaskAtCoord(cx, cy, 'above') || getTriangleAtCoord(cx, cy);
+    const clickedExistingElement = getFocusAtCoord(cx, cy) || getBlurAtCoord(cx, cy, 'above') || getBlurAtCoord(cx, cy, 'below') || getBlurAtCoord(cx, cy) || getMaskAtCoord(cx, cy, 'above') || getMaskAtCoord(cx, cy, 'below') || getTriangleAtCoord(cx, cy);
     if (clickedExistingElement && activeTool !== 'select' && activeTool !== 'zoom') {
       onSelectTool('select');
     } else {
@@ -1916,7 +1939,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (clickedCallout && calloutVignette) {
       const vigH = calloutVignette.height || calloutVignette.width || 100;
       const shadowDist = (calloutVignette.showShadow !== false)
-        ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
+        ? ((calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5) + (calloutVignette.shadowBlur ?? calloutVignette.shadowSize ?? 2))
         : 0;
       const currentVigY = calloutVignette.alignBottom !== false 
         ? (bounds.bgY + bounds.bgHeight - vigH - shadowDist) 
@@ -2012,6 +2035,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   };
 
   const handleMouseUp = (e?: React.MouseEvent<HTMLCanvasElement>) => {
+    isPanningRef.current = false;
     if (isPanning) setIsPanning(false);
     if (dragCalloutState) setDragCalloutState(null);
     if (dragFramingState) setDragFramingState(null);
@@ -2364,7 +2388,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       <div 
         onMouseDown={(e) => {
           const target = e.target as HTMLElement;
-          if (target.closest('button') || target.closest('input') || target.closest('.vertical-tool-palette')) {
+          if (
+            target.closest('button') || 
+            target.closest('input') || 
+            target.closest('.vertical-tool-palette') ||
+            target.tagName === 'CANVAS' ||
+            target.closest('canvas')
+          ) {
             return;
           }
           if (e.button === 0 || e.button === 1) {
@@ -2380,7 +2410,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             : 'bg-[#eeeeee]/40 border-white/60 shadow-inner'
         }`}
         style={{
-          cursor: isPanning || isPanningRef.current ? 'grabbing' : 'grab'
+          cursor: isPanning ? 'grabbing' : (isSpacePressed || isPanMode || activeTool === 'pan' ? 'grab' : 'default')
         }}
       >
         {/* Banner indicator if Internal Framing Mode is ON */}
@@ -2583,7 +2613,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                     }}
                     onMouseLeave={() => {
                       setCanvasMousePos(null);
-                      handleMouseUp();
+                      setHoveredHandle(null);
+                      setHoveredRotationCorner(null);
+                      setHoveredGuide(null);
+                      setHoveredTriangleId(null);
+                      setHoveredMaskId(null);
+                      setHoveredBlurId(null);
+                      setHoveredFocusId(null);
                     }}
                     onDoubleClick={handleDoubleClick}
                     className="block select-none"
@@ -2624,7 +2660,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
                 }}
                 onMouseLeave={() => {
                   setCanvasMousePos(null);
-                  handleMouseUp();
+                  setHoveredHandle(null);
+                  setHoveredRotationCorner(null);
+                  setHoveredGuide(null);
+                  setHoveredTriangleId(null);
+                  setHoveredMaskId(null);
+                  setHoveredBlurId(null);
+                  setHoveredFocusId(null);
                 }}
                 onDoubleClick={handleDoubleClick}
                 className="block select-none"

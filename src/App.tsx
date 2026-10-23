@@ -83,6 +83,7 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+
   // Internal screenshot framing (recadrage du screenshot dans la zone focus sans altérer l'original)
   const [internalFramingFocusId, setInternalFramingFocusId] = useState<string | null>(null);
 
@@ -214,7 +215,7 @@ export default function App() {
   const [globalStyles, setGlobalStyles] = useState<GlobalStyleSettings>({
     bgTintColor: BASE_COLOR,
     bgTintOpacity: 0.50,
-    exportScale: 2,
+    exportScale: 1,
     workspaceWidth: 260,
     container: {
       borderRadius: 0, // Strictement droit, sans arrondis
@@ -229,6 +230,28 @@ export default function App() {
     previewHD: false,
     nudgeStep: 1,
   });
+
+  // Synchronise et aligne la distance de l'ombre portée du callout à 5px avec son flou (7px au total)
+  useEffect(() => {
+    if (calloutVignette?.enabled && (calloutVignette.shadowDistance === 10 || calloutVignette.shadowOffsetY === 10)) {
+      setCalloutVignette((prev) => {
+        if (!prev) return null;
+        const next = {
+          ...prev,
+          shadowDistance: 5,
+          shadowOffsetY: 5,
+          shadowBlur: 2,
+        };
+        if (next.alignBottom !== false && image) {
+          const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, next);
+          const vigH = next.height || next.width || 100;
+          const sDist = (next.showShadow !== false) ? (5 + 2) : 0;
+          next.offsetY = bounds.bgY + bounds.bgHeight - vigH - sDist;
+        }
+        return next;
+      });
+    }
+  }, [calloutVignette?.enabled, image, focuses, globalStyles.workspaceWidth]);
 
   // Panel width management (responsive)
   const [panelWidth, setPanelWidth] = useState<number>(340);
@@ -1516,7 +1539,7 @@ export default function App() {
       const vigW = prev?.width || 100;
       const vigH = prev?.height || vigW;
       const gap = prev?.gap ?? 5;
-      const shadowDist = 5; // distance ombre portée 5px
+      const shadowDist = 7; // distance 5px + flou 2px = 7px pour effleurer exactement le bas
 
       const bounds = calculateCompositionBounds(
         image,
@@ -1537,11 +1560,11 @@ export default function App() {
           offsetY: alignedBottomY,
           width: prev.width || 100,
           height: prev.height || prev.width || 100,
-          shadowDistance: 5,
-          shadowSize: 2,
-          shadowBlur: 2,
-          shadowOffsetY: 5,
-          shadowOpacity: 0.50,
+          shadowDistance: prev.shadowDistance ?? 5,
+          shadowSize: prev.shadowSize ?? 2,
+          shadowBlur: prev.shadowBlur ?? 2,
+          shadowOffsetY: prev.shadowOffsetY ?? prev.shadowDistance ?? 5,
+          shadowOpacity: prev.shadowOpacity ?? 0.50,
         };
       } else {
         // Initialize default Callout Vignette (default 100px)
@@ -1606,6 +1629,18 @@ export default function App() {
         next.sourceCenterY = (next.sourceY ?? prev.sourceY ?? 0) + curH / 2;
       }
 
+      // Si la vignette est alignée au bas et qu'un paramètre d'ombre ou de taille change, recalculer son alignement
+      if (
+        (updated.shadowDistance !== undefined || updated.shadowOffsetY !== undefined || updated.shadowBlur !== undefined || updated.shadowSize !== undefined || updated.showShadow !== undefined || updated.height !== undefined || updated.width !== undefined) &&
+        next.alignBottom !== false &&
+        image
+      ) {
+        const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, next);
+        const vigH = next.height || next.width || 100;
+        const sDist = (next.showShadow !== false) ? ((next.shadowDistance ?? next.shadowOffsetY ?? 5) + (next.shadowBlur ?? next.shadowSize ?? 2)) : 0;
+        next.offsetY = bounds.bgY + bounds.bgHeight - vigH - sDist;
+      }
+
       appStateRef.current.calloutVignette = next;
       return next;
     });
@@ -1665,7 +1700,7 @@ export default function App() {
     setGlobalStyles({
       bgTintColor: BASE_COLOR,
       bgTintOpacity: 0.50,
-      exportScale: 2,
+      exportScale: 1,
       workspaceWidth: 260,
       container: {
         borderRadius: 0,
@@ -1735,7 +1770,7 @@ export default function App() {
         triangles,
         calloutVignette
       );
-      const targetScale = Math.max(1, globalStyles.exportScale || 2);
+      const targetScale = Math.max(1, globalStyles.exportScale || 1);
       const targetWidth = Math.round(exportWidth * targetScale);
       const targetHeight = Math.round(exportHeight * targetScale);
 
@@ -2141,7 +2176,7 @@ export default function App() {
             if (selectedCalloutPart === 'vignette') {
               const vigH = calloutVignette.height || calloutVignette.width || 100;
               const shadowDist = (calloutVignette.showShadow !== false)
-                ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5)
+                ? ((calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5) + (calloutVignette.shadowBlur ?? calloutVignette.shadowSize ?? 2))
                 : 0;
               const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, calloutVignette);
               const alignedBottomY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
