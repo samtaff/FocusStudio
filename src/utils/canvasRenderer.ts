@@ -425,9 +425,9 @@ export function drawComposition(
     });
   }
 
-  // 6.5. RÈGLE ABSOLUE : Re-tracer les bordures de toutes les zones de focus au-dessus des flous internes
-  // Le flou ne doit jamais recouvrir le contour de la zone focus
-  if (!isCalloutMode && focuses.length > 0) {
+  // 6.5. RÈGLE : Re-tracer les bordures de focus UNIQUEMENT si un flou interne a été dessiné par-dessus
+  // Évite tout double-traçage qui détruit l'antialiasing et crée du crénelage
+  if (!isCalloutMode && focuses.length > 0 && focusBlurs.length > 0) {
     focuses.forEach((focus) => {
       const destX = Math.round(focus.x);
       const destY = Math.round(focus.y);
@@ -439,6 +439,8 @@ export function drawComposition(
       ctx.save();
       ctx.strokeStyle = focus.borderColor || BASE_COLOR;
       ctx.lineWidth = bWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       ctx.beginPath();
       ctx.roundRect(destX, destY, destW, destH, radius);
       ctx.stroke();
@@ -825,6 +827,8 @@ function drawSingleFocusContentAndBorder(
   const bWidth = focus.borderWidth || 2;
   ctx.strokeStyle = focus.borderColor || BASE_COLOR;
   ctx.lineWidth = bWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   ctx.beginPath();
   ctx.roundRect(destX, destY, destW, destH, radius);
   ctx.stroke();
@@ -1995,7 +1999,7 @@ function drawImageHighQualityDownscale(
   const origW = img.naturalWidth || img.width;
   const origH = img.naturalHeight || img.height;
 
-  if (origW > dw * 2 && origH > dh * 2) {
+  if (origW > dw * 1.5 && origH > dh * 1.5) {
     let curCanvas = document.createElement('canvas');
     curCanvas.width = origW;
     curCanvas.height = origH;
@@ -2113,6 +2117,46 @@ function drawImageSafeClipped(
 
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
+
+  // Multi-step high-quality downsampling if downscaling by > 1.5x (e.g. high-resolution mobile screenshots)
+  // Prevents severe aliasing, pixel skipping, and jagged font edges
+  if (clampSw > clampDw * 1.5 && clampSh > clampDh * 1.5) {
+    let curCanvas = document.createElement('canvas');
+    curCanvas.width = Math.max(1, Math.round(clampSw));
+    curCanvas.height = Math.max(1, Math.round(clampSh));
+    let curCtx = curCanvas.getContext('2d');
+    if (curCtx) {
+      curCtx.imageSmoothingEnabled = true;
+      curCtx.imageSmoothingQuality = 'high';
+      curCtx.drawImage(img, clampSx, clampSy, clampSw, clampSh, 0, 0, curCanvas.width, curCanvas.height);
+
+      let curW = curCanvas.width;
+      let curH = curCanvas.height;
+
+      while (curW > clampDw * 2 && curH > clampDh * 2) {
+        const nextW = Math.max(Math.round(clampDw), Math.floor(curW / 2));
+        const nextH = Math.max(Math.round(clampDh), Math.floor(curH / 2));
+
+        const nextCanvas = document.createElement('canvas');
+        nextCanvas.width = nextW;
+        nextCanvas.height = nextH;
+        const nextCtx = nextCanvas.getContext('2d');
+        if (!nextCtx) break;
+
+        nextCtx.imageSmoothingEnabled = true;
+        nextCtx.imageSmoothingQuality = 'high';
+        nextCtx.drawImage(curCanvas, 0, 0, curW, curH, 0, 0, nextW, nextH);
+
+        curCanvas = nextCanvas;
+        curW = nextW;
+        curH = nextH;
+      }
+
+      ctx.drawImage(curCanvas, 0, 0, curW, curH, clampDx, clampDy, clampDw, clampDh);
+      return;
+    }
+  }
+
   ctx.drawImage(img, clampSx, clampSy, clampSw, clampSh, clampDx, clampDy, clampDw, clampDh);
 }
 

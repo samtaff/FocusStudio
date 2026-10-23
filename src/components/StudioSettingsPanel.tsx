@@ -1766,7 +1766,9 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       className={`w-full py-1.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-[11px] font-semibold transition-all ${
                         internalFramingFocusId === selectedFocus.id
                           ? 'bg-[#25465F] text-white border-[#25465F] shadow-sm'
-                          : 'bg-white hover:bg-sky-50 text-[#25465F] border-sky-200'
+                          : isDarkMode
+                            ? 'bg-[#2a2a2a] hover:bg-[#333333] text-sky-400 border-[#3f3f3f]'
+                            : 'bg-white hover:bg-sky-50 text-[#25465F] border-sky-200'
                       }`}
                     >
                       <Crosshair className={`w-3.5 h-3.5 ${internalFramingFocusId === selectedFocus.id ? 'animate-pulse text-sky-300' : 'text-[#0088cc]'}`} />
@@ -3249,10 +3251,14 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
                         {/* Action : Éclater en formes indépendantes */}
                         {onSplitMaskMultiplier && (
-                          <div className="pt-2 border-t border-[#f0f0f0]">
+                          <div className={`pt-2 border-t ${isDarkMode ? 'border-[#383838]' : 'border-[#f0f0f0]'}`}>
                             <button
                               onClick={() => onSplitMaskMultiplier(activeMask.id)}
-                              className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-sky-50 hover:bg-sky-100 text-[#0088cc] text-[10px] font-semibold transition-colors border border-sky-200"
+                              className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-[10px] font-semibold transition-colors border ${
+                                isDarkMode
+                                  ? 'bg-[#0088cc]/15 hover:bg-[#0088cc]/25 text-[#38bdf8] border-[#0088cc]/40'
+                                  : 'bg-sky-50 hover:bg-sky-100 text-[#0088cc] border-sky-200'
+                              }`}
                               title="Convertir la grille en formes individuelles distinctes"
                             >
                               <Split className="w-3 h-3" />

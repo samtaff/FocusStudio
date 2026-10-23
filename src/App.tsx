@@ -214,7 +214,7 @@ export default function App() {
   const [globalStyles, setGlobalStyles] = useState<GlobalStyleSettings>({
     bgTintColor: BASE_COLOR,
     bgTintOpacity: 0.50,
-    exportScale: 1,
+    exportScale: 2,
     workspaceWidth: 260,
     container: {
       borderRadius: 0, // Strictement droit, sans arrondis
@@ -1647,7 +1647,7 @@ export default function App() {
     setGlobalStyles({
       bgTintColor: BASE_COLOR,
       bgTintOpacity: 0.50,
-      exportScale: 1,
+      exportScale: 2,
       workspaceWidth: 260,
       container: {
         borderRadius: 0,
@@ -1717,26 +1717,35 @@ export default function App() {
         triangles,
         calloutVignette
       );
-      const scale = globalStyles.exportScale || 1;
+      const targetScale = Math.max(1, globalStyles.exportScale || 2);
+      const targetWidth = Math.round(exportWidth * targetScale);
+      const targetHeight = Math.round(exportHeight * targetScale);
 
-      const exportCanvas = document.createElement('canvas');
-      exportCanvas.width = exportWidth * scale;
-      exportCanvas.height = exportHeight * scale;
-      const ctx = exportCanvas.getContext('2d');
-      if (!ctx) {
+      // Super-Sample Anti-Aliasing (SSAA):
+      // Render on an internal 2x-supersampled canvas to eliminate pixel crénelage on rounded corners, badges, and text,
+      // then downsample using high-quality bicubic filtering to the target export canvas.
+      const ssaa = 2;
+      const renderScale = targetScale * ssaa;
+      const renderWidth = Math.round(exportWidth * renderScale);
+      const renderHeight = Math.round(exportHeight * renderScale);
+
+      const renderCanvas = document.createElement('canvas');
+      renderCanvas.width = renderWidth;
+      renderCanvas.height = renderHeight;
+      const renderCtx = renderCanvas.getContext('2d', { alpha: true });
+      if (!renderCtx) {
         setIsExporting(false);
         return;
       }
 
-      if (scale !== 1) {
-        ctx.scale(scale, scale);
-      }
-
-      ctx.save();
-      ctx.translate(offsetX, offsetY);
+      renderCtx.imageSmoothingEnabled = true;
+      renderCtx.imageSmoothingQuality = 'high';
+      renderCtx.scale(renderScale, renderScale);
+      renderCtx.save();
+      renderCtx.translate(offsetX, offsetY);
 
       // Render pure visual: NO interactive handles, NO guides, NO rulers
-      drawComposition(ctx, image, focuses, { 
+      drawComposition(renderCtx, image, focuses, { 
         interactive: false,
         globalStyles,
         arrows: activeArrows,
@@ -1749,7 +1758,31 @@ export default function App() {
         calloutVignette,
         previewMode: true,
       });
-      ctx.restore();
+      renderCtx.restore();
+
+      // Final export canvas with exact target dimensions and alpha transparency
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = targetWidth;
+      exportCanvas.height = targetHeight;
+      const exportCtx = exportCanvas.getContext('2d', { alpha: true });
+      if (!exportCtx) {
+        setIsExporting(false);
+        return;
+      }
+
+      exportCtx.imageSmoothingEnabled = true;
+      exportCtx.imageSmoothingQuality = 'high';
+      exportCtx.drawImage(
+        renderCanvas,
+        0,
+        0,
+        renderWidth,
+        renderHeight,
+        0,
+        0,
+        targetWidth,
+        targetHeight
+      );
 
       const blob = await new Promise<Blob | null>((resolve) => {
         exportCanvas.toBlob(resolve, 'image/png');
@@ -1801,22 +1834,28 @@ export default function App() {
         triangles,
         calloutVignette
       );
-      const scale = globalStyles.exportScale || 1;
+      const targetScale = Math.max(1, globalStyles.exportScale || 2);
+      const targetWidth = Math.round(exportWidth * targetScale);
+      const targetHeight = Math.round(exportHeight * targetScale);
 
-      const exportCanvas = document.createElement('canvas');
-      exportCanvas.width = exportWidth * scale;
-      exportCanvas.height = exportHeight * scale;
-      const ctx = exportCanvas.getContext('2d');
-      if (!ctx) return;
+      const ssaa = 2;
+      const renderScale = targetScale * ssaa;
+      const renderWidth = Math.round(exportWidth * renderScale);
+      const renderHeight = Math.round(exportHeight * renderScale);
 
-      if (scale !== 1) {
-        ctx.scale(scale, scale);
-      }
+      const renderCanvas = document.createElement('canvas');
+      renderCanvas.width = renderWidth;
+      renderCanvas.height = renderHeight;
+      const renderCtx = renderCanvas.getContext('2d', { alpha: true });
+      if (!renderCtx) return;
 
-      ctx.save();
-      ctx.translate(offsetX, offsetY);
+      renderCtx.imageSmoothingEnabled = true;
+      renderCtx.imageSmoothingQuality = 'high';
+      renderCtx.scale(renderScale, renderScale);
+      renderCtx.save();
+      renderCtx.translate(offsetX, offsetY);
 
-      drawComposition(ctx, image, focuses, { 
+      drawComposition(renderCtx, image, focuses, { 
         interactive: false,
         globalStyles,
         arrows: activeArrows,
@@ -1829,7 +1868,27 @@ export default function App() {
         calloutVignette,
         previewMode: true,
       });
-      ctx.restore();
+      renderCtx.restore();
+
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = targetWidth;
+      exportCanvas.height = targetHeight;
+      const exportCtx = exportCanvas.getContext('2d', { alpha: true });
+      if (!exportCtx) return;
+
+      exportCtx.imageSmoothingEnabled = true;
+      exportCtx.imageSmoothingQuality = 'high';
+      exportCtx.drawImage(
+        renderCanvas,
+        0,
+        0,
+        renderWidth,
+        renderHeight,
+        0,
+        0,
+        targetWidth,
+        targetHeight
+      );
 
       exportCanvas.toBlob(async (blob) => {
         if (!blob) return;

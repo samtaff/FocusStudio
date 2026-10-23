@@ -172,6 +172,24 @@ body.dark-mode button.bg-white:hover,
   color: #ffffff !important;
 }
 
+/* Light sky buttons in dark mode: dark cyan tinted surface */
+.dark button.bg-sky-50,
+body.dark-mode button.bg-sky-50,
+.dark button[class*="bg-sky-50"],
+body.dark-mode button[class*="bg-sky-50"] {
+  background-color: rgba(0, 136, 204, 0.15) !important;
+  border-color: rgba(0, 136, 204, 0.4) !important;
+  color: #38bdf8 !important;
+}
+
+.dark button.bg-sky-50:hover,
+body.dark-mode button.bg-sky-50:hover,
+.dark button[class*="bg-sky-50"]:hover,
+body.dark-mode button[class*="bg-sky-50"]:hover {
+  background-color: rgba(0, 136, 204, 0.25) !important;
+  border-color: rgba(0, 136, 204, 0.6) !important;
+}
+
 /* Ensure icons inside dark mode buttons are always visible */
 .dark button.bg-white svg,
 body.dark-mode button.bg-white svg,
