@@ -26,8 +26,8 @@ interface TopSceneBarProps {
   onUpdateGlobalStyles: (updated: Partial<GlobalStyleSettings>) => void;
   onAddGuideH: () => void;
   onAddGuideV: () => void;
-  isPanMode: boolean;
-  onTogglePanMode: () => void;
+  isPanMode?: boolean;
+  onTogglePanMode?: () => void;
   zoomLevel: number;
   onSetZoom: (level: number) => void;
   // Focus Zone options
@@ -74,22 +74,44 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
   isDarkMode = false,
 }) => {
   const { showRulers, showHandles, previewHD } = globalStyles;
+  const barRef = React.useRef<HTMLDivElement>(null);
+  const [barWidth, setBarWidth] = React.useState<number>(900);
+
+  React.useEffect(() => {
+    if (!barRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setBarWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(barRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const isCompact = barWidth < 960;
+  const isNarrow = barWidth < 760;
+  const isUltraNarrow = barWidth < 620;
 
   return (
-    <div className={`w-full backdrop-blur-xl rounded-2xl px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 text-xs select-none transition-colors duration-200 ${
-      isDarkMode
-        ? 'bg-[#282828]/95 border border-[#383838] text-[#cccccc] shadow-2xs'
-        : 'bg-white/70 border border-[#eeeeee] text-[#666666] shadow-xs'
-    }`}>
+    <div 
+      ref={barRef}
+      className={`w-full backdrop-blur-xl rounded-2xl px-2.5 py-1.5 flex flex-nowrap items-center justify-between gap-1.5 text-xs select-none transition-colors duration-200 overflow-x-auto no-scrollbar shrink-0 ${
+        isDarkMode
+          ? 'bg-[#282828]/95 border border-[#383838] text-[#cccccc] shadow-2xs'
+          : 'bg-white/70 border border-[#eeeeee] text-[#666666] shadow-xs'
+      }`}
+    >
       {/* Left: Title + Undo/Redo Pills + Réinitialiser + Prévisualisation */}
-      <div className="flex items-center gap-2">
-        <span className={`font-semibold tracking-tight text-xs ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
-          Scène Studio
-        </span>
+      <div className="flex items-center gap-1 shrink-0">
+        {!isNarrow && (
+          <span className={`font-semibold tracking-tight text-xs whitespace-nowrap pr-1 ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
+            Scène Studio
+          </span>
+        )}
 
         {/* Undo / Redo Pills */}
         {(onUndo || onRedo) && (
-          <div className={`flex items-center gap-0.5 p-0.5 rounded-full border ${
+          <div className={`flex items-center gap-0.5 p-0.5 rounded-full border shrink-0 ${
             isDarkMode 
               ? 'bg-[#353535] border-[#444444]' 
               : 'bg-[#eeeeee]/80 border-[#eeeeee]'
@@ -133,15 +155,17 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           <button
             id="btn-scene-reset-shapes"
             onClick={onResetShapes}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
+            className={`flex items-center gap-1 rounded-full font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] cursor-pointer border whitespace-nowrap shrink-0 ${
+              isCompact ? 'p-1.5 text-xs' : 'px-2.5 py-1 text-[11px]'
+            } ${
               isDarkMode
-                ? 'bg-[#353535] text-[#dddddd] hover:bg-[#404040] hover:text-white border border-[#444444]'
-                : 'bg-[#eeeeee]/80 text-[#000000] hover:bg-[#eeeeee]'
+                ? 'bg-[#353535] text-[#dddddd] hover:bg-[#404040] hover:text-white border-[#444444]'
+                : 'bg-[#eeeeee]/80 text-[#000000] hover:bg-[#eeeeee] border-transparent'
             }`}
             title="Réinitialiser toutes les formes et annotations du canevas"
           >
-            <RotateCcw className="w-3 h-3 text-rose-500" />
-            <span>Réinitialiser</span>
+            <RotateCcw className="w-3.5 h-3.5 text-rose-500" />
+            {!isCompact && <span>Réinitialiser</span>}
           </button>
         )}
 
@@ -149,129 +173,166 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
         <button
           id="btn-toggle-preview-mode"
           onClick={onTogglePreview}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all ${
+          className={`flex items-center gap-1 rounded-full font-medium transition-all border whitespace-nowrap shrink-0 ${
+            isNarrow ? 'p-1.5 text-xs' : isCompact ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1 text-[11px]'
+          } ${
             isPreviewMode
-              ? 'bg-[#0088cc] text-white shadow-xs'
+              ? 'bg-[#0088cc] text-white border-[#0088cc] shadow-xs'
               : isDarkMode
-                ? 'bg-[#353535] text-[#dddddd] hover:bg-[#404040] border border-[#444444]'
-                : 'bg-[#eeeeee]/80 text-[#000000] hover:bg-[#eeeeee]'
+                ? 'bg-[#353535] text-[#dddddd] hover:bg-[#404040] border-[#444444]'
+                : 'bg-[#eeeeee]/80 text-[#000000] hover:bg-[#eeeeee] border-transparent'
           }`}
           title="Prévisualiser le résultat final sans repères ni poignées"
         >
           <Eye className="w-3.5 h-3.5" />
-          <span>{isPreviewMode ? 'Fermer Aperçu' : 'Prévisualisation'}</span>
+          {!isNarrow && (
+            <span>
+              {isPreviewMode 
+                ? (isCompact ? 'Fermer' : 'Fermer Aperçu') 
+                : (isCompact ? 'Aperçu' : 'Prévisualisation')}
+            </span>
+          )}
         </button>
       </div>
 
-      {/* Center Controls */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      {/* Center Controls (Handles, Rulers, Snap, Grid, Nudge) */}
+      <div className="flex items-center gap-1 shrink-0">
         {/* Poignées ON / OFF */}
         <button
           id="btn-toggle-handles"
           onClick={() => onUpdateGlobalStyles({ showHandles: !showHandles })}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+          className={`flex items-center gap-1 rounded-full font-medium transition-all border whitespace-nowrap shrink-0 ${
+            isCompact ? 'p-1.5 text-xs' : 'px-2 py-1 text-[11px]'
+          } ${
             showHandles 
-              ? isDarkMode ? 'bg-[#0088cc] text-white font-semibold shadow-xs' : 'bg-[#000000] text-white' 
+              ? 'bg-[#0088cc] border-[#0088cc] text-white font-medium shadow-xs' 
               : isDarkMode 
-                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border border-[#525252]'
-                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
+                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border-[#444444]'
+                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee] border-transparent'
           }`}
-          title="Afficher/masquer les poignées de redimensionnement"
+          title={`Poignées de redimensionnement (${showHandles ? 'Actives - Cliquer pour masquer' : 'Masquées - Cliquer pour afficher'})`}
         >
-          <Maximize2 className="w-3 h-3" />
-          <span>Poignées {showHandles ? 'ON' : 'OFF'}</span>
+          <Maximize2 className="w-3.5 h-3.5" />
+          {!isCompact && <span>Poignées {showHandles ? 'ON' : 'OFF'}</span>}
         </button>
 
         {/* Règles ON / OFF */}
         <button
           id="btn-toggle-rulers"
           onClick={() => onUpdateGlobalStyles({ showRulers: !showRulers })}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+          className={`flex items-center gap-1 rounded-full font-medium transition-all border whitespace-nowrap shrink-0 ${
+            isCompact ? 'p-1.5 text-xs' : 'px-2 py-1 text-[11px]'
+          } ${
             showRulers 
-              ? 'bg-[#0088cc] text-white font-medium shadow-xs' 
+              ? 'bg-[#0088cc] border-[#0088cc] text-white font-medium shadow-xs' 
               : isDarkMode
-                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border border-[#525252]'
-                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
+                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border-[#444444]'
+                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee] border-transparent'
           }`}
-          title="Afficher/masquer les règles graduées Photoshop"
+          title={`Règles graduées Photoshop (${showRulers ? 'Actives - Cliquer pour masquer' : 'Masquées - Cliquer pour afficher'})`}
         >
           <Ruler className="w-3.5 h-3.5" />
-          <span>Règles {showRulers ? 'ON' : 'OFF'}</span>
+          {!isCompact && <span>Règles {showRulers ? 'ON' : 'OFF'}</span>}
         </button>
 
         {/* Magnétisme (Snap) ON / OFF */}
         <button
           id="btn-toggle-snap"
           onClick={() => onUpdateGlobalStyles({ snapToGuides: globalStyles.snapToGuides === false ? true : false })}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+          className={`flex items-center gap-1 rounded-full font-medium transition-all border whitespace-nowrap shrink-0 ${
+            isCompact ? 'p-1.5 text-xs' : 'px-2 py-1 text-[11px]'
+          } ${
             globalStyles.snapToGuides !== false
-              ? 'bg-[#0088cc] text-white font-medium shadow-xs' 
+              ? 'bg-[#0088cc] border-[#0088cc] text-white font-medium shadow-xs' 
               : isDarkMode
-                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border border-[#525252]'
-                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
+                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border-[#444444]'
+                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee] border-transparent'
           }`}
-          title="Activer/désactiver le magnétisme Photoshop (Snap aux repères et aux bords)"
+          title={`Magnétisme Photoshop Snap (${globalStyles.snapToGuides !== false ? 'Actif - Cliquer pour désactiver' : 'Désactivé - Cliquer pour activer'})`}
         >
           <Magnet className="w-3.5 h-3.5" />
-          <span>Snap {globalStyles.snapToGuides !== false ? 'ON' : 'OFF'}</span>
+          {!isCompact && <span>Snap {globalStyles.snapToGuides !== false ? 'ON' : 'OFF'}</span>}
         </button>
 
         {/* Grille Photoshop ON / OFF */}
         <button
           id="btn-toggle-grid"
           onClick={() => onUpdateGlobalStyles({ showGrid: !globalStyles.showGrid })}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+          className={`flex items-center gap-1 rounded-full font-medium transition-all border whitespace-nowrap shrink-0 ${
+            isCompact ? 'p-1.5 text-xs' : 'px-2 py-1 text-[11px]'
+          } ${
             globalStyles.showGrid
-              ? 'bg-[#0088cc] text-white font-medium shadow-xs' 
+              ? 'bg-[#0088cc] border-[#0088cc] text-white font-medium shadow-xs' 
               : isDarkMode
-                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border border-[#525252]'
-                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
+                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border-[#444444]'
+                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee] border-transparent'
           }`}
-          title="Afficher/masquer la grille de précision Photoshop"
+          title={`Grille de précision Photoshop (${globalStyles.showGrid ? 'Active - Cliquer pour masquer' : 'Masquée - Cliquer pour afficher'})`}
         >
           <Grid className="w-3.5 h-3.5" />
-          <span>Grille {globalStyles.showGrid ? 'ON' : 'OFF'}</span>
+          {!isCompact && <span>Grille {globalStyles.showGrid ? 'ON' : 'OFF'}</span>}
         </button>
 
-        {/* Pas de déplacement des flèches : 0.1, 0.5, 1, 5, 10 px */}
-        <div 
-          className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all ${
-            isDarkMode
-              ? 'bg-[#353535] border-[#525252] text-[#dddddd]'
-              : 'bg-[#eeeeee]/80 border-[#e5e5e5] text-[#666666]'
-          }`}
-          title="Pas de déplacement avec les flèches du clavier. Raccourcis : Alt + Flèches = 0.1 px (micro-précision) • Shift + Flèches = 10 px"
-        >
-          <Move className="w-3 h-3 text-[#0088cc] mr-0.5 shrink-0" />
-          <span className="text-[10px] text-[#888888] font-medium mr-1">Pas :</span>
-          {[0.1, 0.5, 1, 5, 10].map((step) => {
-            const isSelected = (globalStyles.nudgeStep ?? 1) === step;
-            return (
-              <button
-                key={step}
-                type="button"
-                onClick={() => onUpdateGlobalStyles({ nudgeStep: step })}
-                className={`px-1.5 py-0.5 rounded-full font-mono text-[10px] font-semibold transition-all ${
-                  isSelected
-                    ? 'bg-[#0088cc] text-white shadow-2xs'
-                    : isDarkMode
-                      ? 'text-[#cccccc] hover:text-white hover:bg-white/10'
-                      : 'text-[#666666] hover:text-[#000000] hover:bg-black/5'
-                }`}
-                title={`Régler le pas à ${step} px (Flèches = ${step} px • Alt + Flèches = 0.1 px • Shift + Flèches = ${step * 10} px)`}
-              >
-                {step}
-              </button>
-            );
-          })}
-          <span className="text-[9px] text-[#888888] font-mono ml-0.5">px</span>
-        </div>
+        {/* Pas de déplacement des flèches : responsive compact ou full */}
+        {isNarrow ? (
+          <button
+            type="button"
+            onClick={() => {
+              const steps = [0.1, 0.5, 1, 5, 10];
+              const curr = globalStyles.nudgeStep ?? 1;
+              const nextIndex = (steps.indexOf(curr) + 1) % steps.length;
+              onUpdateGlobalStyles({ nudgeStep: steps[nextIndex] });
+            }}
+            className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium border transition-all shrink-0 cursor-pointer ${
+              isDarkMode
+                ? 'bg-[#353535] border-[#444444] text-[#dddddd] hover:bg-[#404040]'
+                : 'bg-[#eeeeee]/80 border-transparent text-[#666666] hover:bg-[#eeeeee]'
+            }`}
+            title={`Pas de déplacement au clavier : ${globalStyles.nudgeStep ?? 1}px. Cliquer pour changer (0.1, 0.5, 1, 5, 10px)`}
+          >
+            <Move className="w-3 h-3 text-[#0088cc] shrink-0" />
+            <span className="font-mono font-bold text-[10px] text-[#0088cc]">{globalStyles.nudgeStep ?? 1}px</span>
+          </button>
+        ) : (
+          <div 
+            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] font-medium border transition-all shrink-0 ${
+              isDarkMode
+                ? 'bg-[#353535] border-[#444444] text-[#dddddd]'
+                : 'bg-[#eeeeee]/80 border-transparent text-[#666666]'
+            }`}
+            title="Pas de déplacement avec les flèches du clavier. Raccourcis : Alt + Flèches = 0.1 px • Shift + Flèches = 10 px"
+          >
+            <Move className="w-3 h-3 text-[#0088cc] mr-0.5 shrink-0" />
+            <span className="text-[10px] text-[#888888] font-medium mr-0.5">Pas:</span>
+            {[0.1, 0.5, 1, 5, 10].map((step) => {
+              const isSelected = (globalStyles.nudgeStep ?? 1) === step;
+              return (
+                <button
+                  key={step}
+                  type="button"
+                  onClick={() => onUpdateGlobalStyles({ nudgeStep: step })}
+                  className={`px-1 py-0.2 rounded-full font-mono text-[9.5px] font-semibold transition-all ${
+                    isSelected
+                      ? 'bg-[#0088cc] text-white shadow-2xs'
+                      : isDarkMode
+                        ? 'text-[#cccccc] hover:text-white hover:bg-white/10'
+                        : 'text-[#666666] hover:text-[#000000] hover:bg-black/5'
+                  }`}
+                  title={`Régler le pas à ${step} px`}
+                >
+                  {step}
+                </button>
+              );
+            })}
+            <span className="text-[9px] text-[#888888] font-mono ml-0.5">px</span>
+          </div>
+        )}
       </div>
 
-      {/* Right: Zoom controls */}
-      <div className="flex items-center gap-1.5">
-        <div className={`flex items-center rounded-full p-0.5 text-[11px] ${
-          isDarkMode ? 'bg-[#353535] border border-[#525252]' : 'bg-[#eeeeee]/80'
+      {/* Right: Zoom controls & Recentrer - ALWAYS PINNED & NEVER CUT OFF */}
+      <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+        <div className={`flex items-center rounded-full p-0.5 text-[11px] border shrink-0 ${
+          isDarkMode ? 'bg-[#353535] border-[#444444]' : 'bg-[#eeeeee]/80 border-transparent'
         }`}>
           <button
             onClick={() => onSetZoom(Math.max(0.25, Math.round((zoomLevel - 0.25) * 100) / 100))}
@@ -284,7 +345,7 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           </button>
 
           {/* Saisie directe du niveau de zoom */}
-          <div className="w-16 mx-0.5">
+          <div className={`${isNarrow ? 'w-11' : 'w-13'} mx-0.5`}>
             <NumericInput
               value={Math.round(zoomLevel * 100)}
               onChange={(val) => {
@@ -313,21 +374,23 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
         <button
           id="btn-scene-center"
           onClick={onCenterWorkspace || (() => onSetZoom(1))}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] ${
+          className={`flex items-center gap-1 rounded-full font-medium transition-all shadow-2xs hover:scale-[1.02] active:scale-[0.98] border whitespace-nowrap shrink-0 ${
+            isNarrow ? 'p-1.5' : 'px-2.5 py-1 text-[11px]'
+          } ${
             zoomLevel === 1 
-              ? isDarkMode ? 'bg-[#0088cc] text-white font-semibold shadow-xs' : 'bg-[#000000] text-white' 
+              ? 'bg-[#0088cc] border-[#0088cc] text-white shadow-xs' 
               : isDarkMode
-                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border border-[#525252]'
-                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee]'
+                ? 'bg-[#353535] text-[#e0e0e0] hover:text-white hover:bg-[#404040] border-[#444444]'
+                : 'bg-[#eeeeee]/80 text-[#666666] hover:text-[#000000] hover:bg-[#eeeeee] border-transparent'
           }`}
           title="Recentrer le plan de travail (vue 100%, centrée)"
         >
-          <Maximize2 className={`w-3.5 h-3.5 ${
+          <Maximize2 className={`w-3 h-3 ${
             zoomLevel === 1 
               ? 'text-white' 
               : (isDarkMode ? 'text-[#e0e0e0]' : 'text-[#666666]')
           }`} />
-          <span>Recentrer</span>
+          {!isNarrow && <span>Recentrer</span>}
         </button>
       </div>
     </div>

@@ -233,6 +233,24 @@ export default function App() {
   // Panel width management (responsive)
   const [panelWidth, setPanelWidth] = useState<number>(340);
 
+  // Left screenshot workspace width (expandable like StudioSettingsPanel)
+  const [workspacePanelWidth, setWorkspacePanelWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('focus_studio_workspace_panel_width');
+      if (saved) return JSON.parse(saved);
+      return typeof window !== 'undefined' && window.innerWidth >= 1440 ? 940 : 840;
+    } catch {
+      return 840;
+    }
+  });
+
+  const handleUpdateWorkspacePanelWidth = useCallback((w: number) => {
+    setWorkspacePanelWidth(w);
+    try {
+      localStorage.setItem('focus_studio_workspace_panel_width', JSON.stringify(w));
+    } catch {}
+  }, []);
+
   // User manual guides (+ Repère H / V)
   const [userGuides, setUserGuides] = useState<UserGuide[]>([]);
 
@@ -2033,6 +2051,12 @@ export default function App() {
         return;
       }
 
+      // Outil Pointeur / Sélection: 'v' / 'V' (hors focus sélectionné)
+      if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setActiveTool('select');
+        return;
+      }
+
       // Preview Mode Toggle: 'p' / 'P'
       if (e.key === 'p' || e.key === 'P') {
         setIsPreviewMode((prev) => !prev);
@@ -2223,6 +2247,8 @@ export default function App() {
       <div className="flex-1 flex justify-center items-start p-4 md:p-5 lg:p-6 gap-5 lg:gap-6 overflow-hidden relative min-h-0">
         {/* Center Canvas */}
         <CanvasWorkspace
+          workspaceWidth={workspacePanelWidth}
+          onUpdateWorkspaceWidth={handleUpdateWorkspacePanelWidth}
           image={image}
           focuses={focuses}
           selectedFocusId={selectedFocusId}

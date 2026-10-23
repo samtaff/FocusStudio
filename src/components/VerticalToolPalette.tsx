@@ -28,7 +28,7 @@ import {
   CalloutVignette 
 } from '../types';
 
-export type ToolType = 'select' | 'focus' | 'blur' | 'mask' | 'triangle' | 'callout' | 'zoom' | 'pan';
+export type ToolType = 'select' | 'focus' | 'blur' | 'mask' | 'triangle' | 'callout' | 'zoom';
 export type MenuType = 'focus' | 'callout' | 'blur' | 'mask' | 'triangle' | null;
 
 interface VerticalToolPaletteProps {
@@ -82,8 +82,8 @@ interface VerticalToolPaletteProps {
   onUpdateCallout?: (updated: Partial<CalloutVignette>) => void;
 
   // Pan, Workspace & Handles
-  isPanMode: boolean;
-  onTogglePanMode: () => void;
+  isPanMode?: boolean;
+  onTogglePanMode?: () => void;
   isDetecting?: boolean;
   showDetection?: boolean;
   onToggleDetection?: () => void;
@@ -366,6 +366,8 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
   hasCallout,
   onToggleCallout,
   onUpdateCallout,
+  isPanMode = false,
+  onTogglePanMode,
   showHandles,
   onToggleHandles,
   onCenterWorkspace,
@@ -538,9 +540,9 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       onPointerUp={handlePointerUp}
       onMouseEnter={handleMenuMouseEnter}
       onMouseLeave={handleMenuMouseLeave}
-      className={`fixed z-50 backdrop-blur-2xl rounded-full px-1.5 py-2 flex flex-col items-center gap-1 transition-colors select-none ${
+      className={`vertical-tool-palette fixed z-50 backdrop-blur-2xl rounded-full px-1.5 py-2 flex flex-col items-center gap-1 transition-colors select-none ${
         isDarkMode
-          ? 'bg-[#262626]/90 hover:bg-[#2c2c2c]/95 border border-[#3e3e3e] shadow-[0_12px_40px_rgba(0,0,0,0.65)] ring-1 ring-white/10'
+          ? 'bg-black/30 hover:bg-black/40 border border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.5)] ring-1 ring-white/5'
           : 'bg-white/35 hover:bg-white/45 border border-white/50 shadow-[0_12px_40px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.04]'
       }`}
       style={{ left: `${position.x}px`, top: `${position.y}px` }}
@@ -561,18 +563,17 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       <button
         id="tool-select-pointer"
         type="button"
+        data-palette-btn="true"
         onClick={() => {
           onSelectTool('select');
           closeMenu();
         }}
-        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative cursor-pointer ${
+        className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all relative cursor-pointer border-0 outline-none ${
           activeTool === 'select'
-            ? isDarkMode
-              ? 'bg-[#0088cc] text-white shadow-xs scale-105 ring-2 ring-[#0088cc]/30'
-              : 'bg-[#000000] text-white shadow-xs scale-105 ring-2 ring-black/20'
+            ? 'is-active bg-[#0088cc] text-white shadow-xs scale-105 ring-2 ring-[#0088cc]/30'
             : isDarkMode
-              ? 'text-[#aaaaaa] hover:text-white hover:bg-white/10'
-              : 'text-[#666666] hover:text-[#000000] hover:bg-white/40'
+              ? 'bg-transparent text-[#cccccc] hover:text-white hover:bg-white/10'
+              : 'bg-transparent text-[#666666] hover:text-[#000000] hover:bg-white/40'
         }`}
         title="Outil Pointeur / Sélection (Raccourci V ou Échap)"
       >
@@ -589,15 +590,14 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       >
         <button 
           id="tool-zone-indicator"
+          data-palette-btn="true"
           onClick={() => toggleMenu('focus')}
-          className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-xs cursor-pointer transition-all relative ${
-            activeMenu === 'focus' 
-              ? 'bg-[#0088cc] text-white ring-2 ring-[#0088cc]/30 scale-105' 
-              : activeTool === 'focus'
-                ? 'bg-[#0088cc] text-white'
-                : isDarkMode
-                  ? 'bg-[#353535] hover:bg-[#0088cc] text-white border border-[#484848]'
-                  : 'bg-[#000000] hover:bg-[#0088cc] text-white'
+          className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-xs cursor-pointer transition-all relative border-0 outline-none ${
+            activeMenu === 'focus' || activeTool === 'focus'
+              ? 'is-active bg-[#0088cc] text-white ring-2 ring-[#0088cc]/30 scale-105' 
+              : isDarkMode
+                ? 'bg-transparent text-white/90 hover:text-white hover:bg-white/10'
+                : 'bg-[#000000] hover:bg-[#0088cc] text-white'
           }`}
           title={`Zone ${activeZoneLabel} • Menu radial (Ajouter / Dupliquer / Pastille / Supprimer)`}
         >
@@ -799,13 +799,14 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
         >
           <button
             id="tool-toggle-callout"
+            data-palette-btn="true"
             onClick={() => toggleMenu('callout')}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative ${
-              activeMenu === 'callout'
-                ? 'bg-[#0088cc] text-white ring-2 ring-[#0088cc]/30 scale-105'
-                : hasCallout || activeTool === 'callout'
-                  ? 'bg-[#0088cc] text-white shadow-xs'
-                  : 'text-[#666666] hover:text-[#000000] hover:bg-white/40'
+            className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all relative border-0 outline-none ${
+              activeMenu === 'callout' || hasCallout || activeTool === 'callout'
+                ? 'is-active bg-[#0088cc] text-white ring-2 ring-[#0088cc]/30 scale-105'
+                : isDarkMode
+                  ? 'bg-transparent text-[#cccccc] hover:text-white hover:bg-white/10'
+                  : 'bg-transparent text-[#666666] hover:text-[#000000] hover:bg-white/40'
             }`}
             title="Vignette Callout (Zoom) • Menu radial"
           >
@@ -870,15 +871,14 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       >
         <button
           id="tool-add-blur"
+          data-palette-btn="true"
           onClick={() => toggleMenu('blur')}
-          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative cursor-pointer ${
-            activeMenu === 'blur'
-              ? 'bg-[#0088cc] text-white ring-2 ring-[#0088cc]/30 scale-105'
-              : activeTool === 'blur'
-                ? 'bg-[#0088cc] text-white shadow-xs'
-                : isDarkMode
-                  ? 'text-[#e5e5e5] hover:text-white hover:bg-white/15'
-                  : 'text-[#666666] hover:text-[#000000] hover:bg-white/40'
+          className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all relative cursor-pointer border-0 outline-none ${
+            activeMenu === 'blur' || activeTool === 'blur'
+              ? 'is-active bg-[#0088cc] text-white ring-2 ring-[#0088cc]/30 scale-105'
+              : isDarkMode
+                ? 'bg-transparent text-[#cccccc] hover:text-white hover:bg-white/10'
+                : 'bg-transparent text-[#666666] hover:text-[#000000] hover:bg-white/40'
           }`}
           title={`Outil Flou (${blurZones.length}) • Menu radial (Ajouter / Dupliquer / Supprimer)`}
         >
@@ -938,15 +938,14 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       >
         <button
           id="tool-add-mask"
+          data-palette-btn="true"
           onClick={() => toggleMenu('mask')}
-          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative cursor-pointer ${
-            activeMenu === 'mask'
-              ? 'bg-[#0088cc] text-white ring-2 ring-[#0088cc]/30 scale-105'
-              : activeTool === 'mask'
-                ? isDarkMode ? 'bg-[#0088cc] text-white shadow-xs' : 'bg-[#000000] text-white shadow-xs'
-                : isDarkMode
-                  ? 'text-[#e5e5e5] hover:text-white hover:bg-white/15'
-                  : 'text-[#666666] hover:bg-white/40'
+          className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all relative cursor-pointer border-0 outline-none ${
+            activeMenu === 'mask' || activeTool === 'mask'
+              ? 'is-active bg-[#0088cc] text-white ring-2 ring-[#0088cc]/30 scale-105'
+              : isDarkMode
+                ? 'bg-transparent text-[#cccccc] hover:text-white hover:bg-white/10'
+                : 'bg-transparent text-[#666666] hover:bg-white/40'
           }`}
           title={`Forme Masque (${maskShapes.length}) • Menu radial (Ajouter / Dupliquer / Supprimer)`}
         >
@@ -1011,15 +1010,14 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
         >
           <button
             id="tool-add-triangle"
+            data-palette-btn="true"
             onClick={() => toggleMenu('triangle')}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all relative cursor-pointer ${
-              activeMenu === 'triangle'
-                ? 'bg-[#0088cc] text-white ring-2 ring-[#0088cc]/30 scale-105'
-                : activeTool === 'triangle'
-                  ? 'bg-[#0088cc] text-white shadow-xs'
-                  : isDarkMode
-                    ? 'text-[#e5e5e5] hover:text-white hover:bg-white/15'
-                    : 'text-[#666666] hover:text-[#000000] hover:bg-white/40'
+            className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all relative cursor-pointer border-0 outline-none ${
+              activeMenu === 'triangle' || activeTool === 'triangle'
+                ? 'is-active bg-[#0088cc] text-white ring-2 ring-[#0088cc]/30 scale-105'
+                : isDarkMode
+                  ? 'bg-transparent text-[#cccccc] hover:text-white hover:bg-white/10'
+                  : 'bg-transparent text-[#666666] hover:text-[#000000] hover:bg-white/40'
             }`}
             title={`Outil Triangle (${triangles.length}) • Menu radial (Ajouter / Dupliquer / Supprimer)`}
           >
@@ -1078,11 +1076,14 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       {/* Sélection / Poignées de transformation */}
       <button
         id="tool-toggle-handles"
+        data-palette-btn="true"
         onClick={onToggleHandles}
-        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+        className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border-0 outline-none ${
           showHandles 
-            ? isDarkMode ? 'bg-[#0088cc] text-white shadow-xs ring-2 ring-[#0088cc]/30 scale-105' : 'text-[#000000] bg-white/60 shadow-xs' 
-            : isDarkMode ? 'text-[#888888] hover:text-[#e5e5e5] hover:bg-white/15' : 'text-[#979797] hover:bg-white/40'
+            ? 'is-active bg-[#0088cc] text-white shadow-xs ring-2 ring-[#0088cc]/30 scale-105' 
+            : isDarkMode 
+              ? 'bg-transparent text-[#aaaaaa] hover:text-white hover:bg-white/10' 
+              : 'bg-transparent text-[#979797] hover:bg-white/40'
         }`}
         title="Afficher/Masquer les poignées de sélection"
       >
@@ -1095,12 +1096,13 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
           <div className={`w-5 h-px my-0.5 ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`} />
           <button
             id="tool-undo"
+            data-palette-btn="true"
             onClick={onUndo}
             disabled={!canUndo}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+            className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all border-0 outline-none ${
               canUndo 
-                ? isDarkMode ? 'text-[#e5e5e5] hover:text-white hover:bg-white/15 cursor-pointer' : 'text-[#666666] hover:text-[#000000] hover:bg-white/40 cursor-pointer' 
-                : isDarkMode ? 'text-[#555555] opacity-35 cursor-not-allowed' : 'text-[#979797] opacity-35 cursor-not-allowed'
+                ? isDarkMode ? 'bg-transparent text-[#cccccc] hover:text-white hover:bg-white/10 cursor-pointer' : 'bg-transparent text-[#666666] hover:text-[#000000] hover:bg-white/40 cursor-pointer' 
+                : isDarkMode ? 'bg-transparent text-[#555555] opacity-30 cursor-not-allowed' : 'bg-transparent text-[#979797] opacity-30 cursor-not-allowed'
             }`}
             title="Annuler (Ctrl+Z)"
           >
@@ -1109,12 +1111,13 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
 
           <button
             id="tool-redo"
+            data-palette-btn="true"
             onClick={onRedo}
             disabled={!canRedo}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+            className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all border-0 outline-none ${
               canRedo 
-                ? isDarkMode ? 'text-[#e5e5e5] hover:text-white hover:bg-white/15 cursor-pointer' : 'text-[#666666] hover:text-[#000000] hover:bg-white/40 cursor-pointer' 
-                : isDarkMode ? 'text-[#555555] opacity-35 cursor-not-allowed' : 'text-[#979797] opacity-35 cursor-not-allowed'
+                ? isDarkMode ? 'bg-transparent text-[#cccccc] hover:text-white hover:bg-white/10 cursor-pointer' : 'bg-transparent text-[#666666] hover:text-[#000000] hover:bg-white/40 cursor-pointer' 
+                : isDarkMode ? 'bg-transparent text-[#555555] opacity-30 cursor-not-allowed' : 'bg-transparent text-[#979797] opacity-30 cursor-not-allowed'
             }`}
             title="Rétablir (Ctrl+Y)"
           >
@@ -1127,11 +1130,12 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       {onResetShapes && (
         <button
           id="tool-reset-shapes"
+          data-palette-btn="true"
           onClick={onResetShapes}
-          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+          className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border-0 outline-none ${
             isDarkMode
-              ? 'text-[#e5e5e5] hover:text-rose-400 hover:bg-white/15'
-              : 'text-[#666666] hover:text-rose-600 hover:bg-white/40'
+              ? 'bg-transparent text-[#cccccc] hover:text-rose-400 hover:bg-white/10'
+              : 'bg-transparent text-[#666666] hover:text-rose-600 hover:bg-white/40'
           }`}
           title="Réinitialiser (effacer toutes les formes et annotations)"
         >
@@ -1145,11 +1149,12 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
           <div className={`w-5 h-px my-0.5 ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`} />
           <button
             id="tool-center-workspace"
+            data-palette-btn="true"
             onClick={onCenterWorkspace}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+            className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border-0 outline-none ${
               isDarkMode
-                ? 'text-[#e5e5e5] hover:text-white hover:bg-white/15'
-                : 'text-[#666666] hover:text-[#000000] hover:bg-white/40'
+                ? 'bg-transparent text-[#cccccc] hover:text-white hover:bg-white/10'
+                : 'bg-transparent text-[#666666] hover:text-[#000000] hover:bg-white/40'
             }`}
             title="Recentrer le plan de travail (vue 100%, centrée)"
           >
@@ -1164,13 +1169,14 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
           {!onCenterWorkspace && <div className={`w-5 h-px my-0.5 ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`} />}
           <button
             id="tool-preview-mode"
+            data-palette-btn="true"
             onClick={onTogglePreview}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+            className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border-0 outline-none ${
               isPreviewMode 
-                ? 'bg-[#0088cc] text-white shadow-xs' 
+                ? 'is-active bg-[#0088cc] text-white shadow-xs' 
                 : isDarkMode
-                  ? 'text-[#e5e5e5] hover:text-[#38bdf8] hover:bg-white/15'
-                  : 'text-[#666666] hover:text-[#0088cc] hover:bg-white/40'
+                  ? 'bg-transparent text-[#cccccc] hover:text-[#38bdf8] hover:bg-white/10'
+                  : 'bg-transparent text-[#666666] hover:text-[#0088cc] hover:bg-white/40'
             }`}
             title="Prévisualisation du rendu final exporté"
           >
@@ -1185,14 +1191,15 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
           <div className={`w-5 h-px my-0.5 ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`} />
           <button
             id="tool-export"
+            data-palette-btn="true"
             onClick={onExportClick}
             disabled={isExporting}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+            className={`vertical-tool-btn w-8 h-8 rounded-full flex items-center justify-center transition-all border-0 outline-none ${
               isExporting 
-                ? 'bg-[#0088cc] text-white opacity-80 cursor-wait' 
+                ? 'is-active bg-[#0088cc] text-white opacity-80 cursor-wait' 
                 : isDarkMode
-                  ? 'bg-[#0088cc]/25 text-[#38bdf8] hover:bg-[#0088cc] hover:text-white border border-[#0088cc]/50 shadow-xs hover:scale-105 active:scale-95 cursor-pointer'
-                  : 'text-[#0088cc] hover:bg-[#0088cc] hover:text-white bg-white/50 shadow-xs hover:scale-105 active:scale-95 cursor-pointer'
+                  ? 'bg-transparent text-[#38bdf8] hover:bg-white/10 hover:text-white cursor-pointer'
+                  : 'bg-transparent text-[#0088cc] hover:bg-white/40 cursor-pointer'
             }`}
             title="Exporter l'image en PNG (Ctrl + E)"
           >

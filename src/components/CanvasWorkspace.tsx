@@ -128,6 +128,8 @@ interface CanvasWorkspaceProps {
   canUndo?: boolean;
   canRedo?: boolean;
   isDarkMode?: boolean;
+  workspaceWidth?: number;
+  onUpdateWorkspaceWidth?: (width: number) => void;
 }
 
 export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
@@ -213,9 +215,64 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   canUndo = false,
   canRedo = false,
   isDarkMode = false,
+  workspaceWidth,
+  onUpdateWorkspaceWidth,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Workspace Panel Width Drag Resize (Both Right and Left edges)
+  const isResizingRightWidthRef = useRef(false);
+  const startXRightWidthRef = useRef(0);
+  const startWidthRightValRef = useRef(workspaceWidth || 880);
+
+  const handleResizeRightPointerDown = (e: React.PointerEvent) => {
+    isResizingRightWidthRef.current = true;
+    startXRightWidthRef.current = e.clientX;
+    startWidthRightValRef.current = workspaceWidth || containerRef.current?.offsetWidth || 880;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleResizeRightPointerMove = (e: React.PointerEvent) => {
+    if (!isResizingRightWidthRef.current || !onUpdateWorkspaceWidth) return;
+    const delta = e.clientX - startXRightWidthRef.current;
+    const maxWidth = typeof window !== 'undefined' ? Math.max(800, window.innerWidth - 380) : 1600;
+    const newWidth = Math.min(maxWidth, Math.max(480, Math.round(startWidthRightValRef.current + delta)));
+    onUpdateWorkspaceWidth(newWidth);
+  };
+
+  const handleResizeRightPointerUp = (e: React.PointerEvent) => {
+    isResizingRightWidthRef.current = false;
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const isResizingLeftWidthRef = useRef(false);
+  const startXLeftWidthRef = useRef(0);
+  const startWidthLeftValRef = useRef(workspaceWidth || 880);
+
+  const handleResizeLeftPointerDown = (e: React.PointerEvent) => {
+    isResizingLeftWidthRef.current = true;
+    startXLeftWidthRef.current = e.clientX;
+    startWidthLeftValRef.current = workspaceWidth || containerRef.current?.offsetWidth || 880;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleResizeLeftPointerMove = (e: React.PointerEvent) => {
+    if (!isResizingLeftWidthRef.current || !onUpdateWorkspaceWidth) return;
+    const delta = startXLeftWidthRef.current - e.clientX; // Dragging left increases width
+    const maxWidth = typeof window !== 'undefined' ? Math.max(800, window.innerWidth - 380) : 1600;
+    const newWidth = Math.min(maxWidth, Math.max(480, Math.round(startWidthLeftValRef.current + delta)));
+    onUpdateWorkspaceWidth(newWidth);
+  };
+
+  const handleResizeLeftPointerUp = (e: React.PointerEvent) => {
+    isResizingLeftWidthRef.current = false;
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+  };
 
   // Viewport Zoom & Pan (Photoshop-like)
   const [zoomLevel, setZoomLevel] = useState<number>(1);
@@ -223,7 +280,26 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const [isPanMode, setIsPanMode] = useState<boolean>(false);
   const [isPanning, setIsPanning] = useState<boolean>(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isPanningRef = useRef<boolean>(false);
+  const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isAltPressed, setIsAltPressed] = useState<boolean>(false);
+
+  // Sync activeTool === 'pan' with isPanMode
+  useEffect(() => {
+    if (activeTool === 'pan' && !isPanMode) {
+      setIsPanMode(true);
+    } else if (activeTool !== 'pan' && isPanMode) {
+      setIsPanMode(false);
+    }
+  }, [activeTool, isPanMode]);
+
+  const handleTogglePanMode = useCallback(() => {
+    setIsPanMode((prev) => {
+      const next = !prev;
+      onSelectTool(next ? 'pan' : 'select');
+      return next;
+    });
+  }, [onSelectTool]);
 
   // Drag & Resize State
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -345,6 +421,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           onTogglePreview();
           return;
         }
+        if (isPanMode) {
+          setIsPanMode(false);
+        }
         if (activeTool !== 'select') {
           onSelectTool('select');
         }
@@ -353,9 +432,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         return;
       }
 
+      // 'H' shortcut: Switch to / toggle Hand tool (Pan workspace)
+      if ((e.key === 'h' || e.key === 'H') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        handleTogglePanMode();
+      }
+
       // 'V' shortcut: Switch back to pointer/select tool
       if ((e.key === 'v' || e.key === 'V') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        if (activeTool !== 'select') {
+        if (activeTool !== 'select' || isPanMode) {
+          setIsPanMode(false);
           onSelectTool('select');
         }
         setMarqueeState(null);
@@ -385,8 +470,19 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       if (e.key === 'Alt') setIsAltPressed(false);
     };
 
+    // Global mousemove for ultra-smooth fluid canvas panning across window
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (isPanningRef.current) {
+        setPanOffset({
+          x: e.clientX - panStartRef.current.x,
+          y: e.clientY - panStartRef.current.y,
+        });
+      }
+    };
+
     // Global mouseup and window blur so dragging / panning / marquee never gets stuck
     const handleGlobalMouseUp = () => {
+      isPanningRef.current = false;
       setIsPanning(false);
       setDragState(null);
       setDragFramingState(null);
@@ -405,6 +501,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     };
 
     const handleWindowBlur = () => {
+      isPanningRef.current = false;
       setIsAltPressed(false);
       setIsSpacePressed(false);
       setIsPanning(false);
@@ -414,16 +511,18 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('mousemove', handleGlobalMouseMove);
     window.addEventListener('mouseup', handleGlobalMouseUp);
     window.addEventListener('blur', handleWindowBlur);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('mouseup', handleGlobalMouseUp);
       window.removeEventListener('blur', handleWindowBlur);
     };
-  }, [isPreviewMode, onTogglePreview, focuses, onSelectFocus, activeTool, onSelectTool]);
+  }, [isPreviewMode, onTogglePreview, focuses, onSelectFocus, activeTool, onSelectTool, isPanMode, handleTogglePanMode]);
 
   // Center workspace function (Reset zoom to 100% and pan to 0,0)
   const handleCenterWorkspace = useCallback(() => {
@@ -1064,10 +1163,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
   // Mouse Move
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isPanning) {
+    if (isPanning || isPanningRef.current) {
       setPanOffset({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
+        x: e.clientX - (panStartRef.current.x || panStart.x),
+        y: e.clientY - (panStartRef.current.y || panStart.y),
       });
       return;
     }
@@ -1504,6 +1603,15 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
   // Mouse Down
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // 0. Maintien Espace OU clic molette : Déplacer le plan librement
+    if (e.button === 1 || isSpacePressed) {
+      isPanningRef.current = true;
+      panStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+      return;
+    }
+
     // Photoshop Zoom tool click
     if (activeTool === 'zoom') {
       const isZoomOut = e.altKey || isAltPressed;
@@ -1870,14 +1978,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       }
     }
 
-    // 8. Pan mode explicitly active
-    if (isPanMode) {
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
-      return;
-    }
-
-    // 9. Clicked empty background: clear selection unless Shift is held, and start Marquee Selection
+    // 8. Clicked empty background: clear selection unless Shift is held
     if (!isShiftHolding) {
       if (!calloutVignette?.enabled) {
         updateSelectedCallout(null);
@@ -1892,13 +1993,22 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       onClearSelection?.();
     }
 
-    // Start Marquee Selection Box
-    setMarqueeState({
-      startX: cx,
-      startY: cy,
-      currentX: cx,
-      currentY: cy,
-    });
+    // If Shift is held, allow marquee box selection:
+    if (isShiftHolding) {
+      setMarqueeState({
+        startX: cx,
+        startY: cy,
+        currentX: cx,
+        currentY: cy,
+      });
+      return;
+    }
+
+    // Direct pan when clicking and dragging empty workspace/canvas background without requiring Spacebar
+    isPanningRef.current = true;
+    panStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
   };
 
   const handleMouseUp = (e?: React.MouseEvent<HTMLCanvasElement>) => {
@@ -2078,11 +2188,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
   // Cursor style calculation
   const getCursor = () => {
-    if (isSpacePressed || isPanning) return isPanning ? 'grabbing' : 'grab';
+    if (isPanning || isPanningRef.current) return 'grabbing';
+    if (isSpacePressed || isPanMode || activeTool === 'pan') return 'grab';
     if (dragFramingState) return 'grabbing';
     if (activeTool === 'zoom') return isAltPressed ? 'zoom-out' : 'zoom-in';
     if (activeTool === 'blur' || activeTool === 'mask' || activeTool === 'triangle') return 'crosshair';
-    if (isPanMode) return 'grab';
     if (dragCalloutState) return 'grabbing';
     if (draggingGuide) return draggingGuide.type === 'horizontal' ? 'ns-resize' : 'ew-resize';
     if (hoveredGuide) return hoveredGuide.type === 'horizontal' ? 'ns-resize' : 'ew-resize';
@@ -2171,19 +2281,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return activeF.includes(hoveredFocusId) ? 'move' : 'pointer';
     }
 
-    // Lorsque je survole le screenshot la main doit être active pour que je puisse me déplacer comme je le souhaite
-    const isOverScreenshot = Boolean(
-      canvasMousePos &&
-      canvasMousePos.x >= bounds.bgX &&
-      canvasMousePos.x <= bounds.bgX + bounds.bgWidth &&
-      canvasMousePos.y >= bounds.bgY &&
-      canvasMousePos.y <= bounds.bgY + bounds.bgHeight
-    );
-    if (isOverScreenshot) {
-      return isPanning ? 'grabbing' : 'grab';
-    }
-
-    return 'default';
+    // Lorsque je survole la zone de travail, la main est active pour déplacer la zone librement
+    return isPanning || isPanningRef.current ? 'grabbing' : 'grab';
   };
 
   const selectedFocus = focuses.find((f) => f.id === selectedFocusId);
@@ -2191,15 +2290,49 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   return (
     <div 
       ref={containerRef}
-      className={`flex-1 max-w-3xl xl:max-w-4xl flex flex-col h-full max-h-[calc(100vh-7rem)] backdrop-blur-xl rounded-3xl relative overflow-hidden select-none p-3.5 gap-3 transition-colors duration-200 ${
+      className={`flex flex-col h-full max-h-[calc(100vh-7rem)] backdrop-blur-xl rounded-3xl relative select-none p-3.5 gap-3 transition-colors duration-200 shrink-0 ${
         isDarkMode
           ? 'bg-[#212121]/90 border border-[#333333] shadow-[0_8px_30px_rgba(0,0,0,0.4)] ring-1 ring-white/10 text-white'
           : 'bg-white/70 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-[#979797]/15 text-[#000000]'
       }`}
+      style={{
+        width: workspaceWidth ? `${workspaceWidth}px` : undefined,
+        maxWidth: 'calc(100vw - 360px)',
+        minWidth: '480px',
+      }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Draggable resize splitter on the LEFT edge */}
+      {onUpdateWorkspaceWidth && (
+        <div
+          className="absolute left-0 top-0 bottom-0 w-3 -ml-1.5 cursor-col-resize hover:bg-[#0088cc]/20 transition-colors z-30 group flex items-center justify-center"
+          title="Glisser pour élargir ou réduire la largeur du plan de travail (gauche)"
+          onPointerDown={handleResizeLeftPointerDown}
+          onPointerMove={handleResizeLeftPointerMove}
+          onPointerUp={handleResizeLeftPointerUp}
+        >
+          <div className={`w-1 h-8 rounded-full transition-colors ${
+            isDarkMode ? 'bg-white/20 group-hover:bg-[#0088cc]' : 'bg-[#979797]/30 group-hover:bg-[#0088cc]'
+          }`} />
+        </div>
+      )}
+
+      {/* Draggable resize splitter on the RIGHT edge */}
+      {onUpdateWorkspaceWidth && (
+        <div
+          className="absolute right-0 top-0 bottom-0 w-3 -mr-1.5 cursor-col-resize hover:bg-[#0088cc]/20 transition-colors z-30 group flex items-center justify-center"
+          title="Glisser pour élargir ou réduire la largeur du plan de travail (droite)"
+          onPointerDown={handleResizeRightPointerDown}
+          onPointerMove={handleResizeRightPointerMove}
+          onPointerUp={handleResizeRightPointerUp}
+        >
+          <div className={`w-1 h-8 rounded-full transition-colors ${
+            isDarkMode ? 'bg-white/20 group-hover:bg-[#0088cc]' : 'bg-[#979797]/30 group-hover:bg-[#0088cc]'
+          }`} />
+        </div>
+      )}
       {/* Top Scene Bar */}
       <TopSceneBar
         screenWidth={calloutVignette?.enabled ? bounds.canvasWidth : (image?.displayWidth ?? 180)}
@@ -2209,7 +2342,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         onAddGuideH={onAddGuideH}
         onAddGuideV={onAddGuideV}
         isPanMode={isPanMode}
-        onTogglePanMode={() => setIsPanMode(!isPanMode)}
+        onTogglePanMode={handleTogglePanMode}
         zoomLevel={zoomLevel}
         onSetZoom={setZoomLevel}
         onAddFocus={onAddFocus}
@@ -2228,11 +2361,28 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       />
 
       {/* Main Canvas Viewport Area */}
-      <div className={`flex-1 relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border transition-colors duration-200 ${
-        isDarkMode
-          ? 'bg-[#181818] border-[#2c2c2c] shadow-inner'
-          : 'bg-[#eeeeee]/40 border-white/60 shadow-inner'
-      }`}>
+      <div 
+        onMouseDown={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest('button') || target.closest('input') || target.closest('.vertical-tool-palette')) {
+            return;
+          }
+          if (e.button === 0 || e.button === 1) {
+            isPanningRef.current = true;
+            panStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+            setIsPanning(true);
+            setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+          }
+        }}
+        className={`flex-1 relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border transition-colors duration-200 ${
+          isDarkMode
+            ? 'bg-[#181818] border-[#2c2c2c] shadow-inner'
+            : 'bg-[#eeeeee]/40 border-white/60 shadow-inner'
+        }`}
+        style={{
+          cursor: isPanning || isPanningRef.current ? 'grabbing' : 'grab'
+        }}
+      >
         {/* Banner indicator if Internal Framing Mode is ON */}
         {!isPreviewMode && internalFramingFocusId && selectedFocus && (
           <div className="absolute top-4 z-40 bg-[#25465F]/95 text-white backdrop-blur-xl px-4 py-2 rounded-2xl shadow-xl border border-sky-400/40 flex items-center gap-3 text-xs font-medium animate-in fade-in slide-in-from-top-2 select-none">
@@ -2315,7 +2465,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             onToggleCallout={onToggleCallout}
             onUpdateCallout={onUpdateCallout}
             isPanMode={isPanMode}
-            onTogglePanMode={() => setIsPanMode(!isPanMode)}
+            onTogglePanMode={handleTogglePanMode}
             isDetecting={false}
             showDetection={showDetectedOverlay}
             onToggleDetection={() => onUpdateGlobalStyles({ showGuides: !globalStyles.showGuides })}

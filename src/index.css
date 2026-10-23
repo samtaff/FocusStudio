@@ -198,25 +198,42 @@ body.dark-mode button svg.text-white {
   color: #ffffff;
 }
 
-/* All pill buttons (rounded-full) in dark mode: ensure high contrast and clear borders */
-.dark button.rounded-full,
-body.dark-mode button.rounded-full {
+/* All pill buttons (rounded-full) in dark mode: ensure high contrast and clear borders (except toolbar) */
+.dark button.rounded-full:not(.vertical-tool-btn):not([data-palette-btn]),
+body.dark-mode button.rounded-full:not(.vertical-tool-btn):not([data-palette-btn]) {
   border-width: 1px;
 }
 
-/* Unselected pill buttons in dark mode: clear visible background and border */
-.dark button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):not([class*="bg-[#000000]"]):not([class*="bg-amber"]),
-body.dark-mode button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):not([class*="bg-[#000000]"]):not([class*="bg-amber"]) {
+/* Unselected pill buttons in dark mode: clear visible background and border (except toolbar) */
+.dark button.rounded-full:not(.vertical-tool-btn):not([data-palette-btn]):not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):not([class*="bg-[#000000]"]):not([class*="bg-amber"]),
+body.dark-mode button.rounded-full:not(.vertical-tool-btn):not([data-palette-btn]):not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):not([class*="bg-[#000000]"]):not([class*="bg-amber"]) {
   background-color: #333333 !important;
   border: 1px solid #4f4f4f !important;
   color: #e5e5e5 !important;
 }
 
-.dark button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):hover,
-body.dark-mode button.rounded-full:not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):hover {
+.dark button.rounded-full:not(.vertical-tool-btn):not([data-palette-btn]):not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):hover,
+body.dark-mode button.rounded-full:not(.vertical-tool-btn):not([data-palette-btn]):not([class*="bg-[#0088cc]"]):not([class*="bg-sky"]):not([class*="bg-[#25465F]"]):not([class*="bg-rose"]):not([class*="bg-emerald"]):hover {
   background-color: #404040 !important;
   border-color: #666666 !important;
   color: #ffffff !important;
+}
+
+/* Toolbar buttons in dark mode: NO circle container, NO border/contour, clean transparent state */
+.vertical-tool-palette button.vertical-tool-btn:not(.is-active):not([class*="bg-[#0088cc]"]),
+.dark .vertical-tool-palette button.vertical-tool-btn:not(.is-active):not([class*="bg-[#0088cc]"]),
+body.dark-mode .vertical-tool-palette button.vertical-tool-btn:not(.is-active):not([class*="bg-[#0088cc]"]) {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.vertical-tool-palette button.vertical-tool-btn:not(.is-active):not([class*="bg-[#0088cc]"]):hover,
+.dark .vertical-tool-palette button.vertical-tool-btn:not(.is-active):not([class*="bg-[#0088cc]"]):hover,
+body.dark-mode .vertical-tool-palette button.vertical-tool-btn:not(.is-active):not([class*="bg-[#0088cc]"]):hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 /* Counter / Tag pills in headers and info chips in dark mode */
@@ -346,5 +363,15 @@ body.dark-mode aside .hover\:bg-\[\#eeeeee\]\/40:hover {
   background-color: #2c2c2c;
   box-shadow: 0px 5px 14px 0px rgba(16, 16, 16, 0.65);
 }
+
+/* Hide scrollbar for clean toolbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 
 
