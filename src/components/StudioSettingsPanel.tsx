@@ -320,8 +320,6 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
     }
   }, [selectedFocus?.id, selectedFocusIds, selectedTriangleId, selectedMaskId, selectedBlurId, calloutVignette?.enabled]);
 
-  // Requirement: La div "ombre portée" doit être repliée par défaut et dépliable au clic
-  const [isShadowExpanded, setIsShadowExpanded] = useState<boolean>(false);
 
   const isResizingRef = React.useRef(false);
   const startXRef = React.useRef(0);
@@ -355,7 +353,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const clipImageInputRef = React.useRef<HTMLInputElement>(null);
-  const [isMaskGapsLinked, setIsMaskGapsLinked] = useState<boolean>(true);
+  const [isMaskGapsLinked, setIsMaskGapsLinked] = useState<boolean>(false);
 
   const activeBlur = blurZones.find((b) => b.id === selectedBlurId) || null;
   const activeMask = maskShapes.find((m) => m.id === selectedMaskId) || null;
@@ -2632,11 +2630,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           <label className="text-[10px] text-[#666666] dark:text-[#aaaaaa] font-medium">Largeur</label>
                           <button
                             type="button"
-                            onClick={() => onUpdateMask(activeMask.id, { width: 40 })}
+                            onClick={() => onUpdateMask(activeMask.id, { width: 32 })}
                             className="text-[9px] text-[#0088cc] hover:underline font-semibold"
-                            title="40px par défaut"
+                            title="32px par défaut"
                           >
-                            40px
+                            32px
                           </button>
                         </div>
                         <NumericInput
@@ -2652,11 +2650,11 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           <label className="text-[10px] text-[#666666] dark:text-[#aaaaaa] font-medium">Hauteur</label>
                           <button
                             type="button"
-                            onClick={() => onUpdateMask(activeMask.id, { height: 40 })}
+                            onClick={() => onUpdateMask(activeMask.id, { height: 32 })}
                             className="text-[9px] text-[#0088cc] hover:underline font-semibold"
-                            title="40px par défaut"
+                            title="32px par défaut"
                           >
-                            40px
+                            32px
                           </button>
                         </div>
                         <NumericInput
@@ -2669,11 +2667,12 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       </div>
                     </div>
 
-                    {/* Presets rapides de dimensions (40x40 par défaut) */}
+                    {/* Presets rapides de dimensions (32x32 par défaut) */}
                     <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
                       <span className="text-[10px] text-[#666666] dark:text-[#aaaaaa]">Presets :</span>
                       {[
-                        { label: '40 × 40 (Défaut)', w: 40, h: 40 },
+                        { label: '32 × 32 (Défaut)', w: 32, h: 32 },
+                        { label: '40 × 40', w: 40, h: 40 },
                         { label: '50 × 50', w: 50, h: 50 },
                         { label: '80 × 40', w: 80, h: 40 },
                         { label: '100 × 50', w: 100, h: 50 },
@@ -2840,7 +2839,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       <span className="text-[#666666] dark:text-[#aaaaaa] font-medium">Coins arrondis</span>
                       <div className="w-18">
                         <NumericInput
-                          value={activeMask.borderRadius ?? 10}
+                          value={activeMask.borderRadius ?? 13}
                           onChange={(r) => onUpdateMask(activeMask.id, { borderRadius: Math.max(0, r) })}
                           min={0}
                           max={200}
@@ -2853,17 +2852,18 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         type="range"
                         min="0"
                         max="50"
-                        value={activeMask.borderRadius ?? 10}
+                        value={activeMask.borderRadius ?? 13}
                         onChange={(e) => onUpdateMask(activeMask.id, { borderRadius: parseInt(e.target.value) })}
                         className="flex-1 accent-[#0088cc]"
                       />
                     </div>
-                    {/* Presets rapides d'angles (10px par défaut) */}
+                    {/* Presets rapides d'angles (13px par défaut) */}
                     <div className="flex gap-1.5 mt-0.5">
                       {[
                         { label: 'Droit (0px)', val: 0 },
                         { label: '4px', val: 4 },
-                        { label: '10px (Défaut)', val: 10 },
+                        { label: '10px', val: 10 },
+                        { label: '13px (Défaut)', val: 13 },
                         { label: '16px', val: 16 },
                         { label: '20px', val: 20 },
                       ].map((preset) => (
@@ -2872,7 +2872,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           type="button"
                           onClick={() => onUpdateMask(activeMask.id, { borderRadius: preset.val })}
                           className={`flex-1 py-1 px-1.5 rounded-full text-[10px] font-medium transition-all ${
-                            (activeMask.borderRadius ?? 10) === preset.val
+                            (activeMask.borderRadius ?? 13) === preset.val
                               ? 'bg-[#0088cc] text-white shadow-2xs font-semibold'
                               : isDarkMode
                                 ? 'bg-[#333333] border border-[#4d4d4d] text-[#e0e0e0] hover:bg-[#404040]'
@@ -2895,7 +2895,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                         </span>
                         {activeMask.multiplier?.enabled && (
                           <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-[#0088cc] text-white font-mono font-bold">
-                            {(activeMask.multiplier.cols || 2) * (activeMask.multiplier.rows || 2)}×
+                            {(activeMask.multiplier.cols || 4) * (activeMask.multiplier.rows || 1)}×
                           </span>
                         )}
                       </div>
@@ -2912,8 +2912,8 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             onUpdateMask(activeMask.id, {
                               multiplier: {
                                 enabled: true,
-                                cols: 2,
-                                rows: 2,
+                                cols: 4,
+                                rows: 1,
                                 gapX: 10,
                                 gapY: 10,
                               },
@@ -2938,15 +2938,15 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       }`}>
                         <div className="flex flex-col min-w-0">
                           <span className={`text-[10px] font-semibold ${isDarkMode ? 'text-white' : 'text-[#111111]'}`}>Multiplier la forme en 4</span>
-                          <span className="text-[9px] text-[#777777]">Grille 2×2 avec espacement ajustable</span>
+                          <span className="text-[9px] text-[#777777]">Ligne 4×1 (4) avec espacements indépendants</span>
                         </div>
                         <button
                           onClick={() => {
                             onUpdateMask(activeMask.id, {
                               multiplier: {
                                 enabled: true,
-                                cols: 2,
-                                rows: 2,
+                                cols: 4,
+                                rows: 1,
                                 gapX: 10,
                                 gapY: 10,
                               },
@@ -2956,27 +2956,27 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             isDarkMode ? 'bg-[#0088cc] hover:bg-[#0099e6]' : 'bg-[#000000] hover:bg-[#25465F]'
                           }`}
                         >
-                          Multiplier en 4
+                          Ligne 4×1 (4)
                         </button>
                       </div>
                     ) : (
                       <div className={`flex flex-col gap-2.5 p-2.5 rounded-xl border ${
                         isDarkMode ? 'bg-[#282828] border-[#383838]' : 'bg-white border-[#e5e5e5]'
                       }`}>
-                        {/* Presets rapides de disposition (Grille 2x2, Ligne 4x1, Colonne 1x4) */}
+                        {/* Presets rapides de disposition (Ligne 4x1, Grille 2x2, Colonne 1x4) */}
                         <div className="flex flex-col gap-1">
                           <span className="text-[9px] uppercase font-bold text-[#777777] tracking-wider">
-                            Disposition (Total : {(activeMask.multiplier.cols || 2) * (activeMask.multiplier.rows || 2)} formes)
+                            Disposition (Total : {(activeMask.multiplier.cols || 4) * (activeMask.multiplier.rows || 1)} formes)
                           </span>
                           <div className="grid grid-cols-3 gap-1">
                             {[
-                              { label: 'Grille 2×2 (4)', cols: 2, rows: 2 },
                               { label: 'Ligne 4×1 (4)', cols: 4, rows: 1 },
+                              { label: 'Grille 2×2 (4)', cols: 2, rows: 2 },
                               { label: 'Colonne 1×4 (4)', cols: 1, rows: 4 },
                             ].map((preset) => {
                               const isMatch =
-                                (activeMask.multiplier?.cols || 2) === preset.cols &&
-                                (activeMask.multiplier?.rows || 2) === preset.rows;
+                                (activeMask.multiplier?.cols || 4) === preset.cols &&
+                                (activeMask.multiplier?.rows || 1) === preset.rows;
                               return (
                                 <button
                                   key={preset.label}
@@ -3014,7 +3014,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => {
-                                  const currentCols = activeMask.multiplier?.cols || 2;
+                                  const currentCols = activeMask.multiplier?.cols || 4;
                                   if (currentCols > 1) {
                                     onUpdateMask(activeMask.id, {
                                       multiplier: { ...activeMask.multiplier!, cols: currentCols - 1 },
@@ -3029,7 +3029,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               </button>
                               <div className="flex-1">
                                 <NumericInput
-                                  value={activeMask.multiplier.cols || 2}
+                                  value={activeMask.multiplier.cols || 4}
                                   onChange={(c) => {
                                     onUpdateMask(activeMask.id, {
                                       multiplier: { ...activeMask.multiplier!, cols: Math.max(1, Math.min(8, c)) },
@@ -3042,7 +3042,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               </div>
                               <button
                                 onClick={() => {
-                                  const currentCols = activeMask.multiplier?.cols || 2;
+                                  const currentCols = activeMask.multiplier?.cols || 4;
                                   if (currentCols < 8) {
                                     onUpdateMask(activeMask.id, {
                                       multiplier: { ...activeMask.multiplier!, cols: currentCols + 1 },
@@ -3063,7 +3063,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => {
-                                  const currentRows = activeMask.multiplier?.rows || 2;
+                                  const currentRows = activeMask.multiplier?.rows || 1;
                                   if (currentRows > 1) {
                                     onUpdateMask(activeMask.id, {
                                       multiplier: { ...activeMask.multiplier!, rows: currentRows - 1 },
@@ -3078,7 +3078,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               </button>
                               <div className="flex-1">
                                 <NumericInput
-                                  value={activeMask.multiplier.rows || 2}
+                                  value={activeMask.multiplier.rows || 1}
                                   onChange={(r) => {
                                     onUpdateMask(activeMask.id, {
                                       multiplier: { ...activeMask.multiplier!, rows: Math.max(1, Math.min(8, r)) },
@@ -3091,7 +3091,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                               </div>
                               <button
                                 onClick={() => {
-                                  const currentRows = activeMask.multiplier?.rows || 2;
+                                  const currentRows = activeMask.multiplier?.rows || 1;
                                   if (currentRows < 8) {
                                     onUpdateMask(activeMask.id, {
                                       multiplier: { ...activeMask.multiplier!, rows: currentRows + 1 },
@@ -3812,14 +3812,14 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       <div className="flex justify-between items-center text-[10px]">
                         <span className="text-[#666666] font-medium">Rayon des arrondis</span>
                         <div className="flex gap-1">
-                          {[8, 12, 16, 20, 24].map((r) => (
+                          {[16, 24, 32, 39, 48].map((r) => (
                             <button
                               key={r}
                               type="button"
                               onClick={() => onUpdateCallout({ borderRadius: r })}
                               className={`px-1.5 py-0.5 rounded text-[9px] font-medium transition-all ${
-                                (calloutVignette.borderRadius ?? 16) === r
-                                  ? 'bg-[#0088cc] text-white'
+                                (calloutVignette.borderRadius ?? 39) === r
+                                  ? 'bg-[#0088cc] text-white font-bold'
                                   : isDarkMode
                                     ? 'bg-[#333333] text-[#cccccc] hover:text-white'
                                     : 'bg-[#eeeeee] text-[#666666] hover:text-[#000000]'
@@ -3833,18 +3833,18 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                       <div className="flex items-center gap-2">
                         <div className="w-20">
                           <NumericInput
-                            value={calloutVignette.borderRadius ?? 16}
-                            onChange={(r) => onUpdateCallout({ borderRadius: Math.max(0, Math.min(80, r)) })}
+                            value={calloutVignette.borderRadius ?? 39}
+                            onChange={(r) => onUpdateCallout({ borderRadius: Math.max(0, Math.min(50, r)) })}
                             min={0}
-                            max={80}
+                            max={50}
                             unit="px"
                           />
                         </div>
                         <input
                           type="range"
                           min="0"
-                          max="40"
-                          value={calloutVignette.borderRadius ?? 16}
+                          max="50"
+                          value={calloutVignette.borderRadius ?? 39}
                           onChange={(e) => onUpdateCallout({ borderRadius: parseInt(e.target.value, 10) || 0 })}
                           onPointerUp={(e) => (e.target as HTMLElement).blur()}
                           className="accent-[#0088cc] flex-1 cursor-pointer"
@@ -3853,39 +3853,19 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     </div>
                   )}
 
-                  {/* Alignement au bas du screenshot (simplifié et placé après la forme) */}
+                  {/* Position fixe de la vignette : 10px au-dessus du bord inférieur */}
                   <div className={`flex items-center justify-between p-2.5 rounded-2xl border ${
                     isDarkMode ? 'bg-[#252525] border-[#383838]' : 'bg-[#eeeeee]/40 border-[#eeeeee]'
                   }`}>
                     <div>
                       <span className={`text-[10px] font-semibold block ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
-                        Alignement au bas du screenshot
+                        Position de la vignette
                       </span>
-                      <span className="text-[9px] text-[#666666]">Calé sur l'ombre au bas du screenshot</span>
+                      <span className="text-[9px] text-[#666666]">Placée et fixe à 5 px au-dessus du bord inférieur</span>
                     </div>
-                    <button
-                      onClick={() => {
-                        const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, calloutVignette);
-                        const vigH = calloutVignette.height || calloutVignette.width || 100;
-                        const shadowDist = (calloutVignette.showShadow !== false)
-                          ? ((calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5) + (calloutVignette.shadowBlur ?? calloutVignette.shadowSize ?? 2))
-                          : 0;
-                        const targetY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
-                        onUpdateCallout({
-                          alignBottom: calloutVignette.alignBottom === false ? true : false,
-                          offsetY: targetY,
-                        });
-                      }}
-                      className={`px-3 py-1 rounded-full text-[10px] font-semibold transition-all ${
-                        calloutVignette.alignBottom !== false
-                          ? 'bg-[#0088cc] text-white shadow-2xs'
-                          : isDarkMode
-                            ? 'bg-[#333333] text-[#cccccc] hover:text-white border border-[#4d4d4d]'
-                            : 'bg-white text-[#666666] hover:text-[#000000] border border-[#eeeeee]'
-                      }`}
-                    >
-                      {calloutVignette.alignBottom !== false ? '✓ Aligné au bas' : 'Manuel'}
-                    </button>
+                    <span className="px-2.5 py-1 rounded-full text-[9px] font-mono font-semibold bg-[#0088cc]/10 text-[#0088cc] border border-[#0088cc]/20">
+                      5 px fixe
+                    </span>
                   </div>
 
                   {/* Taille de la vignette */}
@@ -3981,7 +3961,28 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                           <div>
                             <div className="flex justify-between items-center text-[9px] text-[#666666] mb-1">
                               <span>Zone ciblée sur l'image</span>
-                              <span className="font-mono text-[#0088cc] font-semibold">{currentSrcW} px</span>
+                              <div className="flex items-center gap-1">
+                                {[1.5, 2.5, 3.7, 5.0].map((z) => (
+                                  <button
+                                    key={z}
+                                    type="button"
+                                    onClick={() => {
+                                      const newSrcW = Math.round((vigW / z) * 10) / 10;
+                                      onUpdateCallout({ sourceWidth: newSrcW, sourceHeight: newSrcW });
+                                    }}
+                                    className={`px-1.5 py-0.5 rounded text-[8.5px] font-mono font-medium transition-all ${
+                                      Math.abs(clampedZoom - z) < 0.15
+                                        ? 'bg-[#0088cc] text-white font-bold'
+                                        : isDarkMode
+                                          ? 'bg-[#333333] text-[#cccccc] hover:text-white'
+                                          : 'bg-[#eeeeee] text-[#666666] hover:text-[#000000]'
+                                    }`}
+                                  >
+                                    {z}×
+                                  </button>
+                                ))}
+                                <span className="font-mono text-[#0088cc] font-semibold ml-1">{currentSrcW} px</span>
+                              </div>
                             </div>
                             <div className="relative flex items-center">
                               <input
@@ -4003,7 +4004,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             <div className="flex justify-between text-[8px] text-[#979797] mt-0.5 font-mono">
                               <span>1.0× (large)</span>
                               <span>2.5×</span>
-                              <span>3.5×</span>
+                              <span className="text-[#0088cc] font-bold">3.7× (défaut)</span>
                               <span>5.0× (serré)</span>
                             </div>
                           </div>
@@ -4073,130 +4074,75 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                     })()}
                   </div>
 
-                  {/* Ombre portée derrière la vignette (Repliée par défaut, dépliable au clic) */}
-                  <div className={`rounded-2xl border overflow-hidden transition-all ${
+                  {/* Ombre portée descendant jusqu'au bord inférieur du screenshot */}
+                  <div className={`p-2.5 rounded-2xl border flex flex-col gap-2 ${
                     isDarkMode ? 'bg-[#252525] border-[#383838]' : 'bg-[#eeeeee]/40 border-[#eeeeee]'
                   }`}>
-                    <button
-                      type="button"
-                      onClick={() => setIsShadowExpanded(!isShadowExpanded)}
-                      className={`w-full p-2.5 flex items-center justify-between text-left transition-colors cursor-pointer ${
-                        isDarkMode ? 'hover:bg-white/5' : 'hover:bg-[#eeeeee]/70'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {isShadowExpanded ? (
-                          <ChevronDown className="w-3.5 h-3.5 text-[#666666]" />
-                        ) : (
-                          <ChevronRight className="w-3.5 h-3.5 text-[#666666]" />
-                        )}
-                        <div>
-                          <span className={`text-[10px] font-semibold block ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
-                            Ombre portée
-                          </span>
-                          <span className="text-[9px] text-[#666666]">
-                            {calloutVignette.showShadow !== false ? 'Active (50%, 5px, 2px)' : 'Désactivée'}
-                          </span>
-                        </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className={`text-[10px] font-semibold block ${isDarkMode ? 'text-white' : 'text-[#000000]'}`}>
+                          Ombre portée
+                        </span>
+                        <span className="text-[9px] text-[#666666]">
+                          Distance portée de 5 px
+                        </span>
                       </div>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-[#0088cc]/10 text-[#0088cc] border border-[#0088cc]/20">
+                        {calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5} px
+                      </span>
+                    </div>
 
-                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const currentVal = calloutVignette.showShadow ?? true;
-                            onUpdateCallout({ showShadow: !currentVal });
+                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[#eeeeee] dark:border-[#333333]">
+                      <div>
+                        <div className="flex justify-between items-center text-[9px] text-[#666666] mb-0.5">
+                          <span>Distance</span>
+                          <span className="font-mono text-[#0088cc]">{calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5} px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="30"
+                          value={calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            onUpdateCallout({ shadowDistance: val, shadowOffsetY: val });
                           }}
-                          className={`w-7 h-4 rounded-full relative transition-colors p-0.5 ${
-                            (calloutVignette.showShadow ?? true) ? 'bg-[#0088cc]' : 'bg-[#cccccc]'
-                          }`}
-                          title={(calloutVignette.showShadow ?? true) ? 'Désactiver l\'ombre' : 'Activer l\'ombre'}
-                        >
-                          <div
-                            className={`w-3 h-3 rounded-full bg-white transition-transform ${
-                              (calloutVignette.showShadow ?? true) ? 'translate-x-3' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
+                          className="accent-[#0088cc] w-full cursor-pointer"
+                        />
                       </div>
-                    </button>
-
-                    {isShadowExpanded && (calloutVignette.showShadow ?? true) && (
-                      <div className={`p-2.5 pt-1 border-t flex flex-col gap-2 ${
-                        isDarkMode ? 'border-[#383838] bg-[#222222]/60' : 'border-[#eeeeee] bg-white/40'
-                      }`}>
-                        <div className="flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() => onUpdateCallout({
-                              shadowOpacity: 0.50,
-                              shadowDistance: 5,
-                              shadowOffsetY: 5,
-                              shadowSize: 2,
-                              shadowBlur: 2,
-                              showShadow: true,
-                            })}
-                            className={`text-[9px] px-2 py-0.5 rounded-full border transition-all ${
-                              isDarkMode
-                                ? 'bg-[#333333] border-[#4d4d4d] text-[#cccccc] hover:text-white'
-                                : 'bg-white border-[#eeeeee] text-[#666666] hover:text-[#000000]'
-                            }`}
-                            title="Réinitialiser (50% / 5px / 2px)"
-                          >
-                            Défaut
-                          </button>
+                      <div>
+                        <div className="flex justify-between items-center text-[9px] text-[#666666] mb-0.5">
+                          <span>Opacité</span>
+                          <span className="font-mono text-[#0088cc]">{Math.round((calloutVignette.shadowOpacity ?? 0.50) * 100)}%</span>
                         </div>
-                        <div>
-                          <div className="flex justify-between items-center text-[9px] text-[#666666] mb-0.5">
-                            <span>Opacité de l'ombre</span>
-                            <span className="font-mono text-[#0088cc]">{Math.round((calloutVignette.shadowOpacity ?? 0.50) * 100)}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0.05"
-                            max="1.0"
-                            step="0.05"
-                            value={calloutVignette.shadowOpacity ?? 0.50}
-                            onChange={(e) => onUpdateCallout({ shadowOpacity: parseFloat(e.target.value) })}
-                            className="accent-[#0088cc] w-full cursor-pointer"
-                          />
-                        </div>
-                        <div>
-                          <div className="flex justify-between items-center text-[9px] text-[#666666] mb-0.5">
-                            <span>Distance de l'ombre</span>
-                            <span className="font-mono text-[#0088cc]">{calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5}px</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="30"
-                            value={calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              onUpdateCallout({ shadowDistance: val, shadowOffsetY: val });
-                            }}
-                            className="accent-[#0088cc] w-full cursor-pointer"
-                          />
-                        </div>
-                        <div>
-                          <div className="flex justify-between items-center text-[9px] text-[#666666] mb-0.5">
-                            <span>Taille de l'ombre</span>
-                            <span className="font-mono text-[#0088cc]">{calloutVignette.shadowSize ?? calloutVignette.shadowBlur ?? 2}px</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="20"
-                            value={calloutVignette.shadowSize ?? calloutVignette.shadowBlur ?? 2}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              onUpdateCallout({ shadowSize: val, shadowBlur: val });
-                            }}
-                            className="accent-[#0088cc] w-full cursor-pointer"
-                          />
-                        </div>
+                        <input
+                          type="range"
+                          min="0.10"
+                          max="1.0"
+                          step="0.05"
+                          value={calloutVignette.shadowOpacity ?? 0.50}
+                          onChange={(e) => onUpdateCallout({ shadowOpacity: parseFloat(e.target.value) })}
+                          className="accent-[#0088cc] w-full cursor-pointer"
+                        />
                       </div>
-                    )}
+                      <div>
+                        <div className="flex justify-between items-center text-[9px] text-[#666666] mb-0.5">
+                          <span>Adoucissement</span>
+                          <span className="font-mono text-[#0088cc]">{calloutVignette.shadowBlur ?? 2} px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="10"
+                          value={calloutVignette.shadowBlur ?? 2}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            onUpdateCallout({ shadowBlur: val, shadowSize: val });
+                          }}
+                          className="accent-[#0088cc] w-full cursor-pointer"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

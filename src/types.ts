@@ -108,7 +108,7 @@ export interface MaskShape {
   rotation?: number; // rotation in degrees, e.g. -180 to 180 (default 0)
   color: string; // #25465F by default
   opacity?: number; // 0 to 1, default 1
-  borderRadius?: number; // default 10 (coins arrondis de 10px)
+  borderRadius?: number; // default 13 (coins arrondis de 13px)
   borderWidth?: number; // 0, 1, 2, etc.
   borderColor?: string;
   borderStyle?: 'solid' | 'dashed' | 'dotted';
@@ -146,7 +146,7 @@ export interface CalloutVignette {
   sourceY: number; // top
   sourceCenterX?: number; // persistent absolute sub-pixel center anchor X
   sourceCenterY?: number; // persistent absolute sub-pixel center anchor Y
-  sourceWidth: number; // sampling diameter/size (default 40px)
+  sourceWidth: number; // sampling diameter/size (default 27px pour un zoom de 3.7x)
   sourceHeight: number;
   sourceZoom?: number; // default 1.0 (fine-tuning crop zoom)
 
@@ -159,18 +159,18 @@ export interface CalloutVignette {
   
   // Styling
   shape: 'circle' | 'rounded'; // circle or custom rounded rectangle
-  borderRadius: number; // e.g. 50% for circle (width/2) or custom (0 to 50px)
+  borderRadius: number; // default 39px (0 to 50px)
   borderWidth: number; // default 0 or 2
   borderColor: string; // default '#ffffff' or '#25465F'
   
-  // Drop shadow behind vignette (ombre portée: opacité 50%, distance 5px, taille 2px)
-  showShadow: boolean; // default true
-  shadowDistance?: number; // default 5 (5px)
-  shadowSize?: number; // default 2 (2px)
-  shadowBlur: number; // default 2
-  shadowOpacity: number; // default 0.50 (50%)
-  shadowOffsetX?: number; // default 0
-  shadowOffsetY?: number; // default 5
+  // Drop shadow behind vignette (désactivée)
+  showShadow?: boolean; // default false
+  shadowDistance?: number;
+  shadowSize?: number;
+  shadowBlur?: number;
+  shadowOpacity?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
   
   // Floor shadow (legacy compatibility)
   showFloorShadow?: boolean;

@@ -166,14 +166,13 @@ export function calculateExportBounds(
 
     const vigW = calloutVignette.width || 100;
     const vigH = calloutVignette.height || vigW;
-    const shadowDistance = calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5;
-    const shadowBlur = calloutVignette.shadowBlur ?? calloutVignette.shadowSize ?? 2;
-    const shadowDist = (calloutVignette.showShadow !== false) ? (shadowDistance + shadowBlur) : 0;
-    const alignedBottomY = bgY + bgHeight - vigH - shadowDist;
-    const vigY = calloutVignette.alignBottom !== false ? alignedBottomY : (calloutVignette.offsetY ?? alignedBottomY);
+    // La vignette est placée et fixe à 5px au-dessus du bord inférieur du screenshot
+    const vigY = bgY + bgHeight - vigH - 5;
+    const shadowDist = (calloutVignette.showShadow !== false) ? (calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5) : 0;
+    const shadowBlur = (calloutVignette.showShadow !== false) ? (calloutVignette.shadowBlur ?? calloutVignette.shadowSize ?? 2) : 0;
 
     const minY = Math.min(vigY, bgY) - 15;
-    const maxY = Math.max(vigY + vigH + shadowDist, bgY + bgHeight) + 15;
+    const maxY = Math.max(vigY + vigH + shadowDist + shadowBlur, bgY + bgHeight) + 15;
 
     return {
       exportWidth: canvasWidth,
@@ -1164,7 +1163,7 @@ function drawSingleMaskShape(
   ctx: CanvasRenderingContext2D,
   mask: MaskShape
 ) {
-  const radius = Math.min(mask.borderRadius ?? 10, mask.width / 2, mask.height / 2);
+  const radius = Math.min(mask.borderRadius ?? 13, mask.width / 2, mask.height / 2);
   const color = mask.color || BASE_COLOR;
   const opacity = mask.opacity ?? 1.0;
 
@@ -2181,55 +2180,80 @@ export function drawCalloutVignette(
   const gap = callout.gap ?? 5; // 5px gap from screen border
   const vigW = callout.width || 100;
   const vigH = callout.height || vigW;
-  const vigX = bgX - gap - vigW; // Placed at 5px gap to the left of the screen border
+  const vigX = Math.round(bgX - gap - vigW); // Placed at 5px gap to the left of the screen border
 
-  // La vignette doit être alignée au bas du screenshot en référence à son ombre portée
-  const showShadow = callout.showShadow !== false;
-  const shadowDistance = callout.shadowDistance ?? callout.shadowOffsetY ?? 5; // distance 5px
-  const shadowSize = callout.shadowSize ?? callout.shadowBlur ?? 2; // taille 2px
-  const shadowBlur = callout.shadowBlur ?? shadowSize;
-  const shadowOpacity = callout.shadowOpacity ?? 0.50; // opacité 50%
-  // L'ombre projetée sous la vignette comprend le déport vertical (5px) et son flou (2px)
-  // Ainsi le halo inférieur de l'ombre effleure précisément la ligne inférieure du screenshot (7px au total)
-  const shadowDist = showShadow ? (shadowDistance + shadowBlur) : 0;
+  // La vignette est placée et fixe à 5px au-dessus du bord inférieur du screenshot
+  const vigY = Math.round(bgY + bgHeight - vigH - 5);
 
-  // L'alignement bas en référence à l'ombre portée : vigY + vigH + shadowDist = bgY + bgHeight
-  const alignedBottomY = bgY + bgHeight - vigH - shadowDist;
-  const vigY = callout.alignBottom !== false ? alignedBottomY : (callout.offsetY ?? alignedBottomY);
-
-  // Compute border radius
+  // Compute border radius (défaut 39px)
   const maxR = Math.min(vigW, vigH) / 2;
   const borderRadius = callout.shape === 'circle'
     ? maxR
-    : Math.min(maxR, Math.max(0, callout.borderRadius ?? 16));
+    : Math.min(maxR, Math.max(0, callout.borderRadius ?? 39));
 
-  // 1. Draw drop shadow behind vignette
-  // Exigences strictes : ombre portée de 50% d'opacité, distance de 5px, taille de 2px
+  // 1. Ombre portée descendante isolée (hors-canvas pour ne jamais altérer le screenshot)
+  const showShadow = callout.showShadow !== false;
   if (showShadow) {
-    ctx.save();
-    const shadowOffsetX = callout.shadowOffsetX ?? 0;
-    const shadowOffsetY = callout.shadowOffsetY ?? shadowDistance;
-    const shadowBlur = callout.shadowBlur ?? shadowSize;
+    const shadowDistance = callout.shadowDistance ?? callout.shadowOffsetY ?? 5; // 5px de distance
+    const shadowBlur = callout.shadowBlur ?? callout.shadowSize ?? 2;
+    const shadowOpacity = callout.shadowOpacity ?? 0.50;
 
-    ctx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity})`;
-    ctx.shadowBlur = shadowBlur;
-    ctx.shadowOffsetX = shadowOffsetX;
-    ctx.shadowOffsetY = shadowOffsetY;
-    // Découpage inverse (evenodd) : conserve uniquement l'ombre portée projetée à l'extérieur
-    // sans déposer de silhouette opaque sous le tracé de l'image (évite tout liseré sombre).
-    // Les coordonnées restent proches du canvas pour éviter tout culling par le moteur graphique.
-    const pad = Math.max(50, shadowBlur * 4 + Math.abs(shadowOffsetY) + Math.abs(shadowOffsetX));
-    ctx.beginPath();
-    ctx.rect(vigX - pad, vigY - pad, vigW + pad * 2, vigH + pad * 2);
-    ctx.roundRect(vigX, vigY, vigW, vigH, borderRadius);
-    ctx.clip('evenodd');
+    const pad = Math.ceil(shadowBlur * 2 + 10);
+    const sCanvas = document.createElement('canvas');
+    sCanvas.width = vigW + pad * 2;
+    sCanvas.height = vigH + shadowDistance + pad * 2;
+    const sCtx = sCanvas.getContext('2d');
+    if (sCtx) {
+      sCtx.shadowColor = `rgba(0, 0, 0, ${shadowOpacity})`;
+      sCtx.shadowBlur = shadowBlur;
+      sCtx.shadowOffsetX = 0;
+      sCtx.shadowOffsetY = shadowDistance;
 
-    ctx.beginPath();
-    ctx.roundRect(vigX, vigY, vigW, vigH, borderRadius);
-    ctx.fillStyle = '#000000';
-    ctx.fill();
+      sCtx.beginPath();
+      sCtx.roundRect(pad, pad, vigW, vigH, borderRadius);
+      sCtx.fillStyle = `rgba(0, 0, 0, ${shadowOpacity})`;
+      sCtx.fill();
 
-    ctx.restore();
+      // Nettoyer sur le canvas isolé pour ne laisser strictement QUE l'ombre descendante :
+      sCtx.save();
+      sCtx.globalCompositeOperation = 'destination-out';
+      sCtx.fillStyle = '#000000';
+
+      // 1) Effacer l'intérieur de la vignette
+      sCtx.beginPath();
+      sCtx.roundRect(pad, pad, vigW, vigH, borderRadius);
+      sCtx.fill();
+
+      // 2) Effacer toute bavure au-dessus du bord supérieur
+      sCtx.fillRect(0, 0, sCanvas.width, pad);
+
+      // 3) Effacer les bavures latérales sur la partie droite des flancs (au-dessus du début des arrondis inférieurs)
+      const clearH = Math.max(0, vigH - borderRadius);
+      sCtx.fillRect(0, pad, pad, clearH);
+      sCtx.fillRect(pad + vigW, pad, pad, clearH);
+
+      // 4) Effacer les coins supérieurs hors courbe
+      sCtx.save();
+      sCtx.beginPath();
+      sCtx.rect(pad - 5, pad - 5, borderRadius + 5, borderRadius + 5);
+      sCtx.roundRect(pad, pad, vigW, vigH, borderRadius);
+      sCtx.clip('evenodd');
+      sCtx.fillRect(pad - 5, pad - 5, borderRadius + 5, borderRadius + 5);
+      sCtx.restore();
+
+      sCtx.save();
+      sCtx.beginPath();
+      sCtx.rect(pad + vigW - borderRadius, pad - 5, borderRadius + 5, borderRadius + 5);
+      sCtx.roundRect(pad, pad, vigW, vigH, borderRadius);
+      sCtx.clip('evenodd');
+      sCtx.fillRect(pad + vigW - borderRadius, pad - 5, borderRadius + 5, borderRadius + 5);
+      sCtx.restore();
+
+      sCtx.restore();
+
+      // Dessiner l'ombre propre sur le canevas principal sans AUCUNE altération destructrice du screenshot
+      ctx.drawImage(sCanvas, vigX - pad, vigY - pad);
+    }
   }
 
   // 2. Draw Vignette body (clipped with rounded corners or circle)
@@ -2319,15 +2343,6 @@ export function drawCalloutVignette(
     ctx.lineTo(vcx, vcy + 5);
     ctx.stroke();
 
-    // Petits crans repères sur les 4 bords (5px)
-    ctx.strokeStyle = 'rgba(0, 136, 204, 0.5)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(vcx, vigY); ctx.lineTo(vcx, vigY + 6);
-    ctx.moveTo(vcx, vigY + vigH - 6); ctx.lineTo(vcx, vigY + vigH);
-    ctx.moveTo(vigX, vcy); ctx.lineTo(vigX + 6, vcy);
-    ctx.moveTo(vigX + vigW - 6, vcy); ctx.lineTo(vigX + vigW, vcy);
-    ctx.stroke();
     ctx.restore();
   }
 

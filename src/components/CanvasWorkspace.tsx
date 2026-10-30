@@ -1144,16 +1144,12 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return 'source';
     }
 
-    // 2. Vignette bubble placed at 5px gap on left of screen
+    // 2. Vignette bubble placed at 5px gap on left of screen, fixed at 5px above bottom border
     const gap = calloutVignette.gap ?? 5;
     const vigW = calloutVignette.width || 100;
     const vigH = calloutVignette.height || vigW;
     const vigX = bounds.bgX - gap - vigW;
-    const shadowDist = (calloutVignette.showShadow !== false)
-      ? ((calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5) + (calloutVignette.shadowBlur ?? calloutVignette.shadowSize ?? 2))
-      : 0;
-    const alignedBottomY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
-    const vigY = calloutVignette.alignBottom !== false ? alignedBottomY : (calloutVignette.offsetY ?? alignedBottomY);
+    const vigY = bounds.bgY + bounds.bgHeight - vigH - 5;
     if (cx >= vigX - pad && cx <= vigX + vigW + pad && cy >= vigY - pad && cy <= vigY + vigH + pad) {
       return 'vignette';
     }
@@ -1277,9 +1273,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           sourceY: Math.round(dragCalloutState.initialSourceY + dy),
         });
       } else if (dragCalloutState.part === 'vignette') {
-        onUpdateCallout({
-          offsetY: Math.round(dragCalloutState.initialOffsetY + dy),
-          alignBottom: false,
+        // La vignette est fixe à 5px au-dessus du bord inférieur du screenshot
+        setHudInfo({
+          x: cx,
+          y: cy,
+          text: 'Vignette fixe : 5 px au-dessus du bord',
         });
       }
       return;
@@ -1938,12 +1936,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const clickedCallout = getCalloutPartAtCoord(cx, cy);
     if (clickedCallout && calloutVignette) {
       const vigH = calloutVignette.height || calloutVignette.width || 100;
-      const shadowDist = (calloutVignette.showShadow !== false)
-        ? ((calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5) + (calloutVignette.shadowBlur ?? calloutVignette.shadowSize ?? 2))
-        : 0;
-      const currentVigY = calloutVignette.alignBottom !== false 
-        ? (bounds.bgY + bounds.bgHeight - vigH - shadowDist) 
-        : calloutVignette.offsetY;
+      const fixedVigY = bounds.bgY + bounds.bgHeight - vigH - 5;
 
       updateSelectedCallout(clickedCallout);
       onSelectFocus(null);
@@ -1956,7 +1949,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         startY: cy,
         initialSourceX: calloutVignette.sourceX,
         initialSourceY: calloutVignette.sourceY,
-        initialOffsetY: currentVigY,
+        initialOffsetY: fixedVigY,
       });
       return;
     }
@@ -2037,7 +2030,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const handleMouseUp = (e?: React.MouseEvent<HTMLCanvasElement>) => {
     isPanningRef.current = false;
     if (isPanning) setIsPanning(false);
-    if (dragCalloutState) setDragCalloutState(null);
+    if (dragCalloutState) {
+      setDragCalloutState(null);
+      setActiveSnapGuides([]);
+      setHudInfo(null);
+    }
     if (dragFramingState) setDragFramingState(null);
     if (dragState) {
       setDragState(null);

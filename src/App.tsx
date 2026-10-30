@@ -231,27 +231,42 @@ export default function App() {
     nudgeStep: 1,
   });
 
-  // Synchronise et aligne la distance de l'ombre portée du callout à 5px avec son flou (7px au total)
+  // Synchronise et garantit que la vignette est placée et fixe à 5px au-dessus du bord inférieur du screenshot, avec ombre portée descendante jusqu'au bord
   useEffect(() => {
-    if (calloutVignette?.enabled && (calloutVignette.shadowDistance === 10 || calloutVignette.shadowOffsetY === 10)) {
-      setCalloutVignette((prev) => {
-        if (!prev) return null;
-        const next = {
-          ...prev,
-          shadowDistance: 5,
-          shadowOffsetY: 5,
-          shadowBlur: 2,
-        };
-        if (next.alignBottom !== false && image) {
-          const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, next);
-          const vigH = next.height || next.width || 100;
-          const sDist = (next.showShadow !== false) ? (5 + 2) : 0;
-          next.offsetY = bounds.bgY + bounds.bgHeight - vigH - sDist;
-        }
-        return next;
-      });
+    if (calloutVignette?.enabled) {
+      const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, calloutVignette);
+      const vigH = calloutVignette.height || calloutVignette.width || 100;
+      const expectedY = bounds.bgY + bounds.bgHeight - vigH - 5;
+
+      const needsBorderRadius = calloutVignette.borderRadius === undefined || calloutVignette.borderRadius === 16;
+      const needsZoom = calloutVignette.sourceWidth === undefined || calloutVignette.sourceWidth === 40;
+      const needsShadow = calloutVignette.showShadow !== true || calloutVignette.shadowDistance !== 5 || calloutVignette.shadowOffsetY !== 5;
+
+      if (
+        needsShadow ||
+        needsBorderRadius ||
+        needsZoom ||
+        calloutVignette.offsetY !== expectedY
+      ) {
+        setCalloutVignette((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            showShadow: true,
+            shadowDistance: 5,
+            shadowOffsetY: 5,
+            shadowBlur: 2,
+            shadowSize: 2,
+            shadowOpacity: 0.50,
+            borderRadius: needsBorderRadius ? 39 : prev.borderRadius,
+            sourceWidth: needsZoom ? 27 : prev.sourceWidth,
+            sourceHeight: needsZoom ? 27 : (prev.sourceHeight || 27),
+            offsetY: expectedY,
+          };
+        });
+      }
     }
-  }, [calloutVignette?.enabled, image, focuses, globalStyles.workspaceWidth]);
+  }, [calloutVignette?.enabled, calloutVignette?.offsetY, calloutVignette?.showShadow, calloutVignette?.shadowDistance, calloutVignette?.shadowOffsetY, calloutVignette?.borderRadius, calloutVignette?.sourceWidth, image, focuses, globalStyles.workspaceWidth]);
 
   // Panel width management (responsive)
   const [panelWidth, setPanelWidth] = useState<number>(340);
@@ -569,6 +584,17 @@ export default function App() {
       nextMaskShapes = cloneSnapshot(currentAppState.maskShapes || []);
       nextTriangles = cloneSnapshot(currentAppState.triangles || []);
       nextCalloutVignette = currentAppState.calloutVignette ? cloneSnapshot(currentAppState.calloutVignette) : null;
+      if (nextCalloutVignette) {
+        const boundsWithCallout = calculateCompositionBounds(loaded, nextFocuses, globalStyles.workspaceWidth, nextCalloutVignette);
+        const vigH = nextCalloutVignette.height || nextCalloutVignette.width || 100;
+        nextCalloutVignette.offsetY = boundsWithCallout.bgY + boundsWithCallout.bgHeight - vigH - 5;
+        nextCalloutVignette.showShadow = true;
+        nextCalloutVignette.shadowDistance = 5;
+        nextCalloutVignette.shadowOffsetY = 5;
+        nextCalloutVignette.shadowBlur = 2;
+        nextCalloutVignette.shadowSize = 2;
+        nextCalloutVignette.shadowOpacity = 0.50;
+      }
       nextUserGuides = cloneSnapshot(currentAppState.userGuides || []);
     } else {
       nextFocuses = [initialFocus];
@@ -1129,7 +1155,7 @@ export default function App() {
     recordHistory({ blurZones: updated });
   };
 
-  // Mask Shape Management (Blue forms: default 40x40px, rounded corners 10px, #25465F)
+  // Mask Shape Management (Blue forms: default 32x32px, rounded corners 13px, #25465F)
   const handleAddMaskShape = (x?: number, y?: number) => {
     const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth);
     const posX = x !== undefined ? x : bounds.bgX + 20;
@@ -1139,11 +1165,11 @@ export default function App() {
       name: `Masque ${maskShapes.length + 1}`,
       x: posX,
       y: posY,
-      width: 40,
-      height: 40,
+      width: 32,
+      height: 32,
       color: '#25465F', // Corporate blue mask #25465F
       opacity: 1,
-      borderRadius: 10,
+      borderRadius: 13,
     };
     const updated = [...maskShapes, newMask];
     setMaskShapes(updated);
@@ -1186,8 +1212,8 @@ export default function App() {
   const handleSplitMaskMultiplier = (id: string) => {
     const target = maskShapes.find((m) => m.id === id);
     if (!target || !target.multiplier?.enabled) return;
-    const cols = Math.max(1, target.multiplier.cols || 2);
-    const rows = Math.max(1, target.multiplier.rows || 2);
+    const cols = Math.max(1, target.multiplier.cols || 4);
+    const rows = Math.max(1, target.multiplier.rows || 1);
     const gapX = target.multiplier.gapX ?? 10;
     const gapY = target.multiplier.gapY ?? 10;
     const newShapes: MaskShape[] = [];
@@ -1539,7 +1565,6 @@ export default function App() {
       const vigW = prev?.width || 100;
       const vigH = prev?.height || vigW;
       const gap = prev?.gap ?? 5;
-      const shadowDist = 7; // distance 5px + flou 2px = 7px pour effleurer exactement le bas
 
       const bounds = calculateCompositionBounds(
         image,
@@ -1548,47 +1573,48 @@ export default function App() {
         { enabled: true, width: vigW, height: vigH, gap } as CalloutVignette
       );
 
-      // Alignement au bas du screenshot en référence à l'ombre portée (vigY + vigH + shadowDist = bgY + bgHeight)
-      const alignedBottomY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
+      // Vignette placée et fixe à 5px au-dessus du bord inférieur du screenshot, avec ombre descendante jusqu'au bord
+      const fixedBottomY = bounds.bgY + bounds.bgHeight - vigH - 5;
 
       let nextCallout: CalloutVignette;
       if (prev) {
         nextCallout = {
           ...prev,
           enabled: true,
-          alignBottom: true,
-          offsetY: alignedBottomY,
+          offsetY: fixedBottomY,
           width: prev.width || 100,
           height: prev.height || prev.width || 100,
-          shadowDistance: prev.shadowDistance ?? 5,
-          shadowSize: prev.shadowSize ?? 2,
-          shadowBlur: prev.shadowBlur ?? 2,
-          shadowOffsetY: prev.shadowOffsetY ?? prev.shadowDistance ?? 5,
-          shadowOpacity: prev.shadowOpacity ?? 0.50,
+          sourceWidth: prev.sourceWidth || 27,
+          sourceHeight: prev.sourceHeight || prev.sourceWidth || 27,
+          borderRadius: prev.borderRadius ?? 39,
+          showShadow: true,
+          shadowDistance: 5,
+          shadowOffsetY: 5,
+          shadowBlur: 2,
+          shadowSize: 2,
+          shadowOpacity: 0.50,
         };
       } else {
-        // Initialize default Callout Vignette (default 100px)
+        // Initialize default Callout Vignette (100px, 3.7x zoom, 39px rounded corners, fixe à 5px au-dessus du bas avec ombre descendante de 5px)
         nextCallout = {
           enabled: true,
           sourceX: Math.round(bounds.bgX + bounds.bgWidth * 0.25),
           sourceY: Math.round(bounds.bgY + bounds.bgHeight * 0.35),
-          sourceWidth: 40,
-          sourceHeight: 40,
+          sourceWidth: 27, // 3.7x zoom par défaut (100 / 27 = 3.7x)
+          sourceHeight: 27,
           width: 100,
           height: 100,
           shape: 'rounded',
-          borderRadius: 16,
+          borderRadius: 39, // Rayon d'arrondis par défaut de 39px
           gap: 5, // Strict requirement: exactly 5px gap from screen border
-          offsetY: alignedBottomY, // Aligned to bottom of screenshot
-          alignBottom: true,
+          offsetY: fixedBottomY, // Fixe à 5px au-dessus du bord inférieur du screenshot
           borderWidth: 0,
           borderColor: 'transparent',
           showShadow: true,
           shadowDistance: 5,
-          shadowSize: 2,
-          shadowBlur: 2,
-          shadowOffsetX: 0,
           shadowOffsetY: 5,
+          shadowBlur: 2,
+          shadowSize: 2,
           shadowOpacity: 0.50,
         };
       }
@@ -1629,16 +1655,11 @@ export default function App() {
         next.sourceCenterY = (next.sourceY ?? prev.sourceY ?? 0) + curH / 2;
       }
 
-      // Si la vignette est alignée au bas et qu'un paramètre d'ombre ou de taille change, recalculer son alignement
-      if (
-        (updated.shadowDistance !== undefined || updated.shadowOffsetY !== undefined || updated.shadowBlur !== undefined || updated.shadowSize !== undefined || updated.showShadow !== undefined || updated.height !== undefined || updated.width !== undefined) &&
-        next.alignBottom !== false &&
-        image
-      ) {
+      // La vignette est fixe à 5px au-dessus du bord inférieur du screenshot
+      if (updated.height !== undefined || updated.width !== undefined) {
         const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, next);
         const vigH = next.height || next.width || 100;
-        const sDist = (next.showShadow !== false) ? ((next.shadowDistance ?? next.shadowOffsetY ?? 5) + (next.shadowBlur ?? next.shadowSize ?? 2)) : 0;
-        next.offsetY = bounds.bgY + bounds.bgHeight - vigH - sDist;
+        next.offsetY = bounds.bgY + bounds.bgHeight - vigH - 5;
       }
 
       appStateRef.current.calloutVignette = next;
@@ -2170,35 +2191,18 @@ export default function App() {
             handled = true;
             scheduleDebouncedRecordHistory();
           } else if (isCalloutActive && calloutVignette) {
-            // En mode Callout :
-            // Si la vignette est explicitement sélectionnée, déplacer la vignette (offsetY).
-            // Sinon (cible loupe sélectionnée ou mode callout actif sans autre sélection), déplacer la cible (sourceX, sourceY) !
-            if (selectedCalloutPart === 'vignette') {
-              const vigH = calloutVignette.height || calloutVignette.width || 100;
-              const shadowDist = (calloutVignette.showShadow !== false)
-                ? ((calloutVignette.shadowDistance ?? calloutVignette.shadowOffsetY ?? 5) + (calloutVignette.shadowBlur ?? calloutVignette.shadowSize ?? 2))
-                : 0;
-              const bounds = calculateCompositionBounds(image, focuses, globalStyles.workspaceWidth, calloutVignette);
-              const alignedBottomY = bounds.bgY + bounds.bgHeight - vigH - shadowDist;
-              const currentY = calloutVignette.alignBottom !== false ? alignedBottomY : (calloutVignette.offsetY ?? alignedBottomY);
-              handleUpdateCallout({
-                offsetY: Math.round((currentY + dy) * 10) / 10,
-                alignBottom: false,
-              });
-              handled = true;
-            } else {
-              // Déplacement précis de la cible loupe (source) avec les flèches du clavier
-              const curX = calloutVignette.sourceX ?? 0;
-              const curY = calloutVignette.sourceY ?? 0;
-              handleUpdateCallout({
-                sourceX: Math.round((curX + dx) * 10) / 10,
-                sourceY: Math.round((curY + dy) * 10) / 10,
-              });
-              if (selectedCalloutPart !== 'source') {
-                setSelectedCalloutPart('source');
-              }
-              handled = true;
+            // En mode Callout : la vignette est fixe à 10px au-dessus du bord inférieur du screenshot.
+            // Les flèches du clavier déplacent avec précision la cible loupe (sourceX, sourceY)
+            const curX = calloutVignette.sourceX ?? 0;
+            const curY = calloutVignette.sourceY ?? 0;
+            handleUpdateCallout({
+              sourceX: Math.round((curX + dx) * 10) / 10,
+              sourceY: Math.round((curY + dy) * 10) / 10,
+            });
+            if (selectedCalloutPart !== 'source') {
+              setSelectedCalloutPart('source');
             }
+            handled = true;
           }
         }
 
