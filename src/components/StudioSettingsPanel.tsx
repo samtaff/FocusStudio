@@ -3263,7 +3263,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
                             >
                               <Split className="w-3 h-3" />
                               <span>
-                                Convertir en {(activeMask.multiplier.cols || 2) * (activeMask.multiplier.rows || 2)} formes distinctes
+                                Convertir en {(activeMask.multiplier.cols || 4) * (activeMask.multiplier.rows || 1)} formes distinctes
                               </span>
                             </button>
                           </div>

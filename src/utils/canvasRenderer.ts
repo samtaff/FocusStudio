@@ -239,8 +239,8 @@ export function calculateExportBounds(
 
   maskShapes.forEach((m) => {
     if (m.multiplier?.enabled) {
-      const cols = Math.max(1, m.multiplier.cols || 2);
-      const rows = Math.max(1, m.multiplier.rows || 2);
+      const cols = Math.max(1, m.multiplier.cols || 4);
+      const rows = Math.max(1, m.multiplier.rows || 1);
       const gapX = m.multiplier.gapX ?? 10;
       const gapY = m.multiplier.gapY ?? 10;
       const totalW = cols * m.width + (cols - 1) * gapX;
@@ -553,14 +553,22 @@ export function drawComposition(
         drawMaskHoverHighlight(ctx, mask);
       } else if (isSelected) {
         if (mask.multiplier?.enabled) {
-          const cols = Math.max(1, mask.multiplier.cols || 2);
-          const rows = Math.max(1, mask.multiplier.rows || 2);
+          const cols = Math.max(1, mask.multiplier.cols || 4);
+          const rows = Math.max(1, mask.multiplier.rows || 1);
           const gapX = mask.multiplier.gapX ?? 10;
           const gapY = mask.multiplier.gapY ?? 10;
           const totalW = cols * mask.width + (cols - 1) * gapX;
           const totalH = rows * mask.height + (rows - 1) * gapY;
+          const centerX = mask.x + totalW / 2;
+          const centerY = mask.y + totalH / 2;
+          const rot = mask.rotation || 0;
           
           ctx.save();
+          if (rot !== 0) {
+            ctx.translate(centerX, centerY);
+            ctx.rotate((rot * Math.PI) / 180);
+            ctx.translate(-centerX, -centerY);
+          }
           ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
           ctx.lineWidth = 1;
           ctx.setLineDash([3, 3]);
@@ -643,8 +651,8 @@ export function drawComposition(
       });
 
       maskShapes.filter(m => activeMaskIds.includes(m.id)).forEach(m => {
-        const mw = m.multiplier?.enabled ? (m.multiplier.cols || 2) * m.width + ((m.multiplier.cols || 2) - 1) * (m.multiplier.gapX ?? 10) : m.width;
-        const mh = m.multiplier?.enabled ? (m.multiplier.rows || 2) * m.height + ((m.multiplier.rows || 2) - 1) * (m.multiplier.gapY ?? 10) : m.height;
+        const mw = m.multiplier?.enabled ? (m.multiplier.cols || 4) * m.width + ((m.multiplier.cols || 4) - 1) * (m.multiplier.gapX ?? 10) : m.width;
+        const mh = m.multiplier?.enabled ? (m.multiplier.rows || 1) * m.height + ((m.multiplier.rows || 1) - 1) * (m.multiplier.gapY ?? 10) : m.height;
         bMinX = Math.min(bMinX, m.x);
         bMinY = Math.min(bMinY, m.y);
         bMaxX = Math.max(bMaxX, m.x + mw);
@@ -687,7 +695,15 @@ export function drawComposition(
       let rect: { x: number; y: number; width: number; height: number; rotation?: number } | null = null;
       if (hoveredRotationCorner.type === 'mask') {
         const m = maskShapes.find(s => s.id === hoveredRotationCorner.id);
-        if (m) rect = { x: m.x, y: m.y, width: m.width, height: m.height, rotation: m.rotation };
+        if (m) {
+          const cols = m.multiplier?.enabled ? Math.max(1, m.multiplier.cols || 4) : 1;
+          const rows = m.multiplier?.enabled ? Math.max(1, m.multiplier.rows || 1) : 1;
+          const gapX = m.multiplier?.gapX ?? 10;
+          const gapY = m.multiplier?.gapY ?? 10;
+          const totalW = m.multiplier?.enabled ? cols * m.width + (cols - 1) * gapX : m.width;
+          const totalH = m.multiplier?.enabled ? rows * m.height + (rows - 1) * gapY : m.height;
+          rect = { x: m.x, y: m.y, width: totalW, height: totalH, rotation: m.rotation };
+        }
       } else if (hoveredRotationCorner.type === 'triangle') {
         const t = triangles.find(s => s.id === hoveredRotationCorner.id);
         if (t) rect = { x: t.x, y: t.y, width: t.width || 15, height: t.height || 13, rotation: t.rotation };
@@ -1167,8 +1183,8 @@ function drawSingleMaskShape(
   const color = mask.color || BASE_COLOR;
   const opacity = mask.opacity ?? 1.0;
 
-  const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 2) : 1;
-  const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 2) : 1;
+  const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 4) : 1;
+  const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 1) : 1;
   const gapX = mask.multiplier?.gapX ?? 10;
   const gapY = mask.multiplier?.gapY ?? 10;
   const totalW = cols * mask.width + (cols - 1) * gapX;
@@ -1350,9 +1366,10 @@ function drawBlurHoverHighlight(ctx: CanvasRenderingContext2D, blur: BlurZone) {
  * High-visibility ergonomic hover highlight for Mask shape
  */
 function drawMaskHoverHighlight(ctx: CanvasRenderingContext2D, mask: MaskShape) {
-  const { x, y, width: w, height: h, borderRadius = 4, rotation = 0 } = mask;
-  const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 2) : 1;
-  const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 2) : 1;
+  const { x, y, width: w, height: h, rotation = 0 } = mask;
+  const borderRadius = Math.min(mask.borderRadius ?? 13, w / 2, h / 2);
+  const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 4) : 1;
+  const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 1) : 1;
   const gapX = mask.multiplier?.gapX ?? 10;
   const gapY = mask.multiplier?.gapY ?? 10;
   const totalW = cols * w + (cols - 1) * gapX;

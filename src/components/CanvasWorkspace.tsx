@@ -11,6 +11,7 @@ import {
   UserGuide,
   BlurZone,
   MaskShape,
+  MaskMultiplier,
   TriangleShape,
   CalloutVignette
 } from '../types';
@@ -330,6 +331,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     initialW: number;
     initialH: number;
     handle: ResizeHandle | null;
+    rotation?: number;
+    multiplier?: MaskMultiplier;
   } | null>(null);
   const [dragTriangleState, setDragTriangleState] = useState<{
     id: string;
@@ -577,21 +580,25 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             : `Repère X : ${newPos} px (${newPos - bounds.bgX >= 0 ? '+' : ''}${newPos - bounds.bgX} px)`,
         });
       } else if (dragRotateState) {
+        hasMovedRef.current = true;
         const { centerX, centerY, startAngle, initialRotation } = dragRotateState;
         const curAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
-        let delta = curAngle - startAngle;
+        const delta = curAngle - startAngle;
         let targetRot = Math.round(initialRotation + delta);
         while (targetRot > 180) targetRot -= 360;
         while (targetRot <= -180) targetRot += 360;
 
-        // Magnetic angle snapping (with shift: 15° steps; normal: 45° steps)
-        const snapAngles = e.shiftKey
-          ? [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, -15, -30, -45, -60, -75, -90, -105, -120, -135, -150, -165, -180]
-          : [0, 45, 90, 135, 180, -45, -90, -135];
-        for (const sa of snapAngles) {
-          if (Math.abs(targetRot - sa) <= (e.shiftKey ? 6 : 3.5)) {
-            targetRot = sa;
-            break;
+        if (e.shiftKey) {
+          targetRot = Math.round(targetRot / 15) * 15;
+          while (targetRot > 180) targetRot -= 360;
+          while (targetRot <= -180) targetRot += 360;
+        } else {
+          const snapAngles = [0, 45, 90, 135, 180, -45, -90, -135, -180];
+          for (const sa of snapAngles) {
+            if (Math.abs(targetRot - sa) <= 3) {
+              targetRot = sa === -180 ? 180 : sa;
+              break;
+            }
           }
         }
 
@@ -604,7 +611,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         setHudInfo({
           x: cx,
           y: cy,
-          text: `Angle : ${targetRot}°`,
+          text: `Angle : ${targetRot}°${e.shiftKey ? ' (Shift: 15°)' : ''}`,
         });
       }
     };
@@ -762,26 +769,39 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     return null;
   };
 
-  // Generic handle hit test
+  // Generic handle hit test (supports rotated shapes and small shapes cleanly)
   const getGenericHandleAtCoord = (
-    cx: number, 
-    cy: number, 
-    rect: { x: number; y: number; width: number; height: number }
+    cx: number,
+    cy: number,
+    rect: { x: number; y: number; width: number; height: number },
+    rotation = 0
   ): ResizeHandle | null => {
-    const tolerance = 8;
-    const handles: Record<ResizeHandle, { x: number; y: number }> = {
-      nw: { x: rect.x, y: rect.y },
-      n: { x: rect.x + rect.width / 2, y: rect.y },
-      ne: { x: rect.x + rect.width, y: rect.y },
-      w: { x: rect.x, y: rect.y + rect.height / 2 },
-      e: { x: rect.x + rect.width, y: rect.y + rect.height / 2 },
-      sw: { x: rect.x, y: rect.y + rect.height },
-      s: { x: rect.x + rect.width / 2, y: rect.y + rect.height },
-      se: { x: rect.x + rect.width, y: rect.y + rect.height },
-    };
-    for (const key of Object.keys(handles) as ResizeHandle[]) {
-      const pt = handles[key];
-      if (Math.abs(cx - pt.x) <= tolerance && Math.abs(cy - pt.y) <= tolerance) {
+    let lx = cx;
+    let ly = cy;
+    if (rotation !== 0) {
+      const centerX = rect.x + rect.width / 2;
+      const centerY = rect.y + rect.height / 2;
+      const rotRad = -((rotation * Math.PI) / 180);
+      const dx = cx - centerX;
+      const dy = cy - centerY;
+      lx = centerX + dx * Math.cos(rotRad) - dy * Math.sin(rotRad);
+      ly = centerY + dx * Math.sin(rotRad) + dy * Math.cos(rotRad);
+    }
+
+    // Adaptive circular hit radius so 32x32 shapes don't have overlapping corner & edge handles
+    const tolerance = Math.min(6, Math.max(4, Math.min(rect.width, rect.height) * 0.2));
+    const handles: [ResizeHandle, { x: number; y: number }][] = [
+      ['nw', { x: rect.x, y: rect.y }],
+      ['ne', { x: rect.x + rect.width, y: rect.y }],
+      ['sw', { x: rect.x, y: rect.y + rect.height }],
+      ['se', { x: rect.x + rect.width, y: rect.y + rect.height }],
+      ['n', { x: rect.x + rect.width / 2, y: rect.y }],
+      ['s', { x: rect.x + rect.width / 2, y: rect.y + rect.height }],
+      ['w', { x: rect.x, y: rect.y + rect.height / 2 }],
+      ['e', { x: rect.x + rect.width, y: rect.y + rect.height / 2 }],
+    ];
+    for (const [key, pt] of handles) {
+      if (Math.hypot(lx - pt.x, ly - pt.y) <= tolerance) {
         return key;
       }
     }
@@ -844,8 +864,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       const mLayer = m.layer === 'below' ? 'below' : 'above';
       if (layerFilter && mLayer !== layerFilter) continue;
 
-      const cols = m.multiplier?.enabled ? Math.max(1, m.multiplier.cols || 2) : 1;
-      const rows = m.multiplier?.enabled ? Math.max(1, m.multiplier.rows || 2) : 1;
+      const cols = m.multiplier?.enabled ? Math.max(1, m.multiplier.cols || 4) : 1;
+      const rows = m.multiplier?.enabled ? Math.max(1, m.multiplier.rows || 1) : 1;
       const gapX = m.multiplier?.gapX ?? 10;
       const gapY = m.multiplier?.gapY ?? 10;
       const totalW = cols * m.width + (cols - 1) * gapX;
@@ -925,8 +945,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     for (const mId of activeMaskIds) {
       const mask = maskShapes.find((m) => m.id === mId);
       if (!mask) continue;
-      const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 2) : 1;
-      const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 2) : 1;
+      const cols = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.cols || 4) : 1;
+      const rows = mask.multiplier?.enabled ? Math.max(1, mask.multiplier.rows || 1) : 1;
       const gapX = mask.multiplier?.gapX ?? 10;
       const gapY = mask.multiplier?.gapY ?? 10;
       const totalW = cols * mask.width + (cols - 1) * gapX;
@@ -944,28 +964,26 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       const halfW = totalW / 2;
       const halfH = totalH / 2;
 
-      const corners: { corner: 'nw' | 'ne' | 'se' | 'sw'; x: number; y: number }[] = [
-        { corner: 'nw', x: -halfW, y: -halfH },
-        { corner: 'ne', x: halfW, y: -halfH },
-        { corner: 'se', x: halfW, y: halfH },
-        { corner: 'sw', x: -halfW, y: halfH },
+      const corners: { corner: 'nw' | 'ne' | 'se' | 'sw'; x: number; y: number; inQuadrant: boolean }[] = [
+        { corner: 'nw', x: -halfW, y: -halfH, inQuadrant: lx <= -halfW + 3 && ly <= -halfH + 3 && (lx < -halfW - 1 || ly < -halfH - 1) },
+        { corner: 'ne', x: halfW, y: -halfH, inQuadrant: lx >= halfW - 3 && ly <= -halfH + 3 && (lx > halfW + 1 || ly < -halfH - 1) },
+        { corner: 'se', x: halfW, y: halfH, inQuadrant: lx >= halfW - 3 && ly >= halfH - 3 && (lx > halfW + 1 || ly > halfH + 1) },
+        { corner: 'sw', x: -halfW, y: halfH, inQuadrant: lx <= -halfW + 3 && ly >= halfH - 3 && (lx < -halfW - 1 || ly > halfH + 1) },
       ];
 
       for (const c of corners) {
+        if (!c.inQuadrant) continue;
         const dist = Math.hypot(lx - c.x, ly - c.y);
-        // Photoshop-style: cursor just outside the corner (between 3px and 18px)
-        if (dist >= 3 && dist <= 20) {
-          const isOutside = Math.abs(lx) >= halfW - 2 || Math.abs(ly) >= halfH - 2;
-          if (isOutside) {
-            return {
-              type: 'mask',
-              id: mask.id,
-              corner: c.corner,
-              centerX,
-              centerY,
-              initialRotation: rot,
-            };
-          }
+        // Photoshop-style: strictly outside the corner resize handle dot (6px..22px)
+        if (dist > 6 && dist <= 22) {
+          return {
+            type: 'mask',
+            id: mask.id,
+            corner: c.corner,
+            centerX,
+            centerY,
+            initialRotation: rot,
+          };
         }
       }
     }
@@ -990,27 +1008,25 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       const halfW = w / 2;
       const halfH = h / 2;
 
-      const corners: { corner: 'nw' | 'ne' | 'se' | 'sw'; x: number; y: number }[] = [
-        { corner: 'nw', x: -halfW, y: -halfH },
-        { corner: 'ne', x: halfW, y: -halfH },
-        { corner: 'se', x: halfW, y: halfH },
-        { corner: 'sw', x: -halfW, y: halfH },
+      const corners: { corner: 'nw' | 'ne' | 'se' | 'sw'; x: number; y: number; inQuadrant: boolean }[] = [
+        { corner: 'nw', x: -halfW, y: -halfH, inQuadrant: lx <= -halfW + 3 && ly <= -halfH + 3 && (lx < -halfW - 1 || ly < -halfH - 1) },
+        { corner: 'ne', x: halfW, y: -halfH, inQuadrant: lx >= halfW - 3 && ly <= -halfH + 3 && (lx > halfW + 1 || ly < -halfH - 1) },
+        { corner: 'se', x: halfW, y: halfH, inQuadrant: lx >= halfW - 3 && ly >= halfH - 3 && (lx > halfW + 1 || ly > halfH + 1) },
+        { corner: 'sw', x: -halfW, y: halfH, inQuadrant: lx <= -halfW + 3 && ly >= halfH - 3 && (lx < -halfW - 1 || ly > halfH + 1) },
       ];
 
       for (const c of corners) {
+        if (!c.inQuadrant) continue;
         const dist = Math.hypot(lx - c.x, ly - c.y);
-        if (dist >= 3 && dist <= 20) {
-          const isOutside = Math.abs(lx) >= halfW - 2 || Math.abs(ly) >= halfH - 2;
-          if (isOutside) {
-            return {
-              type: 'triangle',
-              id: tri.id,
-              corner: c.corner,
-              centerX,
-              centerY,
-              initialRotation: rot,
-            };
-          }
+        if (dist > 4 && dist <= 20) {
+          return {
+            type: 'triangle',
+            id: tri.id,
+            corner: c.corner,
+            centerX,
+            centerY,
+            initialRotation: rot,
+          };
         }
       }
     }
@@ -1172,54 +1188,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     const { x: cx, y: cy } = clientToCanvasCoord(e.clientX, e.clientY);
     setCanvasMousePos({ x: Math.round(cx), y: Math.round(cy) });
 
-    // Dragging Guide from Ruler or moving existing guide
-    if (draggingGuide) {
-      const newPos = draggingGuide.type === 'horizontal' ? Math.round(cy) : Math.round(cx);
-      setDraggingGuide((prev) => (prev ? { ...prev, position: newPos } : null));
-      setHudInfo({
-        x: cx,
-        y: cy,
-        text: draggingGuide.type === 'horizontal'
-          ? `Repère Y: ${newPos} px (${newPos - bounds.bgY >= 0 ? '+' : ''}${newPos - bounds.bgY} px)`
-          : `Repère X: ${newPos} px (${newPos - bounds.bgX >= 0 ? '+' : ''}${newPos - bounds.bgX} px)`,
-      });
-      return;
-    }
-
-    // Dragging Rotation (Photoshop-style corner rotation with Shift 15° snapping)
-    if (dragRotateState) {
-      const { centerX, centerY, startAngle, initialRotation } = dragRotateState;
-      const curAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
-      const delta = curAngle - startAngle;
-      let targetRot = Math.round(initialRotation + delta);
-      while (targetRot > 180) targetRot -= 360;
-      while (targetRot <= -180) targetRot += 360;
-
-      // Photoshop Shift snap: 15° increments (0°, 15°, 30°, 45°, 60°, 75°, 90°...)
-      if (e.shiftKey) {
-        targetRot = Math.round(targetRot / 15) * 15;
-      } else {
-        // Subtle magnetic snap to cardinal angles
-        const snapAngles = [0, 45, 90, 135, 180, -45, -90, -135];
-        for (const sa of snapAngles) {
-          if (Math.abs(targetRot - sa) <= 3) {
-            targetRot = sa;
-            break;
-          }
-        }
-      }
-
-      if (dragRotateState.type === 'mask') {
-        onUpdateMask(dragRotateState.id, { rotation: targetRot });
-      } else {
-        onUpdateTriangle?.(dragRotateState.id, { rotation: targetRot });
-      }
-
-      setHudInfo({
-        x: cx,
-        y: cy,
-        text: `Angle : ${targetRot}°${e.shiftKey ? ' (Shift: 15°)' : ''}`,
-      });
+    // Dragging Guide or Rotation is handled globally on window pointermove
+    if (draggingGuide || dragRotateState) {
       return;
     }
 
@@ -1317,11 +1287,11 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         if (h.includes('s')) newH = Math.max(10, dragBlurState.initialH + dy);
         if (h.includes('w')) {
           newW = Math.max(20, dragBlurState.initialW - dx);
-          newX = dragBlurState.initialX + dx;
+          newX = dragBlurState.initialX + (dragBlurState.initialW - newW);
         }
         if (h.includes('n')) {
           newH = Math.max(10, dragBlurState.initialH - dy);
-          newY = dragBlurState.initialY + dy;
+          newY = dragBlurState.initialY + (dragBlurState.initialH - newH);
         }
         onUpdateBlur(dragBlurState.id, { x: Math.round(newX), y: Math.round(newY), width: Math.round(newW), height: Math.round(newH) });
       } else {
@@ -1342,36 +1312,83 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       return;
     }
 
-    // Dragging Mask Shape (with Photoshop smart snapping)
+    // Dragging Mask Shape (supports rotated shapes, multiplied shapes, and Photoshop smart snapping)
     if (dragMaskState) {
       const dx = cx - dragMaskState.startX;
       const dy = cy - dragMaskState.startY;
+      const mult = dragMaskState.multiplier;
+      const cols = mult?.enabled ? Math.max(1, mult.cols || 4) : 1;
+      const rows = mult?.enabled ? Math.max(1, mult.rows || 1) : 1;
+      const gapX = mult?.enabled ? (mult.gapX ?? 10) : 0;
+      const gapY = mult?.enabled ? (mult.gapY ?? 10) : 0;
+
       if (dragMaskState.handle) {
         const h = dragMaskState.handle;
-        let newW = dragMaskState.initialW;
-        let newH = dragMaskState.initialH;
-        let newX = dragMaskState.initialX;
-        let newY = dragMaskState.initialY;
-        if (h.includes('e')) newW = Math.max(10, dragMaskState.initialW + dx);
-        if (h.includes('s')) newH = Math.max(10, dragMaskState.initialH + dy);
-        if (h.includes('w')) {
-          newW = Math.max(10, dragMaskState.initialW - dx);
-          newX = dragMaskState.initialX + dx;
+        const rot = dragMaskState.rotation || 0;
+        const rad = (rot * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        // Transform world delta into unrotated local space
+        const localDx = dx * cos + dy * sin;
+        const localDy = -dx * sin + dy * cos;
+
+        const initTotalW = cols * dragMaskState.initialW + (cols - 1) * gapX;
+        const initTotalH = rows * dragMaskState.initialH + (rows - 1) * gapY;
+        const minItemSize = 6;
+
+        let newItemW = dragMaskState.initialW;
+        if (h.includes('e') || h.includes('w')) {
+          const targetTotalW = h.includes('e') ? initTotalW + localDx : initTotalW - localDx;
+          newItemW = Math.max(minItemSize, Math.round((targetTotalW - (cols - 1) * gapX) / cols));
         }
-        if (h.includes('n')) {
-          newH = Math.max(10, dragMaskState.initialH - dy);
-          newY = dragMaskState.initialY + dy;
+
+        let newItemH = dragMaskState.initialH;
+        if (h.includes('s') || h.includes('n')) {
+          const targetTotalH = h.includes('s') ? initTotalH + localDy : initTotalH - localDy;
+          newItemH = Math.max(minItemSize, Math.round((targetTotalH - (rows - 1) * gapY) / rows));
         }
-        onUpdateMask(dragMaskState.id, { x: Math.round(newX), y: Math.round(newY), width: Math.round(newW), height: Math.round(newH) });
+
+        const newTotalW = cols * newItemW + (cols - 1) * gapX;
+        const newTotalH = rows * newItemH + (rows - 1) * gapY;
+        const dTotalW = newTotalW - initTotalW;
+        const dTotalH = newTotalH - initTotalH;
+
+        let localShiftX = 0;
+        if (h.includes('e')) localShiftX = dTotalW / 2;
+        else if (h.includes('w')) localShiftX = -dTotalW / 2;
+
+        let localShiftY = 0;
+        if (h.includes('s')) localShiftY = dTotalH / 2;
+        else if (h.includes('n')) localShiftY = -dTotalH / 2;
+
+        const worldShiftX = localShiftX * cos - localShiftY * sin;
+        const worldShiftY = localShiftX * sin + localShiftY * cos;
+
+        const initCenterX = dragMaskState.initialX + initTotalW / 2;
+        const initCenterY = dragMaskState.initialY + initTotalH / 2;
+        const newCenterX = initCenterX + worldShiftX;
+        const newCenterY = initCenterY + worldShiftY;
+
+        const rawNewX = newCenterX - newTotalW / 2;
+        const rawNewY = newCenterY - newTotalH / 2;
+        const newX = rot === 0 ? Math.round(rawNewX) : Math.round(rawNewX * 10) / 10;
+        const newY = rot === 0 ? Math.round(rawNewY) : Math.round(rawNewY * 10) / 10;
+
+        onUpdateMask(dragMaskState.id, { x: newX, y: newY, width: newItemW, height: newItemH });
         setHudInfo({
           x: cx,
           y: cy,
-          text: `L: ${Math.round(newW)} px  H: ${Math.round(newH)} px`,
+          text: mult?.enabled
+            ? `L: ${newItemW} px  H: ${newItemH} px (Grille ${Math.round(newTotalW)}×${Math.round(newTotalH)})`
+            : `L: ${newItemW} px  H: ${newItemH} px`,
         });
       } else {
+        const totalW = cols * dragMaskState.initialW + (cols - 1) * gapX;
+        const totalH = rows * dragMaskState.initialH + (rows - 1) * gapY;
         const rawX = Math.round(dragMaskState.initialX + dx);
         const rawY = Math.round(dragMaskState.initialY + dy);
-        const snap = calculateSmartSnaps(rawX, rawY, dragMaskState.initialW, dragMaskState.initialH, dragMaskState.id);
+        const snap = calculateSmartSnaps(rawX, rawY, totalW, totalH, dragMaskState.id);
         setActiveSnapGuides(snap.smartGuides);
         onUpdateMask(dragMaskState.id, {
           x: snap.snappedX,
@@ -1567,17 +1584,17 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (!foundHandle) {
       const selectedMask = maskShapes.find((m) => m.id === selectedMaskId);
       if (selectedMask && selectedMaskIds.length <= 1 && selectedFocusIds.length === 0 && selectedBlurIds.length === 0 && selectedTriangleIds.length === 0) {
-        let handleRect = selectedMask;
+        let handleRect = { x: selectedMask.x, y: selectedMask.y, width: selectedMask.width, height: selectedMask.height };
         if (selectedMask.multiplier?.enabled) {
-          const cols = Math.max(1, selectedMask.multiplier.cols || 2);
-          const rows = Math.max(1, selectedMask.multiplier.rows || 2);
+          const cols = Math.max(1, selectedMask.multiplier.cols || 4);
+          const rows = Math.max(1, selectedMask.multiplier.rows || 1);
           const gapX = selectedMask.multiplier.gapX ?? 10;
           const gapY = selectedMask.multiplier.gapY ?? 10;
           const totalW = cols * selectedMask.width + (cols - 1) * gapX;
           const totalH = rows * selectedMask.height + (rows - 1) * gapY;
           handleRect = { x: selectedMask.x, y: selectedMask.y, width: totalW, height: totalH };
         }
-        foundHandle = getGenericHandleAtCoord(cx, cy, handleRect) || getGenericHandleAtCoord(cx, cy, selectedMask);
+        foundHandle = getGenericHandleAtCoord(cx, cy, handleRect, selectedMask.rotation || 0);
       }
     }
     if (!foundHandle) {
@@ -1587,7 +1604,10 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
       }
     }
     setHoveredHandle(foundHandle);
-    if (foundHandle) return;
+    if (foundHandle) {
+      setHoveredRotationCorner(null);
+      return;
+    }
 
     // Photoshop-style corner rotation hover
     const rotCorner = getPhotoshopRotationCornerAtCoord(cx, cy);
@@ -1663,9 +1683,9 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         return;
       }
 
-      // Mask tool click to place a new blue mask on empty canvas
+      // Mask tool click to place a new 32x32 blue mask centered on cursor
       if (activeTool === 'mask') {
-        onAddMaskAt(Math.round(cx - 50), Math.round(cy - 20));
+        onAddMaskAt(Math.round(cx - 16), Math.round(cy - 16));
         onSelectTool('select');
         return;
       }
@@ -1689,34 +1709,6 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
 
     (document.activeElement as HTMLElement)?.blur?.();
 
-    // 0. Check if clicking Photoshop-style Corner Rotation on selected mask or triangle
-    const clickedRotCorner = getPhotoshopRotationCornerAtCoord(cx, cy);
-    if (clickedRotCorner) {
-      const { centerX, centerY, id, type, initialRotation } = clickedRotCorner;
-      const startAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
-      setDragRotateState({
-        id,
-        type,
-        centerX,
-        centerY,
-        startAngle,
-        initialRotation,
-      });
-      return;
-    }
-
-    // 0.b. Check if clicking existing guide line on canvas
-    const clickedGuide = getGuideAtCoord(cx, cy);
-    if (clickedGuide) {
-      setDraggingGuide({
-        type: clickedGuide.type,
-        position: clickedGuide.position,
-        isNew: false,
-        guideId: clickedGuide.id,
-      });
-      return;
-    }
-
     // 1. Check if clicking handles on selected Blur Zone (only when single blur is selected)
     const selectedBlur = blurZones.find((b) => b.id === selectedBlurId);
     if (selectedBlur && selectedBlurIds.length <= 1 && selectedFocusIds.length === 0 && selectedMaskIds.length === 0 && selectedTriangleIds.length === 0) {
@@ -1739,17 +1731,17 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     // 2. Check if clicking handles on selected Mask Shape (only when single mask is selected)
     const selectedMask = maskShapes.find((m) => m.id === selectedMaskId);
     if (selectedMask && selectedMaskIds.length <= 1 && selectedFocusIds.length === 0 && selectedBlurIds.length === 0 && selectedTriangleIds.length === 0) {
-      let handleRect = selectedMask;
+      let handleRect = { x: selectedMask.x, y: selectedMask.y, width: selectedMask.width, height: selectedMask.height };
       if (selectedMask.multiplier?.enabled) {
-        const cols = Math.max(1, selectedMask.multiplier.cols || 2);
-        const rows = Math.max(1, selectedMask.multiplier.rows || 2);
+        const cols = Math.max(1, selectedMask.multiplier.cols || 4);
+        const rows = Math.max(1, selectedMask.multiplier.rows || 1);
         const gapX = selectedMask.multiplier.gapX ?? 10;
         const gapY = selectedMask.multiplier.gapY ?? 10;
         const totalW = cols * selectedMask.width + (cols - 1) * gapX;
         const totalH = rows * selectedMask.height + (rows - 1) * gapY;
         handleRect = { x: selectedMask.x, y: selectedMask.y, width: totalW, height: totalH };
       }
-      const handle = getGenericHandleAtCoord(cx, cy, handleRect) || getGenericHandleAtCoord(cx, cy, selectedMask);
+      const handle = getGenericHandleAtCoord(cx, cy, handleRect, selectedMask.rotation || 0);
       if (handle) {
         setDragMaskState({
           id: selectedMask.id,
@@ -1760,9 +1752,39 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           initialW: selectedMask.width,
           initialH: selectedMask.height,
           handle,
+          rotation: selectedMask.rotation || 0,
+          multiplier: selectedMask.multiplier,
         });
         return;
       }
+    }
+
+    // 2.5. Check if clicking Photoshop-style Corner Rotation on selected mask or triangle
+    const clickedRotCorner = getPhotoshopRotationCornerAtCoord(cx, cy);
+    if (clickedRotCorner) {
+      const { centerX, centerY, id, type, initialRotation } = clickedRotCorner;
+      const startAngle = (Math.atan2(cy - centerY, cx - centerX) * 180) / Math.PI;
+      setDragRotateState({
+        id,
+        type,
+        centerX,
+        centerY,
+        startAngle,
+        initialRotation,
+      });
+      return;
+    }
+
+    // 2.6. Check if clicking existing guide line on canvas
+    const clickedGuide = getGuideAtCoord(cx, cy);
+    if (clickedGuide) {
+      setDraggingGuide({
+        type: clickedGuide.type,
+        position: clickedGuide.position,
+        isNew: false,
+        guideId: clickedGuide.id,
+      });
+      return;
     }
 
     // 3. Check if clicking handles of selected focus (only when single focus is selected)
@@ -1854,6 +1876,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         initialW: clickedMask.width,
         initialH: clickedMask.height,
         handle: null,
+        rotation: clickedMask.rotation || 0,
+        multiplier: clickedMask.multiplier,
       });
       return;
     }
@@ -1974,8 +1998,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         bMaxY = Math.max(bMaxY, b.y + b.height);
       });
       maskShapes.filter((m) => activeMIds.includes(m.id)).forEach((m) => {
-        const mw = m.multiplier?.enabled ? (m.multiplier.cols || 2) * m.width + ((m.multiplier.cols || 2) - 1) * (m.multiplier.gapX ?? 10) : m.width;
-        const mh = m.multiplier?.enabled ? (m.multiplier.rows || 2) * m.height + ((m.multiplier.rows || 2) - 1) * (m.multiplier.gapY ?? 10) : m.height;
+        const mw = m.multiplier?.enabled ? (m.multiplier.cols || 4) * m.width + ((m.multiplier.cols || 4) - 1) * (m.multiplier.gapX ?? 10) : m.width;
+        const mh = m.multiplier?.enabled ? (m.multiplier.rows || 1) * m.height + ((m.multiplier.rows || 1) - 1) * (m.multiplier.gapY ?? 10) : m.height;
         bMinX = Math.min(bMinX, m.x);
         bMinY = Math.min(bMinY, m.y);
         bMaxX = Math.max(bMaxX, m.x + mw);
@@ -2070,8 +2094,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
           .map((b) => b.id);
         const hitMaskIds = maskShapes
           .filter((m) => {
-            const mw = m.multiplier?.enabled ? (m.multiplier.cols || 2) * m.width + ((m.multiplier.cols || 2) - 1) * (m.multiplier.gapX ?? 10) : m.width;
-            const mh = m.multiplier?.enabled ? (m.multiplier.rows || 2) * m.height + ((m.multiplier.rows || 2) - 1) * (m.multiplier.gapY ?? 10) : m.height;
+            const mw = m.multiplier?.enabled ? (m.multiplier.cols || 4) * m.width + ((m.multiplier.cols || 4) - 1) * (m.multiplier.gapX ?? 10) : m.width;
+            const mh = m.multiplier?.enabled ? (m.multiplier.rows || 1) * m.height + ((m.multiplier.rows || 1) - 1) * (m.multiplier.gapY ?? 10) : m.height;
             return m.x + mw >= minX && m.x <= maxX && m.y + mh >= minY && m.y <= maxY;
           })
           .map((m) => m.id);
@@ -2220,21 +2244,36 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
     if (dragRotateState || hoveredRotationCorner) {
       return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 4C7.58 4 4 7.58 4 12' stroke='%23000' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M12 4C7.58 4 4 7.58 4 12' stroke='%23fff' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M14 2L11 4.5L14 7' fill='%23000'/%3E%3Cpath d='M14 2L11 4.5L14 7' stroke='%23fff' stroke-width='0.75' fill='%23000'/%3E%3Cpath d='M12 20C16.42 20 20 16.42 20 12' stroke='%23000' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M12 20C16.42 20 20 16.42 20 12' stroke='%23fff' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M10 22L13 19.5L10 17' fill='%23000'/%3E%3Cpath d='M10 22L13 19.5L10 17' stroke='%23fff' stroke-width='0.75' fill='%23000'/%3E%3C/svg%3E") 12 12, crosshair`;
     }
+    const getRotatedResizeCursor = (h: ResizeHandle, rotationDeg = 0) => {
+      const baseAngles: Record<ResizeHandle, number> = {
+        e: 0, se: 45, s: 90, sw: 135, w: 180, nw: 225, n: 270, ne: 315,
+      };
+      let angle = (baseAngles[h] + rotationDeg) % 180;
+      if (angle < 0) angle += 180;
+      if (angle < 22.5 || angle >= 157.5) return 'ew-resize';
+      if (angle < 67.5) return 'nwse-resize';
+      if (angle < 112.5) return 'ns-resize';
+      return 'nesw-resize';
+    };
+
     if (multiDragState) return 'move';
     if (marqueeState) return 'crosshair';
+    if (dragMaskState?.handle) {
+      return getRotatedResizeCursor(dragMaskState.handle, dragMaskState.rotation || 0);
+    }
+    if (dragBlurState?.handle) {
+      return getRotatedResizeCursor(dragBlurState.handle, 0);
+    }
     if (dragState?.isDragging || dragBlurState || dragMaskState || dragTriangleState) return 'move';
     if (dragState?.isResizing && dragState.handle) {
-      const h = dragState.handle;
-      if (h === 'nw' || h === 'se') return 'nwse-resize';
-      if (h === 'ne' || h === 'sw') return 'nesw-resize';
-      if (h === 'n' || h === 's') return 'ns-resize';
-      if (h === 'w' || h === 'e') return 'ew-resize';
+      return getRotatedResizeCursor(dragState.handle, 0);
     }
     if (hoveredHandle) {
-      if (hoveredHandle === 'nw' || hoveredHandle === 'se') return 'nwse-resize';
-      if (hoveredHandle === 'ne' || hoveredHandle === 'sw') return 'nesw-resize';
-      if (hoveredHandle === 'n' || hoveredHandle === 's') return 'ns-resize';
-      if (hoveredHandle === 'w' || hoveredHandle === 'e') return 'ew-resize';
+      const selectedMask = maskShapes.find((m) => m.id === selectedMaskId);
+      const activeRot = (selectedMask && selectedMaskIds.length <= 1 && selectedFocusIds.length === 0 && selectedBlurIds.length === 0 && selectedTriangleIds.length === 0)
+        ? (selectedMask.rotation || 0)
+        : 0;
+      return getRotatedResizeCursor(hoveredHandle, activeRot);
     }
 
     const activeF = selectedFocusIds.length > 0 ? selectedFocusIds : (selectedFocusId ? [selectedFocusId] : []);
@@ -2261,8 +2300,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
         bMaxY = Math.max(bMaxY, b.y + b.height);
       });
       maskShapes.filter((m) => activeM.includes(m.id)).forEach((m) => {
-        const mw = m.multiplier?.enabled ? (m.multiplier.cols || 2) * m.width + ((m.multiplier.cols || 2) - 1) * (m.multiplier.gapX ?? 10) : m.width;
-        const mh = m.multiplier?.enabled ? (m.multiplier.rows || 2) * m.height + ((m.multiplier.rows || 2) - 1) * (m.multiplier.gapY ?? 10) : m.height;
+        const mw = m.multiplier?.enabled ? (m.multiplier.cols || 4) * m.width + ((m.multiplier.cols || 4) - 1) * (m.multiplier.gapX ?? 10) : m.width;
+        const mh = m.multiplier?.enabled ? (m.multiplier.rows || 1) * m.height + ((m.multiplier.rows || 1) - 1) * (m.multiplier.gapY ?? 10) : m.height;
         bMinX = Math.min(bMinX, m.x);
         bMinY = Math.min(bMinY, m.y);
         bMaxX = Math.max(bMaxX, m.x + mw);
