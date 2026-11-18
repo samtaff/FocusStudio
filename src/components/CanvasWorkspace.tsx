@@ -237,8 +237,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const handleResizeRightPointerMove = (e: React.PointerEvent) => {
     if (!isResizingRightWidthRef.current || !onUpdateWorkspaceWidth) return;
     const delta = e.clientX - startXRightWidthRef.current;
-    const maxWidth = typeof window !== 'undefined' ? Math.max(800, window.innerWidth - 380) : 1600;
-    const newWidth = Math.min(maxWidth, Math.max(480, Math.round(startWidthRightValRef.current + delta)));
+    const maxWidth = typeof window !== 'undefined' ? Math.max(360, window.innerWidth - 360) : 1600;
+    const newWidth = Math.min(maxWidth, Math.max(360, Math.round(startWidthRightValRef.current + delta)));
     onUpdateWorkspaceWidth(newWidth);
   };
 
@@ -263,8 +263,8 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   const handleResizeLeftPointerMove = (e: React.PointerEvent) => {
     if (!isResizingLeftWidthRef.current || !onUpdateWorkspaceWidth) return;
     const delta = startXLeftWidthRef.current - e.clientX; // Dragging left increases width
-    const maxWidth = typeof window !== 'undefined' ? Math.max(800, window.innerWidth - 380) : 1600;
-    const newWidth = Math.min(maxWidth, Math.max(480, Math.round(startWidthLeftValRef.current + delta)));
+    const maxWidth = typeof window !== 'undefined' ? Math.max(360, window.innerWidth - 360) : 1600;
+    const newWidth = Math.min(maxWidth, Math.max(360, Math.round(startWidthLeftValRef.current + delta)));
     onUpdateWorkspaceWidth(newWidth);
   };
 
@@ -2350,15 +2350,13 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   return (
     <div 
       ref={containerRef}
-      className={`flex flex-col h-full max-h-[calc(100vh-7rem)] backdrop-blur-xl rounded-3xl relative select-none p-3.5 gap-3 transition-colors duration-200 shrink-0 ${
+      className={`flex flex-col w-full md:w-[var(--ws-width)] md:max-w-[calc(100vw-360px)] md:min-w-[min(420px,calc(100vw-380px))] min-h-[420px] md:min-h-0 h-full md:max-h-[calc(100vh-6rem)] backdrop-blur-xl rounded-3xl relative select-none p-2.5 sm:p-3.5 gap-2 sm:gap-3 transition-colors duration-200 shrink-0 ${
         isDarkMode
           ? 'bg-[#212121]/90 border border-[#333333] shadow-[0_8px_30px_rgba(0,0,0,0.4)] ring-1 ring-white/10 text-white'
           : 'bg-white/70 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-[#979797]/15 text-[#000000]'
       }`}
       style={{
-        width: workspaceWidth ? `${workspaceWidth}px` : undefined,
-        maxWidth: 'calc(100vw - 360px)',
-        minWidth: '480px',
+        ['--ws-width' as string]: workspaceWidth ? `${workspaceWidth}px` : '840px',
       }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}

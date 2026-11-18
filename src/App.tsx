@@ -2283,7 +2283,7 @@ export default function App() {
       />
 
       {/* Main Workspace Area */}
-      <div className="flex-1 flex justify-center items-start p-4 md:p-5 lg:p-6 gap-5 lg:gap-6 overflow-hidden relative min-h-0">
+      <div className="flex-1 flex flex-col md:flex-row justify-start md:justify-center items-center md:items-start p-2.5 sm:p-4 md:p-5 lg:p-6 gap-3 md:gap-5 lg:gap-6 overflow-y-auto md:overflow-hidden relative min-h-0">
         {/* Center Canvas */}
         <CanvasWorkspace
           workspaceWidth={workspacePanelWidth}

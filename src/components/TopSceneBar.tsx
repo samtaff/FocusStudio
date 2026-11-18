@@ -89,13 +89,17 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
   }, []);
 
   const isCompact = barWidth < 960;
-  const isNarrow = barWidth < 760;
-  const isUltraNarrow = barWidth < 620;
+  const isNarrow = barWidth < 740;
+  const isUltraNarrow = barWidth < 560;
 
   return (
     <div 
       ref={barRef}
-      className={`w-full backdrop-blur-xl rounded-2xl px-2.5 py-1.5 flex flex-nowrap items-center justify-between gap-1.5 text-xs select-none transition-colors duration-200 overflow-x-auto no-scrollbar shrink-0 ${
+      className={`w-full backdrop-blur-xl rounded-2xl transition-colors duration-200 select-none shrink-0 flex items-center justify-between ${
+        isUltraNarrow
+          ? 'flex-wrap gap-1 px-2 py-1.5 text-[11px]'
+          : 'flex-nowrap gap-1.5 px-2.5 py-1.5 text-xs overflow-x-auto no-scrollbar'
+      } ${
         isDarkMode
           ? 'bg-[#282828]/95 border border-[#383838] text-[#cccccc] shadow-2xs'
           : 'bg-white/70 border border-[#eeeeee] text-[#666666] shadow-xs'
@@ -196,7 +200,7 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
       </div>
 
       {/* Center Controls (Handles, Rulers, Snap, Grid, Nudge) */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className={`flex items-center ${isUltraNarrow ? 'gap-0.5' : 'gap-1'} shrink-0`}>
         {/* Poignées ON / OFF */}
         <button
           id="btn-toggle-handles"
@@ -330,7 +334,7 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
       </div>
 
       {/* Right: Zoom controls & Recentrer - ALWAYS PINNED & NEVER CUT OFF */}
-      <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+      <div className={`flex items-center ${isUltraNarrow ? 'gap-1' : 'gap-1.5'} shrink-0 ml-auto`}>
         <div className={`flex items-center rounded-full p-0.5 text-[11px] border shrink-0 ${
           isDarkMode ? 'bg-[#353535] border-[#444444]' : 'bg-[#eeeeee]/80 border-transparent'
         }`}>
@@ -345,7 +349,7 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
           </button>
 
           {/* Saisie directe du niveau de zoom */}
-          <div className={`${isNarrow ? 'w-11' : 'w-13'} mx-0.5`}>
+          <div className={`${isUltraNarrow ? 'w-10' : isNarrow ? 'w-11' : 'w-13'} mx-0.5`}>
             <NumericInput
               value={Math.round(zoomLevel * 100)}
               onChange={(val) => {
