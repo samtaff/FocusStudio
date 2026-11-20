@@ -57,14 +57,11 @@ export const Header: React.FC<HeaderProps> = ({
           ? 'border-[#2d2d2d] bg-[#212121]/95 backdrop-blur-xl text-white shadow-[0_1px_4px_rgba(0,0,0,0.4)]'
           : 'border-[#eeeeee] bg-white/70 backdrop-blur-xl text-[#000000] shadow-[0_1px_3px_rgba(0,0,0,0.03)]'
     }`}>
-      {/* Subtle neon gradient hairline along bottom edge in GTA 6 theme */}
+      {/* Subtle animated neon gradient hairline along bottom edge in GTA 6 theme */}
       {isGta6 && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-[1.5px] opacity-85"
-          style={{
-            background: 'linear-gradient(90deg, rgba(44,229,229,0.2) 0%, rgba(44,229,229,0.85) 28%, rgba(255,62,157,0.95) 60%, rgba(255,140,66,0.8) 85%, rgba(255,62,157,0.2) 100%)',
-          }}
+          className="gta6-neon-hairline pointer-events-none absolute inset-x-0 bottom-0 h-[1.5px] opacity-90"
         />
       )}
       {/* Brand & Logo */}

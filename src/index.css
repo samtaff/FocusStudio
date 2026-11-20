@@ -77,8 +77,8 @@ body.dark-mode:not(.gta6-mode) {
   color: #ffffff;
 }
 
-.dark aside,
-body.dark-mode aside {
+.dark:not(.gta6-mode) aside,
+body.dark-mode:not(.gta6-mode) aside {
   background-color: rgba(33, 33, 33, 0.95) !important;
   border-color: #333333 !important;
   color: #ffffff !important;
@@ -385,16 +385,93 @@ body.gta6-mode {
   color: #ffffff;
 }
 
+@keyframes gta6HairlineFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes gta6HeaderNeonPulse {
+  0%, 100% {
+    border-bottom-color: rgba(255, 62, 157, 0.58);
+    box-shadow:
+      0 4px 24px rgba(24, 8, 46, 0.25),
+      0 1px 18px rgba(255, 62, 157, 0.34),
+      0 1px 10px rgba(44, 229, 229, 0.18);
+  }
+  50% {
+    border-bottom-color: rgba(44, 229, 229, 0.62);
+    box-shadow:
+      0 4px 24px rgba(24, 8, 46, 0.25),
+      0 1px 18px rgba(44, 229, 229, 0.32),
+      0 1px 12px rgba(255, 140, 66, 0.22);
+  }
+}
+
+@keyframes gta6PanelNeonPulse {
+  0%, 100% {
+    border-color: rgba(255, 105, 185, 0.56);
+    box-shadow:
+      0 10px 34px rgba(20, 6, 38, 0.26),
+      0 0 20px rgba(255, 62, 157, 0.28),
+      0 0 10px rgba(44, 229, 229, 0.14),
+      inset 0 0 0 1px rgba(44, 229, 229, 0.16);
+  }
+  50% {
+    border-color: rgba(44, 229, 229, 0.52);
+    box-shadow:
+      0 10px 34px rgba(20, 6, 38, 0.26),
+      0 0 20px rgba(44, 229, 229, 0.24),
+      0 0 12px rgba(255, 140, 66, 0.18),
+      inset 0 0 0 1px rgba(255, 62, 157, 0.2);
+  }
+}
+
+@keyframes gta6ToolbarNeonPulse {
+  0%, 100% {
+    border-color: rgba(44, 229, 229, 0.52);
+    box-shadow:
+      0 8px 26px rgba(20, 6, 38, 0.26),
+      0 0 16px rgba(44, 229, 229, 0.24),
+      0 0 8px rgba(255, 62, 157, 0.14);
+  }
+  50% {
+    border-color: rgba(255, 92, 175, 0.54);
+    box-shadow:
+      0 8px 26px rgba(20, 6, 38, 0.26),
+      0 0 16px rgba(255, 62, 157, 0.24),
+      0 0 10px rgba(255, 140, 66, 0.16);
+  }
+}
+
+.gta6-neon-hairline {
+  background: linear-gradient(
+    90deg,
+    rgba(44, 229, 229, 0.35) 0%,
+    rgba(44, 229, 229, 0.95) 22%,
+    rgba(255, 62, 157, 0.98) 50%,
+    rgba(255, 140, 66, 0.92) 76%,
+    rgba(44, 229, 229, 0.4) 100%
+  );
+  background-size: 200% 100%;
+  animation: gta6HairlineFlow 6s ease-in-out infinite;
+}
+
 /* Header subtle neon border & luminous frosted glass over sunset */
 body.gta6-mode header.gta6-header {
   background: rgba(44, 21, 72, 0.56) !important;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border-bottom: 1px solid rgba(255, 92, 175, 0.52) !important;
-  box-shadow:
-    0 4px 24px rgba(24, 8, 46, 0.25),
-    0 1px 16px rgba(255, 62, 157, 0.28),
-    0 1px 10px rgba(44, 229, 229, 0.2) !important;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: rgba(255, 92, 175, 0.52);
+  animation: gta6HeaderNeonPulse 6.5s ease-in-out infinite;
 }
 
 /* Panels (CanvasWorkspace, StudioSettingsPanel, PreviewModal) frosted glass + subtle neon borders */
@@ -403,12 +480,11 @@ body.gta6-mode aside.gta6-panel {
   background: rgba(38, 17, 64, 0.52) !important;
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 105, 185, 0.5) !important;
-  box-shadow:
-    0 10px 34px rgba(20, 6, 38, 0.26),
-    0 0 18px rgba(255, 62, 157, 0.22),
-    0 0 10px rgba(44, 229, 229, 0.16),
-    inset 0 0 0 1px rgba(44, 229, 229, 0.18) !important;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(255, 105, 185, 0.5);
+  color: #ffffff;
+  animation: gta6PanelNeonPulse 7s ease-in-out infinite;
 }
 
 /* Inner canvas viewport frame */
@@ -425,11 +501,20 @@ body.gta6-mode .gta6-toolbar {
   background: rgba(46, 20, 76, 0.58) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(44, 229, 229, 0.45) !important;
-  box-shadow:
-    0 8px 26px rgba(20, 6, 38, 0.26),
-    0 0 14px rgba(44, 229, 229, 0.2),
-    0 0 8px rgba(255, 62, 157, 0.15) !important;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(44, 229, 229, 0.45);
+  animation: gta6ToolbarNeonPulse 5.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gta6-neon-hairline,
+  body.gta6-mode header.gta6-header,
+  body.gta6-mode .gta6-panel,
+  body.gta6-mode aside.gta6-panel,
+  body.gta6-mode .gta6-toolbar {
+    animation: none !important;
+  }
 }
 
 /* Lighten dark inner cards/pills inside StudioSettingsPanel & TopSceneBar in GTA 6 mode */
