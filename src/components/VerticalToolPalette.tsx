@@ -691,7 +691,7 @@ export const VerticalToolPalette: React.FC<VerticalToolPaletteProps> = ({
       onPointerUp={handlePointerUp}
       onMouseEnter={handleMenuMouseEnter}
       onMouseLeave={handleMenuMouseLeave}
-      className={`vertical-tool-palette fixed z-50 backdrop-blur-2xl transition-colors select-none ${
+      className={`vertical-tool-palette gta6-toolbar fixed z-50 backdrop-blur-2xl transition-colors select-none ${
         isHorizontal
           ? 'rounded-2xl px-2 py-1.5 flex flex-row flex-wrap items-center justify-center gap-1 max-w-[calc(100vw-16px)]'
           : isTwoCol

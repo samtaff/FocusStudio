@@ -263,7 +263,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         Glassmorphism with low opacity, refined backdrop-blur, elegant borders and shadows
       */}
       <div 
-        className={`relative flex flex-col w-full max-w-3xl h-[84vh] max-h-[780px] rounded-3xl overflow-hidden transition-all backdrop-blur-2xl border ${
+        className={`gta6-panel relative flex flex-col w-full max-w-3xl h-[84vh] max-h-[780px] rounded-3xl overflow-hidden transition-all backdrop-blur-2xl border ${
           isDarkMode
             ? 'bg-[#181818]/45 border-white/15 text-white shadow-[0_25px_60px_-10px_rgba(0,0,0,0.7)]'
             : 'bg-white/45 border-white/70 text-[#111111] shadow-[0_20px_50px_-10px_rgba(0,0,0,0.18)]'

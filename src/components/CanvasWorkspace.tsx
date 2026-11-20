@@ -2350,7 +2350,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
   return (
     <div 
       ref={containerRef}
-      className={`flex flex-col w-full md:w-[var(--ws-width)] md:max-w-[calc(100vw-360px)] md:min-w-[min(420px,calc(100vw-380px))] min-h-[420px] md:min-h-0 h-full md:max-h-[calc(100vh-6rem)] backdrop-blur-xl rounded-3xl relative select-none p-2.5 sm:p-3.5 gap-2 sm:gap-3 transition-colors duration-200 shrink-0 ${
+      className={`gta6-panel flex flex-col w-full md:w-[var(--ws-width)] md:max-w-[calc(100vw-360px)] md:min-w-[min(420px,calc(100vw-380px))] min-h-[420px] md:min-h-0 h-full md:max-h-[calc(100vh-6rem)] backdrop-blur-xl rounded-3xl relative select-none p-2.5 sm:p-3.5 gap-2 sm:gap-3 transition-colors duration-200 shrink-0 ${
         isDarkMode
           ? 'bg-[#212121]/90 border border-[#333333] shadow-[0_8px_30px_rgba(0,0,0,0.4)] ring-1 ring-white/10 text-white'
           : 'bg-white/70 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-[#979797]/15 text-[#000000]'
@@ -2438,7 +2438,7 @@ export const CanvasWorkspace: React.FC<CanvasWorkspaceProps> = ({
             setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
           }
         }}
-        className={`flex-1 relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border transition-colors duration-200 ${
+        className={`gta6-inner-viewport flex-1 relative flex flex-col items-center justify-center overflow-hidden rounded-2xl border transition-colors duration-200 ${
           isDarkMode
             ? 'bg-[#181818] border-[#2c2c2c] shadow-inner'
             : 'bg-[#eeeeee]/40 border-white/60 shadow-inner'

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
+  AppTheme,
   FocusZone, 
   LoadedImage, 
   DetectedElement, 
@@ -52,36 +53,59 @@ export default function App() {
   const [calloutVignette, setCalloutVignette] = useState<CalloutVignette | null>(null);
   const [selectedCalloutPart, setSelectedCalloutPart] = useState<'source' | 'vignette' | null>(null);
 
-  // Dark Mode State (#212121)
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+  // Theme State ('light' | 'dark' | 'gta6')
+  const [theme, setTheme] = useState<AppTheme>(() => {
     try {
-      const saved = localStorage.getItem('focus_studio_dark_mode');
-      if (saved !== null) return JSON.parse(saved);
-      return false;
+      const savedTheme = localStorage.getItem('focus_studio_theme');
+      if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'gta6') {
+        return savedTheme;
+      }
+      const savedDark = localStorage.getItem('focus_studio_dark_mode');
+      if (savedDark !== null) return JSON.parse(savedDark) ? 'dark' : 'light';
+      return 'light';
     } catch {
-      return false;
+      return 'light';
     }
   });
 
+  const isDarkMode = theme !== 'light';
+
+  const handleSelectTheme = useCallback((nextTheme: AppTheme) => {
+    setTheme(nextTheme);
+    try {
+      localStorage.setItem('focus_studio_theme', nextTheme);
+      localStorage.setItem('focus_studio_dark_mode', JSON.stringify(nextTheme !== 'light'));
+    } catch {}
+  }, []);
+
   const handleToggleDarkMode = useCallback(() => {
-    setIsDarkMode((prev) => {
-      const next = !prev;
+    setTheme((prev) => {
+      const next: AppTheme = prev === 'light' ? 'dark' : prev === 'dark' ? 'gta6' : 'light';
       try {
-        localStorage.setItem('focus_studio_dark_mode', JSON.stringify(next));
+        localStorage.setItem('focus_studio_theme', next);
+        localStorage.setItem('focus_studio_dark_mode', JSON.stringify(next !== 'light'));
       } catch {}
       return next;
     });
   }, []);
 
   useEffect(() => {
-    if (isDarkMode) {
+    if (theme !== 'light') {
       document.documentElement.classList.add('dark');
       document.body.classList.add('dark-mode');
     } else {
       document.documentElement.classList.remove('dark');
       document.body.classList.remove('dark-mode');
     }
-  }, [isDarkMode]);
+
+    if (theme === 'gta6') {
+      document.documentElement.classList.add('gta6-mode');
+      document.body.classList.add('gta6-mode');
+    } else {
+      document.documentElement.classList.remove('gta6-mode');
+      document.body.classList.remove('gta6-mode');
+    }
+  }, [theme]);
 
 
   // Internal screenshot framing (recadrage du screenshot dans la zone focus sans altérer l'original)
@@ -2264,11 +2288,25 @@ export default function App() {
   const selectedFocus = focuses.find((f) => f.id === selectedFocusId) || null;
 
   return (
-    <div className={`h-screen w-screen flex flex-col overflow-hidden font-sans antialiased transition-colors duration-200 ${
-      isDarkMode 
-        ? 'bg-[#212121] text-white' 
-        : 'bg-gradient-to-br from-[#fdfbfb] to-[#ebedee] text-[#000000]'
-    }`}>
+    <div
+      className={`h-screen w-screen flex flex-col overflow-hidden font-sans antialiased transition-colors duration-200 ${
+        theme === 'gta6'
+          ? 'text-white'
+          : isDarkMode 
+            ? 'bg-[#212121] text-white' 
+            : 'bg-gradient-to-br from-[#fdfbfb] to-[#ebedee] text-[#000000]'
+      }`}
+      style={
+        theme === 'gta6'
+          ? {
+              backgroundImage: "url('/assets/aistudio/gta-6-teaser-3840x2160-13559_ed57f9d3.png')",
+              backgroundSize: 'cover',
+              backgroundPosition: 'center center',
+              backgroundRepeat: 'no-repeat',
+            }
+          : undefined
+      }
+    >
       {/* Top Header */}
       <Header
         onImportFile={handleImportFile}
@@ -2278,6 +2316,8 @@ export default function App() {
         copied={copied}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         hasImage={!!image}
+        theme={theme}
+        onSelectTheme={handleSelectTheme}
         isDarkMode={isDarkMode}
         onToggleDarkMode={handleToggleDarkMode}
       />

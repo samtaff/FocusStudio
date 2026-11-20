@@ -2,6 +2,8 @@
  * Types for the Focus technical visual procedure generator
  */
 
+export type AppTheme = 'light' | 'dark' | 'gta6';
+
 export interface FocusZone {
   id: string;
   name: string; // e.g., "Focus 1", "Empreintes"

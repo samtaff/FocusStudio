@@ -95,7 +95,7 @@ export const TopSceneBar: React.FC<TopSceneBarProps> = ({
   return (
     <div 
       ref={barRef}
-      className={`w-full backdrop-blur-xl rounded-2xl transition-colors duration-200 select-none shrink-0 flex items-center justify-between ${
+      className={`gta6-toolbar w-full backdrop-blur-xl rounded-2xl transition-colors duration-200 select-none shrink-0 flex items-center justify-between ${
         isUltraNarrow
           ? 'flex-wrap gap-1 px-2 py-1.5 text-[11px]'
           : 'flex-nowrap gap-1.5 px-2.5 py-1.5 text-xs overflow-x-auto no-scrollbar'

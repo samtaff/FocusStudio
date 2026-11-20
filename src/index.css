@@ -14,8 +14,8 @@
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
-  body.dark-mode,
-  html.dark body {
+  body.dark-mode:not(.gta6-mode),
+  html.dark:not(.gta6-mode) body:not(.gta6-mode) {
     color: #ffffff;
     background: #212121 !important;
   }
@@ -71,8 +71,8 @@ html.dark .photoshop-checkerboard {
 }
 
 /* Dark Mode Enhancements for #212121 theme */
-html.dark,
-body.dark-mode {
+html.dark:not(.gta6-mode),
+body.dark-mode:not(.gta6-mode) {
   background-color: #212121 !important;
   color: #ffffff;
 }
@@ -371,6 +371,131 @@ body.dark-mode aside .hover\:bg-\[\#eeeeee\]\/40:hover {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ========================================================= */
+/* GTA 6 (Vice City / Leonida) Sunset Neon Theme             */
+/* ========================================================= */
+html.gta6-mode,
+html.gta6-mode body,
+body.gta6-mode {
+  background:
+    url('/assets/aistudio/gta-6-teaser-3840x2160-13559_ed57f9d3.png') center center / cover no-repeat fixed,
+    linear-gradient(135deg, #4f4685 0%, #b35d99 48%, #ffb46b 100%) !important;
+  color: #ffffff;
+}
+
+/* Header subtle neon border & luminous frosted glass over sunset */
+body.gta6-mode header.gta6-header {
+  background: rgba(44, 21, 72, 0.56) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(255, 92, 175, 0.52) !important;
+  box-shadow:
+    0 4px 24px rgba(24, 8, 46, 0.25),
+    0 1px 16px rgba(255, 62, 157, 0.28),
+    0 1px 10px rgba(44, 229, 229, 0.2) !important;
+}
+
+/* Panels (CanvasWorkspace, StudioSettingsPanel, PreviewModal) frosted glass + subtle neon borders */
+body.gta6-mode .gta6-panel,
+body.gta6-mode aside.gta6-panel {
+  background: rgba(38, 17, 64, 0.52) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 105, 185, 0.5) !important;
+  box-shadow:
+    0 10px 34px rgba(20, 6, 38, 0.26),
+    0 0 18px rgba(255, 62, 157, 0.22),
+    0 0 10px rgba(44, 229, 229, 0.16),
+    inset 0 0 0 1px rgba(44, 229, 229, 0.18) !important;
+}
+
+/* Inner canvas viewport frame */
+body.gta6-mode .gta6-inner-viewport {
+  background: rgba(24, 10, 44, 0.34) !important;
+  border: 1px solid rgba(44, 229, 229, 0.36) !important;
+  box-shadow:
+    inset 0 0 20px rgba(20, 8, 40, 0.2),
+    0 0 12px rgba(44, 229, 229, 0.12) !important;
+}
+
+/* Floating & Top Toolbars frosted glass + cyan/magenta neon rim */
+body.gta6-mode .gta6-toolbar {
+  background: rgba(46, 20, 76, 0.58) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(44, 229, 229, 0.45) !important;
+  box-shadow:
+    0 8px 26px rgba(20, 6, 38, 0.26),
+    0 0 14px rgba(44, 229, 229, 0.2),
+    0 0 8px rgba(255, 62, 157, 0.15) !important;
+}
+
+/* Lighten dark inner cards/pills inside StudioSettingsPanel & TopSceneBar in GTA 6 mode */
+body.gta6-mode aside .bg-\[\#252525\],
+body.gta6-mode aside .bg-\[\#262626\],
+body.gta6-mode aside .bg-\[\#282828\],
+body.gta6-mode aside .bg-\[\#2a2a2a\],
+body.gta6-mode aside .bg-\[\#2d2d2d\],
+body.gta6-mode aside .bg-\[\#333333\],
+body.gta6-mode aside .rounded-2xl.border-white,
+body.gta6-mode .gta6-toolbar .bg-\[\#353535\],
+body.gta6-mode header.gta6-header .bg-\[\#2d2d2d\],
+body.gta6-mode header.gta6-header .bg-\[\#2b2b2b\] {
+  background-color: rgba(74, 36, 114, 0.62) !important;
+  border-color: rgba(255, 110, 185, 0.26) !important;
+}
+
+body.gta6-mode aside .text-\[\#666666\],
+body.gta6-mode aside .text-\[\#979797\],
+body.gta6-mode aside .text-\[\#aaaaaa\] {
+  color: #e4d4f7 !important;
+}
+
+/* Keep active Vice City accent crisp and vibrant */
+body.gta6-mode .vertical-tool-palette button.vertical-tool-btn.is-active,
+body.gta6-mode .gta6-toolbar button[class*="bg-[#0088cc]"] {
+  background: linear-gradient(135deg, #ff3e9d 0%, #ff8c42 100%) !important;
+  border-color: rgba(255, 170, 100, 0.85) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(255, 62, 157, 0.48) !important;
+}
+
+body.gta6-mode aside .bg-\[\#0088cc\],
+body.gta6-mode aside button[class*="bg-[#0088cc]"] {
+  background: linear-gradient(135deg, #ff3e9d 0%, #ff7a59 100%) !important;
+  border-color: rgba(255, 110, 185, 0.8) !important;
+  box-shadow: 0 0 10px rgba(255, 62, 157, 0.36) !important;
+}
+
+body.gta6-mode aside .text-\[\#0088cc\],
+body.gta6-mode .gta6-toolbar .text-\[\#0088cc\] {
+  color: #4af2f2 !important;
+}
+
+body.gta6-mode aside .border-\[\#eeeeee\],
+body.gta6-mode aside .border-\[\#333333\] {
+  border-color: rgba(255, 92, 175, 0.26) !important;
+}
+
+body.gta6-mode aside input:not([type="range"]),
+body.gta6-mode aside select {
+  background-color: rgba(42, 20, 72, 0.78) !important;
+  border-color: rgba(44, 229, 229, 0.34) !important;
+}
+
+body.gta6-mode aside input:not([type="range"]):focus,
+body.gta6-mode aside select:focus {
+  border-color: rgba(255, 62, 157, 0.85) !important;
+  box-shadow: 0 0 10px rgba(255, 62, 157, 0.3) !important;
+}
+
+body.gta6-mode ::-webkit-scrollbar-thumb {
+  background: rgba(255, 62, 157, 0.45);
+}
+body.gta6-mode ::-webkit-scrollbar-thumb:hover {
+  background: rgba(44, 229, 229, 0.65);
 }
 
 

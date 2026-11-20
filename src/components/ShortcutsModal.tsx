@@ -33,7 +33,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-      <div className="bg-white/90 dark:bg-[#212121]/95 backdrop-blur-2xl border border-white/60 dark:border-[#383838] rounded-3xl shadow-2xl max-w-md w-full p-6 text-[#000000] dark:text-white transition-colors">
+      <div className="gta6-panel bg-white/90 dark:bg-[#212121]/95 backdrop-blur-2xl border border-white/60 dark:border-[#383838] rounded-3xl shadow-2xl max-w-md w-full p-6 text-[#000000] dark:text-white transition-colors">
         <div className="flex items-center justify-between pb-3 border-b border-[#eeeeee] dark:border-[#333333]">
           <div className="flex items-center gap-2">
             <Keyboard className="w-5 h-5 text-[#0088cc]" />

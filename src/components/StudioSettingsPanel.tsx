@@ -361,7 +361,7 @@ export const StudioSettingsPanel: React.FC<StudioSettingsPanelProps> = ({
 
   return (
     <aside
-      className={`relative backdrop-blur-xl rounded-3xl flex flex-col h-fit max-h-none md:max-h-[calc(100vh-6rem)] overflow-y-auto select-none shrink-0 z-20 text-xs self-stretch md:self-start w-full md:w-[var(--panel-w)] max-w-full md:max-w-[calc(100vw-2rem)] transition-colors duration-200 ${
+      className={`gta6-panel relative backdrop-blur-xl rounded-3xl flex flex-col h-fit max-h-none md:max-h-[calc(100vh-6rem)] overflow-y-auto select-none shrink-0 z-20 text-xs self-stretch md:self-start w-full md:w-[var(--panel-w)] max-w-full md:max-w-[calc(100vw-2rem)] transition-colors duration-200 ${
         isDarkMode
           ? 'bg-[#212121]/95 border border-[#333333] shadow-[0_8px_30px_rgba(0,0,0,0.4)] ring-1 ring-white/10 text-white'
           : 'bg-white/70 border border-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-[#979797]/15 text-[#000000]'
